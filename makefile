@@ -1,7 +1,8 @@
 # compiler options
 #--------------------------------------------
 COMPILER = g++
-FLAGS = -std=c++11 -fopenmp -O3 -g -Wno-unused-result -lstdc++ -lm -lz
+LDFLAGS = -lm -lz -lstdc++
+FLAGS = -std=c++11 -fopenmp -O3 -g -Wno-unused-result
 
 # project files
 #--------------------------------------------
@@ -18,7 +19,7 @@ build/%.o: src/%.cpp
 	$(COMPILER) $(FLAGS) -c src/$*.cpp -o build/$*.o
 
 $(PROGRAM): $(OBJECTS)
-	$(COMPILER) $(FLAGS) -o $@ $+
+	$(COMPILER) $(FLAGS) $+ $(LDFLAGS) -o $@
 
 clean:
 	rm -f $(PROGRAM) $(OBJECTS)
