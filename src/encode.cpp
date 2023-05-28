@@ -3,7 +3,7 @@
 void
 kmerEncodingBPCompute(const char* seq, uint64_t& enc_bp)
 {
-  for (int i = 0; i < (unsigned)strlen(seq); i++) {
+  for (unsigned int i = 0; i < (unsigned)strlen(seq); i++) {
     enc_bp = enc_bp << 2;
     if (seq[i] == 'T') {
       enc_bp += 3;
@@ -20,7 +20,7 @@ kmerEncodingBPCompute(const char* seq, uint64_t& enc_bp)
 void
 kmerEncodingCompute(const char* seq, uint64_t& enc_lr, uint64_t& enc_bp)
 {
-  for (int i = 0; i < (unsigned)strlen(seq); i++) {
+  for (unsigned int i = 0; i < (unsigned)strlen(seq); i++) {
     enc_lr = enc_lr << 1;
     enc_bp = enc_bp << 2;
     if (seq[i] == 'T') {
@@ -42,7 +42,7 @@ kmerEncodingCompute(const char* seq, uint64_t& enc_lr, uint64_t& enc_bp)
 void
 kmerEncodingComputeC(const char* seq, uint64_t& enc_lr, uint64_t& enc_bp)
 {
-  for (int i = 0; i < (unsigned)strlen(seq); i++) {
+  for (unsigned int i = 0; i < (unsigned)strlen(seq); i++) {
     enc_lr = enc_lr << 1;
     enc_bp = enc_bp << 2;
 

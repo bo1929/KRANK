@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <assert.h>
+#include <bitset>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -20,6 +21,7 @@
 #include <new>
 #include <ostream>
 #include <random>
+#include <set>
 #include <sstream>
 #include <stdio.h>
 #include <stdlib.h>
@@ -40,7 +42,7 @@
 
 /* #define UINT32_MAX ((uint32_t)-1) */
 
-int
-computeHammingDistance(uint64_t x, uint64_t y);
+uint8_t
+computeHammingDistance(uint64_t x, uint64_t y); // TODO: CHECK
 
 #endif

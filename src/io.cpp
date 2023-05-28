@@ -1,8 +1,11 @@
 #include "io.h"
+#include <cstdint>
 #include <cstring>
+#include <fstream>
+#include <utility>
 
 kseq_t*
-getReader(char* fpath)
+getReader(const char* fpath)
 {
   gzFile fp;
   fp = gzopen(fpath, "r");
@@ -27,8 +30,9 @@ std::vector<sseq_t>
 readBatch(kseq_t* kseq, unsigned int batch_size)
 {
   int l;
-  int i = 0;
+  unsigned int i = 0;
   std::vector<sseq_t> seqRead;
+  seqRead.reserve(batch_size);
   while ((i < batch_size) && (l = kseq_read(kseq)) >= 0) {
     sseq_t tmp_seq;
     tmp_seq.nseq.assign(kseq->seq.s);
@@ -39,6 +43,31 @@ readBatch(kseq_t* kseq, unsigned int batch_size)
   if ((i < batch_size) && (!seqRead.empty())) {
     kseq_destroy(kseq);
     gzclose(kseq->f->f);
+    seqRead.shrink_to_fit();
   }
   return seqRead;
+}
+
+FILE*
+open_file(const char* filepath, bool is_ok, const char* mode)
+{
+  FILE* f;
+  f = std::fopen(filepath, mode);
+  if (!f) {
+    std::fprintf(stderr, "File opening failed! %s", filepath);
+    is_ok = false;
+  }
+  return f;
+}
+
+std::ifstream
+open_ifstream(const char* filepath, bool is_ok)
+{
+  std::ifstream ifs;
+  ifs.open(filepath, std::ios::binary | std::ios::in);
+  if (!ifs.is_open()) {
+    std::fprintf(stderr, "File opening failed! %s", filepath);
+    is_ok = false;
+  }
+  return ifs;
 }
