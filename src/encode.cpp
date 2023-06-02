@@ -143,3 +143,12 @@ retrieveEncodings(char* fpath, uint64_t*& enc_arr, uint32_t num_kmers, unsigned 
       seqBatch.clear();
   }
 }
+
+inline uint8_t
+computeHammingDistanceEnc64(const uint64_t x, const uint64_t y)
+{
+  uint64_t z1 = x ^ y;
+  uint32_t z2 = z1 >> 32;
+  uint32_t zc = z1 | z2;
+  return (uint8_t)__builtin_popcount(zc);
+}

@@ -43,7 +43,6 @@ readBatch(kseq_t* kseq, unsigned int batch_size)
   if ((i < batch_size) && (!seqRead.empty())) {
     kseq_destroy(kseq);
     gzclose(kseq->f->f);
-    seqRead.shrink_to_fit();
   }
   return seqRead;
 }

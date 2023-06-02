@@ -8,4 +8,5 @@ enum
   UNCLASSIFIED_OUT_OPT, // --classified-out
   CLASSIFIED_OUT_OPT,   // --unclassified-out
 };
+
 #endif

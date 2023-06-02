@@ -6,6 +6,7 @@
 #include <bitset>
 #include <chrono>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -16,6 +17,7 @@
 #include <getopt.h>
 #include <iomanip>
 #include <iostream>
+#include <list>
 #include <map>
 #include <memory>
 #include <new>
@@ -34,15 +36,12 @@
 #include <utility>
 #include <vector>
 
+/* #define UINT32_MAX ((uint32_t)-1) */
+
 #ifdef _OPENMP
   #include <omp.h>
 #else
   #warning "OpenMP not found, multi-threading will be DISABLED and --num-threads option will be ignored!"
 #endif
-
-/* #define UINT32_MAX ((uint32_t)-1) */
-
-uint8_t
-computeHammingDistance(uint64_t x, uint64_t y); // TODO: CHECK
 
 #endif
