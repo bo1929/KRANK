@@ -23,8 +23,9 @@ pruneVectorPseudorandom(std::vector<T>& v, uint8_t b_max)
     v[computeFastModulo(v.back(), v.size())] = v.back();
     v.pop_back();
   }
-  std::sort(v.begin(), v.end());
-  // Somewhat slower alternative
+  // Might be costly but better to keep it sorted.
+  std::sort(v.begin(), v.end()); // TODO: Check if this can be avoided.
+  // Somewhat slower alternative, converts to a list.
   /* std::list<T> l; */
   /* std::copy(v.begin(), v.end(), std::back_inserter(l)); */
   /* pruneListPseudorandom(l, b_max); */
