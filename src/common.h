@@ -44,4 +44,6 @@
   #warning "OpenMP not found, multi-threading will be DISABLED and --num-threads option will be ignored!"
 #endif
 
+extern unsigned int num_threads;
+
 #endif

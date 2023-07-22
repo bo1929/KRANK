@@ -2,7 +2,9 @@
 
 #define SIZE_ESTIMATE 4194304
 
-// TODO: BENCHMARK DIFFERENT THREAD SCHEDULES ETC
+// TODO: Benchmark different thread schedules etc.
+// TODO: Check what is sorted and what is not.
+// TODO: Check if size is updated or not.
 // TODO: Add macros for debugging to avoid redundant computation.
 
 template<typename T>
@@ -10,7 +12,6 @@ inline void
 sortColumns(std::vector<std::vector<T>>& table)
 {
   uint32_t num_rows = table.size();
-  unsigned int num_threads = omp_get_max_threads();
 #pragma omp parallel for num_threads(num_threads) schedule(static, 1)
   for (uint32_t rix = 0; rix < num_rows; ++rix) {
     if (!table[rix].empty())
@@ -20,10 +21,9 @@ sortColumns(std::vector<std::vector<T>>& table)
 
 template<typename encT>
 uint64_t
-tableC<encT>::fillVec(const char* filepath, unsigned int batch_size)
+tableC<encT>::fill(const char* filepath, unsigned int batch_size)
 {
   kseq_t* reader = getReader(filepath);
-  unsigned int num_threads = omp_get_max_threads();
   batch_size = adjustBatchSize(batch_size, num_threads);
   std::vector<sseq_t> seqBatch = readBatch(reader, batch_size);
   uint64_t total_kmer = 0;
@@ -75,6 +75,17 @@ tableC<encT>::histNumCols()
 
 template<typename encT>
 std::unordered_map<uint8_t, uint64_t>
+tableD<encT>::histNumCols()
+{
+  std::unordered_map<uint8_t, uint64_t> hist_map;
+  for (auto& row : tableD<encT>::enc_vvec) {
+    hist_map[row.size()]++;
+  }
+  return hist_map;
+}
+
+template<typename encT>
+std::unordered_map<uint8_t, uint64_t>
 tableF<encT>::histNumCols()
 {
   std::unordered_map<uint8_t, uint64_t> hist_map;
@@ -87,7 +98,7 @@ tableF<encT>::histNumCols()
 
 template<typename encT>
 bool
-tableC<encT>::saveVec(const char* filepath)
+tableC<encT>::save(const char* filepath)
 {
   bool is_ok = false;
   if (tableC<encT>::rix_enc_vec.empty()) {
@@ -107,7 +118,7 @@ tableC<encT>::saveVec(const char* filepath)
 
 template<typename encT>
 bool
-tableC<encT>::loadVec(const char* filepath)
+tableC<encT>::load(const char* filepath)
 {
   bool is_ok = false;
   tableC<encT>::rix_enc_vec.clear();
@@ -187,22 +198,44 @@ tableS<encT>::getBatch(std::vector<std::vector<encT>>& batch_table, uint32_t bat
     tableS<encT>::vec_ifs.seekg(curr_pos);
     tableS<encT>::f_rix = f_rix + batch_size;
   }
+  sortColumns(batch_table);
   return num_kmers;
 }
 
 template<typename encT>
 void
-tableD<encT>::makeUnique()
+tableD<encT>::makeUnique(bool update_size)
 {
   if (!tableD<encT>::areColumnsSorted())
     tableD<encT>::sortColumns();
   uint32_t num_rows = tableD<encT>::num_rows;
-  unsigned int num_threads = omp_get_max_threads();
 #pragma omp parallel for num_threads(num_threads) schedule(static, 1)
   for (uint32_t rix = 0; rix < num_rows; ++rix) {
     if (!tableD<encT>::enc_vvec[rix].empty())
       tableD<encT>::enc_vvec[rix].erase(std::unique(tableD<encT>::enc_vvec[rix].begin(), tableD<encT>::enc_vvec[rix].end()), tableD<encT>::enc_vvec[rix].end());
   }
+  if (update_size)
+    tableD<encT>::updateSize();
+}
+
+template<typename encT>
+void
+tableF<encT>::makeUnique(bool update_size)
+{
+  if (!tableF<encT>::areColumnsSorted())
+    tableF<encT>::sortColumns();
+  uint8_t b = tableF<encT>::b;
+  uint32_t num_rows = tableF<encT>::num_rows;
+#pragma omp parallel for num_threads(num_threads) schedule(static, 1)
+  for (uint32_t rix = 0; rix < num_rows; ++rix) {
+    if (tableF<encT>::ind_arr[rix] > 0) {
+      auto last =
+        std::unique(tableF<encT>::enc_arr + (rix * b), tableF<encT>::enc_arr + (rix * b) + tableF<encT>::ind_arr[rix]) - tableF<encT>::enc_arr - (rix * b);
+      tableF<encT>::ind_arr[rix] = last;
+    }
+  }
+  if (update_size)
+    tableF<encT>::updateSize();
 }
 
 template<typename encT>
@@ -210,7 +243,6 @@ void
 tableD<encT>::sortColumns()
 {
   uint32_t num_rows = tableD<encT>::num_rows;
-  unsigned int num_threads = omp_get_max_threads();
 #pragma omp parallel for num_threads(num_threads) schedule(static, 1)
   for (uint32_t rix = 0; rix < num_rows; ++rix) {
     if (!tableD<encT>::enc_vvec[rix].empty())
@@ -224,7 +256,6 @@ tableF<encT>::sortColumns()
 {
   uint8_t b = tableF<encT>::b;
   uint32_t num_rows = tableF<encT>::num_rows;
-  unsigned int num_threads = omp_get_max_threads();
 #pragma omp parallel for num_threads(num_threads) schedule(static, 1)
   for (uint32_t rix = 0; rix < num_rows; ++rix) {
     if (tableF<encT>::ind_arr[rix] > 0) {
@@ -239,7 +270,6 @@ tableD<encT>::areColumnsSorted()
 {
   bool is_ok = true;
   uint32_t num_rows = tableD<encT>::num_rows;
-  unsigned int num_threads = omp_get_max_threads();
 #pragma omp parallel for num_threads(num_threads) schedule(static, 1)
   for (uint32_t rix = 0; rix < num_rows; ++rix) {
     if (!tableD<encT>::enc_vvec[rix].empty() && !std::is_sorted(tableD<encT>::enc_vvec[rix].begin(), tableD<encT>::enc_vvec[rix].end())) {
@@ -257,15 +287,12 @@ tableF<encT>::areColumnsSorted()
   bool is_ok = true;
   uint8_t b = tableF<encT>::b;
   uint32_t num_rows = tableF<encT>::num_rows;
-  unsigned int num_threads = omp_get_max_threads();
 #pragma omp parallel for num_threads(num_threads) schedule(static, 1)
   for (uint32_t rix = 0; rix < num_rows; ++rix) {
-    if (tableF<encT>::ind_arr[rix] > 0) {
-      if ((tableF<encT>::ind_arr[rix] > 0) &&
-          !std::is_sorted(tableF<encT>::enc_arr + (rix * b), tableF<encT>::enc_arr + (rix * b) + tableF<encT>::ind_arr[rix])) {
+    if ((tableF<encT>::ind_arr[rix] > 0) &&
+        !std::is_sorted(tableF<encT>::enc_arr + (rix * b), tableF<encT>::enc_arr + (rix * b) + tableF<encT>::ind_arr[rix])) {
 #pragma omp atomic write
-        is_ok = false;
-      }
+      is_ok = false;
     }
   }
   return is_ok;
@@ -285,7 +312,6 @@ void
 tableF<encT>::clearRows()
 {
   uint32_t num_rows = tableF<encT>::num_rows;
-  unsigned int num_threads = omp_get_max_threads();
 #pragma omp parallel for num_threads(num_threads) schedule(static, 1)
   for (uint32_t rix = 0; rix < num_rows; ++rix) {
     tableF<encT>::ind_arr[rix] = 0;
@@ -323,7 +349,6 @@ void
 tableD<encT>::trimColumns(uint8_t b)
 {
   uint32_t num_rows = tableD<encT>::num_rows;
-  unsigned int num_threads = omp_get_max_threads();
 #pragma omp parallel for num_threads(num_threads) schedule(static, 1)
   for (uint32_t rix = 0; rix < num_rows; ++rix) {
     if (tableD<encT>::enc_vvec[rix].size() > b)
@@ -336,7 +361,6 @@ void
 tableD<encT>::pruneColumns(uint8_t b)
 {
   uint32_t num_rows = tableD<encT>::num_rows;
-  unsigned int num_threads = omp_get_max_threads();
 #pragma omp parallel for num_threads(num_threads) schedule(static, 1)
   for (uint32_t rix = 0; rix < num_rows; ++rix) {
     if (tableD<encT>::enc_vvec[rix].size() > b)
@@ -348,15 +372,19 @@ template<typename encT>
 void
 tableD<encT>::unionRows(tableD<encT>& sibling, bool update_size)
 {
+  if (!tableD<encT>::areColumnsSorted())
+    tableD<encT>::sortColumns();
+  if (!sibling.areColumnsSorted())
+    sibling.sortColumns();
   assert(tableD<encT>::num_rows == sibling.num_rows);
   uint32_t num_rows = tableD<encT>::num_rows;
-  unsigned int num_threads = omp_get_max_threads();
 #pragma omp parallel for num_threads(num_threads) schedule(static, 1)
   for (uint32_t rix = 0; rix < num_rows; ++rix) {
     if (!tableD<encT>::enc_vvec[rix].empty() && !sibling.enc_vvec[rix].empty()) {
       tableD<encT>::enc_vvec[rix].insert(tableD<encT>::enc_vvec[rix].end(), sibling.enc_vvec[rix].begin(), sibling.enc_vvec[rix].end());
-      std::inplace_merge(
-        tableD<encT>::enc_vvec[rix].begin(), tableD<encT>::enc_vvec[rix].begin() + tableD<encT>::enc_vvec[rix].size(), tableD<encT>::enc_vvec[rix].end());
+      std::inplace_merge(tableD<encT>::enc_vvec[rix].begin(),
+                         tableD<encT>::enc_vvec[rix].begin() + (tableD<encT>::enc_vvec[rix].size() - sibling.enc_vvec[rix].size()),
+                         tableD<encT>::enc_vvec[rix].end());
       tableD<encT>::enc_vvec[rix].erase(std::unique(tableD<encT>::enc_vvec[rix].begin(), tableD<encT>::enc_vvec[rix].end()), tableD<encT>::enc_vvec[rix].end());
     } else if (!sibling.enc_vvec[rix].empty()) {
       tableD<encT>::enc_vvec[rix] = sibling.enc_vvec[rix];
@@ -370,11 +398,14 @@ template<typename encT>
 void
 tableF<encT>::unionRows(tableF<encT>& sibling, bool update_size)
 {
+  if (!tableF<encT>::areColumnsSorted())
+    tableF<encT>::sortColumns();
+  if (!sibling.areColumnsSorted())
+    sibling.sortColumns();
   assert(tableF<encT>::b == sibling.b);
   assert(tableF<encT>::num_rows * tableF<encT>::b == sibling.num_rows * sibling.b);
   uint32_t b = tableF<encT>::b;
   uint32_t num_rows = tableF<encT>::num_rows;
-  unsigned int num_threads = omp_get_max_threads();
 #pragma omp parallel for num_threads(num_threads) schedule(static, 1)
   for (uint32_t rix = 0; rix < num_rows; ++rix) {
     unsigned int ix = rix * b;
@@ -402,15 +433,19 @@ template<typename encT>
 void
 tableD<encT>::mergeRows(tableD<encT>& sibling, bool update_size)
 {
+  if (!tableD<encT>::areColumnsSorted())
+    tableD<encT>::sortColumns();
+  if (!sibling.areColumnsSorted())
+    sibling.sortColumns();
   assert(tableD<encT>::num_rows == sibling.num_rows);
   uint32_t num_rows = tableD<encT>::num_rows;
-  unsigned int num_threads = omp_get_max_threads();
 #pragma omp parallel for num_threads(num_threads) schedule(static, 1)
   for (uint32_t rix = 0; rix < num_rows; ++rix) {
     if (!tableD<encT>::enc_vvec[rix].empty() && !sibling.enc_vvec[rix].empty()) {
       tableD<encT>::enc_vvec[rix].insert(tableD<encT>::enc_vvec[rix].end(), sibling.enc_vvec[rix].begin(), sibling.enc_vvec[rix].end());
-      std::inplace_merge(
-        tableD<encT>::enc_vvec[rix].begin(), tableD<encT>::enc_vvec[rix].begin() + tableD<encT>::enc_vvec[rix].size(), tableD<encT>::enc_vvec[rix].end());
+      std::inplace_merge(tableD<encT>::enc_vvec[rix].begin(),
+                         tableD<encT>::enc_vvec[rix].begin() + (tableD<encT>::enc_vvec[rix].size() - sibling.enc_vvec[rix].size()),
+                         tableD<encT>::enc_vvec[rix].end());
     } else if (!sibling.enc_vvec[rix].empty()) {
       tableD<encT>::enc_vvec[rix] = sibling.enc_vvec[rix];
     }
@@ -423,11 +458,14 @@ template<typename encT>
 void
 tableF<encT>::mergeRows(tableF<encT>& sibling, bool update_size)
 {
+  if (!tableF<encT>::areColumnsSorted())
+    tableF<encT>::sortColumns();
+  if (!sibling.areColumnsSorted())
+    sibling.sortColumns();
   assert(tableF<encT>::b == sibling.b);
   assert(tableF<encT>::num_rows * tableF<encT>::b == sibling.num_rows * sibling.b);
   uint32_t b = tableF<encT>::b;
   uint32_t num_rows = tableF<encT>::num_rows;
-  unsigned int num_threads = omp_get_max_threads();
 #pragma omp parallel for num_threads(num_threads) schedule(static, 1)
   for (uint32_t rix = 0; rix < num_rows; ++rix) {
     unsigned int ix = rix * b;
@@ -487,76 +525,48 @@ tableF<encT>::removeIndices(std::vector<std::pair<uint32_t, uint8_t>>& indices_v
 }
 
 template<typename encT>
-std::unordered_map<uint8_t, uint64_t>
-tableD<encT>::histNumCols()
-{
-  std::unordered_map<uint8_t, uint64_t> hist_map;
-  for (auto& row : tableD<encT>::enc_vvec) {
-    hist_map[row.size()]++;
-  }
-  return hist_map;
-}
-
-template<typename encT>
 void
-tableF<encT>::makeUnique()
+tableD<encT>::transformF(tableF<encT>& new_table)
 {
-  if (!tableF<encT>::areColumnsSorted())
-    tableF<encT>::sortColumns();
-  uint8_t b = tableF<encT>::b;
-  uint32_t num_rows = tableF<encT>::num_rows;
-  unsigned int num_threads = omp_get_max_threads();
-#pragma omp parallel for num_threads(num_threads) schedule(static, 1)
-  for (uint32_t rix = 0; rix < num_rows; ++rix) {
-    if (tableF<encT>::ind_arr[rix] > 0) {
-      auto last =
-        std::unique(tableF<encT>::enc_arr + (rix * b), tableF<encT>::enc_arr + (rix * b) + tableF<encT>::ind_arr[rix]) - tableF<encT>::enc_arr - rix * b;
-      tableF<encT>::ind_arr[rix] = last;
-    }
-  }
-}
-
-template<typename encT>
-void
-tableD<encT>::transformTableF(tableF<encT>& table)
-{
-  assert(table.k == tableD<encT>::k);
-  assert(table.h == tableD<encT>::h);
-  assert(table.num_rows == tableD<encT>::num_rows);
-  assert(table.ptr_lsh_vg == tableD<encT>::ptr_lsh_vg);
-  uint8_t b = table.b;
-  uint32_t num_rows = table.num_rows;
+  new_table.clearRows();
+  assert(new_table.k == tableD<encT>::k);
+  assert(new_table.h == tableD<encT>::h);
+  assert(new_table.num_rows == tableD<encT>::num_rows);
+  assert(new_table.ptr_lsh_vg == tableD<encT>::ptr_lsh_vg);
+  uint8_t b = new_table.b;
+  uint32_t num_rows = new_table.num_rows;
   for (uint32_t rix = 0; rix < num_rows; ++rix) {
     if (tableD<encT>::enc_vvec[rix].size() <= b) {
-      table.ind_arr[rix] = tableD<encT>::enc_vvec[rix].size();
-      if (table.ind_arr[rix])
-        std::copy(tableD<encT>::enc_vvec[rix].begin(), tableD<encT>::enc_vvec[rix].end(), table.enc_arr + rix * b);
+      new_table.ind_arr[rix] = tableD<encT>::enc_vvec[rix].size();
+      if (new_table.ind_arr[rix])
+        std::copy(tableD<encT>::enc_vvec[rix].begin(), tableD<encT>::enc_vvec[rix].end(), new_table.enc_arr + (rix * b));
     } else {
       std::vector<encT> row = tableD<encT>::enc_vvec[rix];
       pruneVectorPseudorandom(row, b);
-      table.ind_arr[rix] = b;
-      std::copy(row.begin(), row.end(), table.enc_arr + rix * b);
+      new_table.ind_arr[rix] = b;
+      std::copy(row.begin(), row.end(), new_table.enc_arr + (rix * b));
     }
   }
+  new_table.updateSize();
 }
 
 template uint64_t
-tableC<uint32_t>::fillVec(const char* filepath, unsigned int batch_size);
+tableC<uint32_t>::fill(const char* filepath, unsigned int batch_size);
 
 template uint64_t
-tableC<uint64_t>::fillVec(const char* filepath, unsigned int batch_size);
+tableC<uint64_t>::fill(const char* filepath, unsigned int batch_size);
 
 template bool
-tableC<uint64_t>::saveVec(const char* filepath);
+tableC<uint64_t>::save(const char* filepath);
 
 template bool
-tableC<uint32_t>::saveVec(const char* filepath);
+tableC<uint32_t>::save(const char* filepath);
 
 template bool
-tableC<uint64_t>::loadVec(const char* filepath);
+tableC<uint64_t>::load(const char* filepath);
 
 template bool
-tableC<uint32_t>::loadVec(const char* filepath);
+tableC<uint32_t>::load(const char* filepath);
 
 template uint64_t
 tableC<uint64_t>::getBatch(std::vector<std::vector<u_int64_t>>& batch_table, uint32_t batch_size);
@@ -583,16 +593,16 @@ template std::unordered_map<uint8_t, uint64_t>
 tableC<uint32_t>::histNumCols();
 
 template void
-tableD<uint32_t>::makeUnique();
+tableD<uint32_t>::makeUnique(bool update_size);
 
 template void
-tableD<uint64_t>::makeUnique();
+tableD<uint64_t>::makeUnique(bool update_size);
 
 template void
-tableF<uint32_t>::makeUnique();
+tableF<uint32_t>::makeUnique(bool update_size);
 
 template void
-tableF<uint64_t>::makeUnique();
+tableF<uint64_t>::makeUnique(bool update_size);
 
 template void
 tableD<uint32_t>::trimColumns(uint8_t b);
@@ -703,7 +713,7 @@ template std::unordered_map<uint8_t, uint64_t>
 tableF<uint32_t>::histNumCols();
 
 template void
-tableD<uint32_t>::transformTableF(tableF<uint32_t>& table);
+tableD<uint32_t>::transformF(tableF<uint32_t>& table);
 
 template void
-tableD<uint64_t>::transformTableF(tableF<uint64_t>& table);
+tableD<uint64_t>::transformF(tableF<uint64_t>& table);

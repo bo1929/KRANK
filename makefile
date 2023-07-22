@@ -2,13 +2,13 @@
 #--------------------------------------------
 COMPILER = g++
 LDLIBS = -lm -lz -lstdc++
-CXXFLAGS = -fopenmp -std=c++11 -g -O3
-WFLAGS = -Wno-unused-result
+CXXFLAGS = -g -std=c++11 -O3 -fopenmp
+WFLAGS = -Wno-unused-result -Wno-unused-command-line-argument
 
 # project files
 #--------------------------------------------
 PROGRAM = kestane
-OBJECTS = build/encode.o build/table.o build/assess.o build/io.o build/kestane.o build/lsh.o
+OBJECTS = build/common.o build/encode.o build/table.o build/assess.o build/io.o build/kestane.o build/lsh.o
 
 # rules
 #--------------------------------------------
@@ -17,10 +17,10 @@ all: clean $(PROGRAM)
 # generic rule for compiling *.cpp -> *.o
 build/%.o: src/%.cpp
 	@mkdir -p build
-	$(COMPILER) $(WFLAGS) $(CXXFLAGS) -c src/$*.cpp -o build/$*.o
+	$(COMPILER) $(WFLAGS) $(CXXFLAGS) $(CPPFLAGS) $(LDFLAGS) -c src/$*.cpp -o build/$*.o
 
 $(PROGRAM): $(OBJECTS)
-	$(COMPILER) $(WFLAGS) $(CXXFLAGS) $+ $(LDLIBS) -o $@
+	$(COMPILER) $(WFLAGS) $(CXXFLAGS) $+ $(LDLIBS) $(CPPFLAGS) $(LDFLAGS) -o $@
 
 clean:
 	rm -f $(PROGRAM) $(OBJECTS)

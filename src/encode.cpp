@@ -3,6 +3,7 @@
 void
 kmerEncodingBPCompute(const char* seq, uint64_t& enc_bp)
 {
+  enc_bp = 0;
   for (unsigned int i = 0; i < (unsigned)strlen(seq); i++) {
     enc_bp = enc_bp << 2;
     if (seq[i] == 'T') {
@@ -20,6 +21,8 @@ kmerEncodingBPCompute(const char* seq, uint64_t& enc_bp)
 void
 kmerEncodingCompute(const char* seq, uint64_t& enc_lr, uint64_t& enc_bp)
 {
+  enc_lr = 0;
+  enc_bp = 0;
   for (unsigned int i = 0; i < (unsigned)strlen(seq); i++) {
     enc_lr = enc_lr << 1;
     enc_bp = enc_bp << 2;
@@ -42,10 +45,11 @@ kmerEncodingCompute(const char* seq, uint64_t& enc_lr, uint64_t& enc_bp)
 void
 kmerEncodingComputeC(const char* seq, uint64_t& enc_lr, uint64_t& enc_bp)
 {
+  enc_lr = 0;
+  enc_bp = 0;
   for (unsigned int i = 0; i < (unsigned)strlen(seq); i++) {
     enc_lr = enc_lr << 1;
     enc_bp = enc_bp << 2;
-
     if (seq[i] == 'A') {
       enc_lr += 4294967297;
       enc_bp += 3;
@@ -67,10 +71,8 @@ kmerEncodingUpdate(const char* seq, uint64_t& enc_lr, uint64_t& enc_bp)
 {
   enc_lr = enc_lr << 1;
   enc_bp = enc_bp << 2;
-
   uint64_t mask = 4294967297;
   enc_lr = enc_lr & ~mask;
-
   if (seq[0] == 'T') {
     enc_lr += 4294967297;
     enc_bp += 3;
@@ -91,10 +93,8 @@ kmerEncodingUpdateC(const char* seq, uint64_t& enc_lr, uint64_t& enc_bp)
 {
   enc_lr = enc_lr << 1;
   enc_bp = enc_bp << 2;
-
   uint64_t mask = 4294967297;
   enc_lr = enc_lr & ~mask;
-
   if (seq[0] == 'A') {
     enc_lr += 4294967297;
     enc_bp += 3;
@@ -111,7 +111,7 @@ kmerEncodingUpdateC(const char* seq, uint64_t& enc_lr, uint64_t& enc_bp)
 }
 
 void
-retrieveEncodings(char* fpath, uint64_t*& enc_arr, uint32_t num_kmers, unsigned int batch_size, unsigned int num_threads)
+retrieveEncodings(char* fpath, uint64_t*& enc_arr, uint32_t num_kmers, unsigned int batch_size)
 {
   // Allocate memory for the encoding array.
   try {
@@ -145,7 +145,7 @@ retrieveEncodings(char* fpath, uint64_t*& enc_arr, uint32_t num_kmers, unsigned 
 }
 
 inline uint8_t
-computeHammingDistanceEnc64(const uint64_t x, const uint64_t y)
+computeHammingDistance64(const uint64_t x, const uint64_t y)
 {
   uint64_t z1 = x ^ y;
   uint32_t z2 = z1 >> 32;
