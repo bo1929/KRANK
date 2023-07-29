@@ -5,7 +5,7 @@
 #include <utility>
 
 kseq_t*
-getReader(const char* fpath)
+IO::getReader(const char* fpath)
 {
   gzFile fp;
   fp = gzopen(fpath, "r");
@@ -21,13 +21,13 @@ getReader(const char* fpath)
 }
 
 unsigned int
-adjustBatchSize(unsigned int batch_size, unsigned int num_threads)
+IO::adjustBatchSize(unsigned int batch_size, unsigned int num_threads)
 {
   return (batch_size / num_threads) * num_threads;
 }
 
 std::vector<sseq_t>
-readBatch(kseq_t* kseq, unsigned int batch_size)
+IO::readBatch(kseq_t* kseq, unsigned int batch_size)
 {
   int l;
   unsigned int i = 0;
@@ -48,7 +48,7 @@ readBatch(kseq_t* kseq, unsigned int batch_size)
 }
 
 FILE*
-open_file(const char* filepath, bool is_ok, const char* mode)
+IO::open_file(const char* filepath, bool is_ok, const char* mode)
 {
   FILE* f;
   f = std::fopen(filepath, mode);
@@ -60,7 +60,7 @@ open_file(const char* filepath, bool is_ok, const char* mode)
 }
 
 std::ifstream
-open_ifstream(const char* filepath, bool is_ok)
+IO::open_ifstream(const char* filepath, bool is_ok)
 {
   std::ifstream ifs;
   ifs.open(filepath, std::ios::binary | std::ios::in);

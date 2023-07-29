@@ -17,6 +17,7 @@ struct sseq_t
 
 KSEQ_INIT(gzFile, gzread)
 
+namespace IO {
 kseq_t*
 getReader(const char* path);
 
@@ -31,6 +32,7 @@ open_file(const char* filepath, bool is_ok, const char* mode);
 
 std::ifstream
 open_ifstream(const char* filepath, bool is_ok);
+}
 
 #define DEFAULT_BATCH_SIZE 65536
 

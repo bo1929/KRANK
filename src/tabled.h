@@ -1,0 +1,178 @@
+#ifndef _TABLED_H
+#define _TABLED_H
+
+template uint64_t
+StreamIM<uint32_t>::readBatch(const char* filepath, unsigned int batch_size);
+
+template uint64_t
+StreamIM<uint64_t>::readBatch(const char* filepath, unsigned int batch_size);
+
+template bool
+StreamIM<uint64_t>::save(const char* filepath);
+
+template bool
+StreamIM<uint32_t>::save(const char* filepath);
+
+template bool
+StreamIM<uint64_t>::load(const char* filepath);
+
+template bool
+StreamIM<uint32_t>::load(const char* filepath);
+
+template uint64_t
+StreamIM<uint64_t>::getBatch(vvec<uint64_t>& batch_table, uint32_t batch_size);
+
+template uint64_t
+StreamIM<uint32_t>::getBatch(vvec<uint32_t>& batch_table, uint32_t batch_size);
+
+template bool
+StreamOD<uint64_t>::openStream();
+
+template bool
+StreamOD<uint32_t>::openStream();
+
+template uint64_t
+StreamOD<uint64_t>::getBatch(vvec<uint64_t>& batch_table, uint32_t batch_size);
+
+template uint64_t
+StreamOD<uint32_t>::getBatch(vvec<uint32_t>& batch_table, uint32_t batch_size);
+
+template std::unordered_map<uint8_t, uint64_t>
+StreamIM<uint64_t>::histRowSizes();
+
+template std::unordered_map<uint8_t, uint64_t>
+StreamIM<uint32_t>::histRowSizes();
+
+template void
+HTd<uint32_t>::makeUnique(bool update_size);
+
+template void
+HTd<uint64_t>::makeUnique(bool update_size);
+
+template void
+HTs<uint32_t>::makeUnique(bool update_size);
+
+template void
+HTs<uint64_t>::makeUnique(bool update_size);
+
+template void
+HTd<uint32_t>::trimColumns(uint8_t b);
+
+template void
+HTd<uint64_t>::trimColumns(uint8_t b);
+
+template void
+HTd<uint32_t>::pruneColumns(uint8_t b);
+
+template void
+HTd<uint64_t>::pruneColumns(uint8_t b);
+
+template void
+HTd<uint64_t>::sortColumns();
+
+template void
+HTd<uint32_t>::sortColumns();
+
+template void
+HTs<uint64_t>::sortColumns();
+
+template void
+HTs<uint32_t>::sortColumns();
+
+template bool
+HTd<uint64_t>::areColumnsSorted();
+
+template bool
+HTd<uint32_t>::areColumnsSorted();
+
+template bool
+HTs<uint64_t>::areColumnsSorted();
+
+template bool
+HTs<uint32_t>::areColumnsSorted();
+
+template void
+HTd<uint32_t>::clearRows();
+
+template void
+HTd<uint64_t>::clearRows();
+
+template void
+HTs<uint32_t>::clearRows();
+
+template void
+HTs<uint64_t>::clearRows();
+
+template void
+HTd<uint64_t>::updateSize();
+
+template void
+HTd<uint32_t>::updateSize();
+
+template void
+HTs<uint64_t>::updateSize();
+
+template void
+HTs<uint32_t>::updateSize();
+
+template void
+HTd<uint64_t>::initCounts();
+
+template void
+HTd<uint32_t>::initCounts();
+
+template void
+HTd<uint64_t>::unionRows(HTd<uint64_t>& sibling, bool update_size);
+
+template void
+HTd<uint32_t>::unionRows(HTd<uint32_t>& sibling, bool update_size);
+
+template void
+HTs<uint64_t>::unionRows(HTs<uint64_t>& sibling, bool update_size);
+
+template void
+HTs<uint32_t>::unionRows(HTs<uint32_t>& sibling, bool update_size);
+
+template void
+HTd<uint64_t>::mergeRows(HTd<uint64_t>& sibling, bool update_size);
+
+template void
+HTd<uint32_t>::mergeRows(HTd<uint32_t>& sibling, bool update_size);
+
+template void
+HTs<uint64_t>::mergeRows(HTs<uint64_t>& sibling, bool update_size);
+
+template void
+HTs<uint32_t>::mergeRows(HTs<uint32_t>& sibling, bool update_size);
+
+template void
+HTd<uint64_t>::removeIndices(std::vector<std::pair<uint32_t, uint8_t>>& indices_vec);
+
+template void
+HTd<uint32_t>::removeIndices(std::vector<std::pair<uint32_t, uint8_t>>& indices_vec);
+
+template void
+HTs<uint64_t>::removeIndices(std::vector<std::pair<uint32_t, uint8_t>>& indices_vec);
+
+template void
+HTs<uint32_t>::removeIndices(std::vector<std::pair<uint32_t, uint8_t>>& indices_vec);
+
+template std::unordered_map<uint8_t, uint64_t>
+HTd<uint64_t>::histRowSizes();
+
+template std::unordered_map<uint8_t, uint64_t>
+HTd<uint32_t>::histRowSizes();
+
+template std::unordered_map<uint8_t, uint64_t>
+HTs<uint64_t>::histRowSizes();
+
+template std::unordered_map<uint8_t, uint64_t>
+HTs<uint32_t>::histRowSizes();
+
+template void
+HTd<uint32_t>::transformHTs(HTs<uint32_t>& table);
+
+template void
+HTd<uint64_t>::transformHTs(HTs<uint64_t>& table);
+
+#endif

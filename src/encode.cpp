@@ -113,15 +113,14 @@ kmerEncodingUpdateC(const char* seq, uint64_t& enc_lr, uint64_t& enc_bp)
 void
 retrieveEncodings(char* fpath, uint64_t*& enc_arr, uint32_t num_kmers, unsigned int batch_size)
 {
-  // Allocate memory for the encoding array.
-  try {
+  try { // Allocate memory for the encoding array.
     enc_arr = new uint64_t[num_kmers];
   } catch (std::bad_alloc& ba) {
     std::cerr << "Failed to allocate memory for the encoding array." << ba.what() << std::endl;
   }
-  kseq_t* reader = getReader(fpath);
-  batch_size = adjustBatchSize(batch_size, num_threads);
-  std::vector<sseq_t> seqBatch = readBatch(reader, batch_size);
+  kseq_t* reader = IO::getReader(fpath);
+  batch_size = IO::adjustBatchSize(batch_size, num_threads);
+  std::vector<sseq_t> seqBatch = IO::readBatch(reader, batch_size);
   uint32_t total_ix = 0;
 
   while (!seqBatch.empty()) {
@@ -138,7 +137,7 @@ retrieveEncodings(char* fpath, uint64_t*& enc_arr, uint32_t num_kmers, unsigned 
     }
     total_ix += (uint32_t)seqBatch.size();
     if (seqBatch.size() == batch_size)
-      seqBatch = readBatch(reader, batch_size);
+      seqBatch = IO::readBatch(reader, batch_size);
     else
       seqBatch.clear();
   }
