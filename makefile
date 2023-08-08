@@ -8,7 +8,7 @@ WFLAGS = -Wno-unused-result -Wno-unused-command-line-argument
 # project files
 #--------------------------------------------
 PROGRAM = kestane
-OBJECTS = build/common.o build/encode.o build/table.o build/assess.o build/io.o build/kestane.o build/lsh.o
+OBJECTS = build/common.o build/taxonomy.o build/encode.o build/table.o build/assess.o build/io.o build/lsh.o build/kestane.o
 
 # rules
 #--------------------------------------------

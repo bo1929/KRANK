@@ -8,8 +8,6 @@
 #include "lsh.h"
 
 typedef uint32_t scT;
-template<typename encT>
-using vvec = std::vector<std::vector<encT>>;
 
 template<typename encT>
 struct StreamIM
@@ -138,7 +136,7 @@ struct HTd
   void unionRows(HTd<encT>& sibling, bool update_size = true);
   void mergeRows(HTd<encT>& sibling, bool update_size = true);
   void trimColumns(uint8_t b);
-  void pruneColumns(uint8_t b);                                               // TODO
+  void pruneColumnsRandom(uint8_t b);
   void removeIndices(std::vector<std::pair<uint32_t, uint8_t>>& indices_vec); // TODO
   std::unordered_map<uint8_t, uint64_t> histRowSizes();
   void transformHTs(HTs<encT>& table);

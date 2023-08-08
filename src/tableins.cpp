@@ -62,10 +62,10 @@ template void
 HTd<uint64_t>::trimColumns(uint8_t b);
 
 template void
-HTd<uint32_t>::pruneColumns(uint8_t b);
+HTd<uint32_t>::pruneColumnsRandom(uint8_t b);
 
 template void
-HTd<uint64_t>::pruneColumns(uint8_t b);
+HTd<uint64_t>::pruneColumnsRandom(uint8_t b);
 
 template void
 HTd<uint64_t>::sortColumns();

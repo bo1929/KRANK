@@ -1,6 +1,8 @@
 #ifndef _SCOUNTS_H
 #define _SCOUNTS_H
 
+#pragma GCC optimize("Og,inline")
+
 template<typename T>
 inline std::unordered_map<T, scT>
 mapTotalCountsHTd(std::vector<T>& r1, std::vector<T>& r2, std::vector<scT>& c1, std::vector<scT>& c2)

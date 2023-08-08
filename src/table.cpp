@@ -392,19 +392,25 @@ HTd<encT>::trimColumns(uint8_t b_max)
       HTd<encT>::scounts_vvec[rix].resize(b_max);
     }
   }
+  HTd<encT>::updateSize();
 }
 
 template<typename encT>
 void
-HTd<encT>::pruneColumns(uint8_t b_max)
+HTd<encT>::pruneColumnsRandom(uint8_t b_max)
 {
   assert(b_max > 0);
   uint32_t num_rows = HTd<encT>::num_rows;
 #pragma omp parallel for num_threads(num_threads) schedule(static, 1)
   for (uint32_t rix = 0; rix < num_rows; ++rix) {
-    if (HTd<encT>::enc_vvec[rix].size() > b_max)
-      pruneVectorPseudorandom(HTd<encT>::enc_vvec[rix], b_max);
+    if (HTd<encT>::enc_vvec[rix].size() > b_max) {
+      std::vector<unsigned int> ixs;
+      getIxsRandom(ixs, enc_vvec[rix].size(), b_max);
+      vecRemoveIxs(HTd<encT>::enc_vvec[rix], ixs);
+      vecRemoveIxs(HTd<encT>::scounts_vvec[rix], ixs);
+    }
   }
+  HTd<encT>::updateSize();
 }
 
 template<typename encT>
@@ -456,16 +462,25 @@ HTs<encT>::unionRows(HTs<encT>& sibling, bool update_size)
     if ((sibling.ind_arr[rix] > 0) && (HTs<encT>::ind_arr[rix] > 0)) {
       std::unordered_map<encT, scT> count_map = mapTotalCountsHTs(
         HTs<encT>::enc_arr + ix, HTs<encT>::scounts_arr + ix, HTs<encT>::ind_arr[rix], sibling.enc_arr + ix, sibling.scounts_arr + ix, sibling.ind_arr[rix]);
-      std::list<encT> l;
+      std::vector<encT> v;
       std::set_union(HTs<encT>::enc_arr + ix,
                      HTs<encT>::enc_arr + (ix + HTs<encT>::ind_arr[rix]),
                      sibling.enc_arr + ix,
                      sibling.enc_arr + (ix + sibling.ind_arr[rix]),
-                     std::back_inserter(l));
-      if (l.size() > b)
-        pruneListPseudorandom(l, b);
-      std::copy(l.begin(), l.end(), HTs<encT>::enc_arr + ix);
-      HTs<encT>::ind_arr[rix] = l.size();
+                     std::back_inserter(v));
+      if (v.size() > b) {
+        std::vector<unsigned int> ixs;
+        // Alternative - 1
+        // getIxsRandom(ixs, v.size(), b);
+        // Alternative - 2
+        std::vector<scT> s_v;
+        s_v.resize(v.size());
+        std::transform(v.begin(), v.end(), back_inserter(s_v), [&count_map](encT val) { return count_map[val]; });
+        vecIxsNumber(ixs, s_v, v.size() - b);
+        vecRemoveIxs(v, ixs);
+      }
+      std::copy(v.begin(), v.end(), HTs<encT>::enc_arr + ix);
+      HTs<encT>::ind_arr[rix] = v.size();
       updateCountsHTs(HTs<encT>::enc_arr + ix, HTs<encT>::scounts_arr + ix, HTs<encT>::ind_arr[rix], count_map);
     } else if (sibling.ind_arr[rix] > 0) {
       std::copy(sibling.enc_arr + ix, sibling.enc_arr + (ix + sibling.ind_arr[rix]), HTs<encT>::enc_arr + ix);
@@ -526,18 +541,28 @@ HTs<encT>::mergeRows(HTs<encT>& sibling, bool update_size)
     if ((sibling.ind_arr[rix] > 0) && (HTs<encT>::ind_arr[rix] > 0)) {
       std::unordered_map<encT, scT> count_map = mapTotalCountsHTs(
         HTs<encT>::enc_arr + ix, HTs<encT>::scounts_arr + ix, HTs<encT>::ind_arr[rix], sibling.enc_arr + ix, sibling.scounts_arr + ix, sibling.ind_arr[rix]);
-      std::list<encT> l;
+      std::vector<encT> v;
       std::merge(HTs<encT>::enc_arr + ix,
                  HTs<encT>::enc_arr + (ix + HTs<encT>::ind_arr[rix]),
                  sibling.enc_arr + ix,
                  sibling.enc_arr + (ix + sibling.ind_arr[rix]),
-                 std::back_inserter(l));
-      if (l.size() > b)
-        l.erase(std::unique(l.begin(), l.end()), l.end());
-      if (l.size() > b)
-        pruneListPseudorandom(l, b);
-      std::copy(l.begin(), l.end(), HTs<encT>::enc_arr + ix);
-      HTs<encT>::ind_arr[rix] = l.size();
+                 std::back_inserter(v));
+      if (v.size() > b) {
+        v.erase(std::unique(v.begin(), v.end()), v.end());
+      }
+      if (v.size() > b) {
+        std::vector<unsigned int> ixs;
+        // Alternative - 1
+        // getIxsRandom(ixs, v.size(), b);
+        // Alternative - 2
+        std::vector<scT> s_v;
+        s_v.resize(v.size());
+        std::transform(v.begin(), v.end(), back_inserter(s_v), [&count_map](encT val) { return count_map[val]; });
+        vecIxsNumber(ixs, s_v, v.size() - b);
+        vecRemoveIxs(v, ixs);
+      }
+      std::copy(v.begin(), v.end(), HTs<encT>::enc_arr + ix);
+      HTs<encT>::ind_arr[rix] = v.size();
       updateCountsHTs(HTs<encT>::enc_arr + ix, HTs<encT>::scounts_arr + ix, HTs<encT>::ind_arr[rix], count_map);
     } else if (sibling.ind_arr[rix] > 0) {
       std::copy(sibling.enc_arr + ix, sibling.enc_arr + (ix + sibling.ind_arr[rix]), HTs<encT>::enc_arr + ix);
@@ -611,4 +636,4 @@ HTd<encT>::transformHTs(HTs<encT>& new_table)
   new_table.updateSize();
 }
 
-#include "tabled.h"
+#include "tableins.cpp"

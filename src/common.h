@@ -46,4 +46,7 @@
 
 extern unsigned int num_threads;
 
+template<typename T>
+using vvec = std::vector<std::vector<T>>;
+
 #endif
