@@ -55,4 +55,7 @@ template<typename T>
 void
 vvecSizeOrder(std::vector<unsigned int>& ixs, const vvec<T>& vv, bool reverse = true);
 
+void
+arrSizeOrder(std::vector<unsigned int>& ixs, const uint8_t* inr_r, uint32_t num_rows, bool reverse = true);
+
 #endif

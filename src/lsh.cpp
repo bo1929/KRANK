@@ -58,5 +58,5 @@ computeValueLSH(uint64_t enc_bp, maskLSH lsh_vg)
     asm("shld %b3, %2, %0" : "=rm"(res) : "0"(res), "r"(enc_bp), "ic"(lsh_vg[i].second) : "cc");
     i++;
   }
-  return (uint32_t)res;
+  return static_cast<uint32_t>(res);
 }

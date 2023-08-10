@@ -62,10 +62,10 @@ template void
 HTd<uint64_t>::trimColumns(uint8_t b);
 
 template void
-HTd<uint32_t>::pruneColumnsRandom(uint8_t b);
+HTd<uint32_t>::pruneColumns(uint8_t b_max);
 
 template void
-HTd<uint64_t>::pruneColumnsRandom(uint8_t b);
+HTd<uint64_t>::pruneColumns(uint8_t b_max);
 
 template void
 HTd<uint64_t>::sortColumns();
@@ -146,16 +146,16 @@ template void
 HTs<uint32_t>::mergeRows(HTs<uint32_t>& sibling, bool update_size);
 
 template void
-HTd<uint64_t>::removeIndices(std::vector<std::pair<uint32_t, uint8_t>>& indices_vec);
+HTd<uint64_t>::shrinkHT(uint64_t num_rm, uint8_t b_max);
 
 template void
-HTd<uint32_t>::removeIndices(std::vector<std::pair<uint32_t, uint8_t>>& indices_vec);
+HTd<uint32_t>::shrinkHT(uint64_t num_rm, uint8_t b_max);
 
 template void
-HTs<uint64_t>::removeIndices(std::vector<std::pair<uint32_t, uint8_t>>& indices_vec);
+HTs<uint64_t>::shrinkHT(uint64_t num_rm);
 
 template void
-HTs<uint32_t>::removeIndices(std::vector<std::pair<uint32_t, uint8_t>>& indices_vec);
+HTs<uint32_t>::shrinkHT(uint64_t num_rm);
 
 template std::unordered_map<uint8_t, uint64_t>
 HTd<uint64_t>::histRowSizes();
@@ -170,9 +170,9 @@ template std::unordered_map<uint8_t, uint64_t>
 HTs<uint32_t>::histRowSizes();
 
 template void
-HTd<uint32_t>::transformHTs(HTs<uint32_t>& table);
+HTd<uint32_t>::convertHTs(HTs<uint32_t>& table);
 
 template void
-HTd<uint64_t>::transformHTs(HTs<uint64_t>& table);
+HTd<uint64_t>::convertHTs(HTs<uint64_t>& table);
 
 #endif

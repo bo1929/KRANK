@@ -11,8 +11,12 @@ vecRemoveIxs(std::vector<T>& v, std::vector<unsigned int>& ixs)
   for (unsigned int i = 1; i != ixs.size(); ++i) {
     unsigned int range_begin = ixs[i - 1] + 1;
     unsigned int range_end = ixs[i];
-    std::copy(v.begin() + range_begin, v.begin() + range_end, last);
-    last += range_end - range_begin;
+    if ((range_begin >= 0) && (range_end < v.size())) {
+      std::copy(v.begin() + range_begin, v.begin() + range_end, last);
+      last += range_end - range_begin;
+    } else {
+      std::puts("The attempt of removing non-existent index has been ignored.");
+    }
   }
   v.erase(last, v.end());
 }
@@ -42,6 +46,7 @@ vecArgsort1D(std::vector<unsigned int>& ixs, const std::vector<T>& v, bool rever
 {
   ixs.resize(v.size());
   std::iota(ixs.begin(), ixs.end(), 0);
+  std::random_shuffle(ixs.begin(), ixs.end());
   if (reverse)
     std::sort(ixs.begin(), ixs.end(), [&v](unsigned int i1, unsigned int i2) { return v[i1] < v[i2]; });
   else
@@ -54,6 +59,7 @@ arrArgsort1D(std::vector<unsigned int>& ixs, const T* r, uint8_t last, bool reve
 {
   ixs.resize(last);
   std::iota(ixs.begin(), ixs.end(), 0);
+  std::random_shuffle(ixs.begin(), ixs.end());
   if (reverse)
     std::sort(ixs.begin(), ixs.end(), [&r](unsigned int i1, unsigned int i2) { return r[i1] < r[i2]; });
   else
@@ -72,14 +78,14 @@ vvecArgmax2D(const vvec<T>& vv, uint64_t n, bool reverse)
   uint64_t cumsum = 0;
   T val_prev;
   if (reverse) {
+    val_prev = 0;
     for (auto it = val_counts.cbegin(); (it != val_counts.cend()) && (cumsum < n); ++it) {
-      val_prev = 0;
       cumsum += it->second;
       val_prev = it->first;
     }
   } else {
+    val_prev = std::numeric_limits<T>::max();
     for (auto it = val_counts.crbegin(); (it != val_counts.crend()) && (cumsum < n); ++it) {
-      val_prev = std::numeric_limits<T>::max();
       cumsum += it->second;
       val_prev = it->first;
     }
@@ -105,8 +111,8 @@ arrArgmax2D(const T* r, const uint8_t* ind_r, uint32_t num_rows, uint8_t b, uint
       val_prev = it->first;
     }
   } else {
+    val_prev = std::numeric_limits<T>::max();
     for (auto it = val_counts.crbegin(); (it != val_counts.crend()) && (cumsum < n); ++it) {
-      val_prev = std::numeric_limits<T>::max();
       cumsum += it->second;
       val_prev = it->first;
     }
@@ -115,13 +121,13 @@ arrArgmax2D(const T* r, const uint8_t* ind_r, uint32_t num_rows, uint8_t b, uint
 }
 
 void
-getIxsRandom(std::vector<unsigned int>& ixs, uint8_t b_curr, uint8_t b_max)
+getIxsRandom(std::vector<unsigned int>& ixs, uint8_t b, uint8_t number)
 {
-  if (ixs.size() != b_curr)
-    ixs.resize(b_curr);
+  if (ixs.size() != b)
+    ixs.resize(b);
   std::iota(ixs.begin(), ixs.end(), 0);
   std::random_shuffle(ixs.begin(), ixs.end());
-  ixs.resize(b_max);
+  ixs.resize(number);
   std::sort(ixs.begin(), ixs.end());
 }
 
@@ -175,6 +181,17 @@ vvecSizeOrder(std::vector<unsigned int>& ixs, const vvec<T>& vv, bool reverse)
     std::sort(ixs.begin(), ixs.end(), [&vv](unsigned int i1, unsigned int i2) { return vv[i1].size() < vv[i2].size(); });
   else
     std::sort(ixs.begin(), ixs.end(), [&vv](unsigned int i1, unsigned int i2) { return vv[i1].size() > vv[i2].size(); });
+}
+
+void
+arrSizeOrder(std::vector<unsigned int>& ixs, const uint8_t* ind_r, uint32_t num_rows, bool reverse)
+{
+  ixs.resize(num_rows);
+  std::iota(ixs.begin(), ixs.end(), 0);
+  if (reverse)
+    std::sort(ixs.begin(), ixs.end(), [&ind_r](unsigned int i1, unsigned int i2) { return ind_r[i1] < ind_r[i2]; });
+  else
+    std::sort(ixs.begin(), ixs.end(), [&ind_r](unsigned int i1, unsigned int i2) { return ind_r[i1] > ind_r[i2]; });
 }
 
 #include "assessins.cpp"

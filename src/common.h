@@ -31,6 +31,7 @@
 #include <string>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <type_traits>
 #include <unistd.h>
 #include <unordered_map>
 #include <utility>

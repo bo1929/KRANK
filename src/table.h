@@ -9,6 +9,12 @@
 
 typedef uint32_t scT;
 
+enum RemovalStrategy
+{
+  random_kmer,
+  small_scount
+};
+
 template<typename encT>
 struct StreamIM
 {
@@ -65,8 +71,9 @@ struct HTs
   size_t table_size;
   maskLSH* ptr_lsh_vg;
   encT* enc_arr;
-  scT* scounts_arr;
+  scT* scount_arr;
   uint8_t* ind_arr;
+  RemovalStrategy rm_strategy;
 
   HTs(uint8_t k, uint8_t h, uint8_t b, uint32_t num_rows, maskLSH* ptr_lsh_vg)
     : k(h)
@@ -76,11 +83,12 @@ struct HTs
     , num_kmers(0)
     , num_species(0)
     , ptr_lsh_vg(ptr_lsh_vg)
+    , rm_strategy(small_scount)
   {
     enc_arr = new encT[num_rows * b];
     std::fill(enc_arr, enc_arr + num_rows * b, 0);
-    scounts_arr = new scT[num_rows * b];
-    std::fill(scounts_arr, scounts_arr + num_rows * b, 0);
+    scount_arr = new scT[num_rows * b];
+    std::fill(scount_arr, scount_arr + num_rows * b, 0);
     ind_arr = new uint8_t[num_rows];
     std::fill(ind_arr, ind_arr + num_rows, 0);
     table_size = num_rows * b * sizeof(encT) + num_rows * sizeof(uint8_t) + num_rows * b * sizeof(scT);
@@ -98,7 +106,7 @@ struct HTs
   void makeUnique(bool update_size = true);
   void unionRows(HTs<encT>& sibling, bool update_size = true);
   void mergeRows(HTs<encT>& sibling, bool update_size = true);
-  void removeIndices(std::vector<std::pair<uint32_t, uint8_t>>& indices_vec); // TODO
+  void shrinkHT(uint64_t num_rm);
   std::unordered_map<uint8_t, uint64_t> histRowSizes();
 };
 
@@ -112,7 +120,8 @@ struct HTd
   size_t table_size;
   maskLSH* ptr_lsh_vg;
   vvec<encT> enc_vvec;
-  vvec<scT> scounts_vvec;
+  vvec<scT> scount_vvec;
+  RemovalStrategy rm_strategy;
 
   HTd(uint8_t k, uint8_t h, uint32_t num_rows, maskLSH* ptr_lsh_vg)
     : k(h)
@@ -121,9 +130,10 @@ struct HTd
     , num_kmers(0)
     , num_species(0)
     , ptr_lsh_vg(ptr_lsh_vg)
+    , rm_strategy(small_scount)
   {
     enc_vvec.resize(num_rows);
-    scounts_vvec.resize(num_rows);
+    scount_vvec.resize(num_rows);
     table_size = num_rows * sizeof(std::vector<encT>) + num_rows * sizeof(std::vector<scT>);
   }
 
@@ -135,12 +145,12 @@ struct HTd
   void makeUnique(bool update_size = true);
   void unionRows(HTd<encT>& sibling, bool update_size = true);
   void mergeRows(HTd<encT>& sibling, bool update_size = true);
-  void trimColumns(uint8_t b);
-  void pruneColumnsRandom(uint8_t b);
-  void removeIndices(std::vector<std::pair<uint32_t, uint8_t>>& indices_vec); // TODO
+  void trimColumns(uint8_t b_max);
+  void pruneColumns(uint8_t b_max);
+  void shrinkHT(uint64_t num_rm, uint8_t b_max);
+  void convertHTs(HTs<encT>& table);
   std::unordered_map<uint8_t, uint64_t> histRowSizes();
-  void transformHTs(HTs<encT>& table);
 };
 
-#include "scounts.h"
+#include "scount.h"
 #endif

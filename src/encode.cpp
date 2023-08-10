@@ -4,7 +4,7 @@ void
 kmerEncodingBPCompute(const char* seq, uint64_t& enc_bp)
 {
   enc_bp = 0;
-  for (unsigned int i = 0; i < (unsigned)strlen(seq); i++) {
+  for (unsigned int i = 0; i < static_cast<unsigned int>(strlen(seq)); i++) {
     enc_bp = enc_bp << 2;
     if (seq[i] == 'T') {
       enc_bp += 3;
@@ -23,7 +23,7 @@ kmerEncodingCompute(const char* seq, uint64_t& enc_lr, uint64_t& enc_bp)
 {
   enc_lr = 0;
   enc_bp = 0;
-  for (unsigned int i = 0; i < (unsigned)strlen(seq); i++) {
+  for (unsigned int i = 0; i < static_cast<unsigned int>(strlen(seq)); i++) {
     enc_lr = enc_lr << 1;
     enc_bp = enc_bp << 2;
     if (seq[i] == 'T') {
@@ -47,7 +47,7 @@ kmerEncodingComputeC(const char* seq, uint64_t& enc_lr, uint64_t& enc_bp)
 {
   enc_lr = 0;
   enc_bp = 0;
-  for (unsigned int i = 0; i < (unsigned)strlen(seq); i++) {
+  for (unsigned int i = 0; i < static_cast<unsigned int>(strlen(seq)); i++) {
     enc_lr = enc_lr << 1;
     enc_bp = enc_bp << 2;
     if (seq[i] == 'A') {
@@ -125,7 +125,7 @@ retrieveEncodings(char* fpath, uint64_t*& enc_arr, uint32_t num_kmers, unsigned 
 
   while (!seqBatch.empty()) {
 #pragma omp parallel for num_threads(num_threads) schedule(static, 1)
-    for (uint32_t ix = 0; ix < (uint32_t)seqBatch.size(); ++ix) {
+    for (uint32_t ix = 0; ix < seqBatch.size(); ++ix) {
       const char* kmer_seq;
       uint64_t enc_bp;
       uint32_t fix = total_ix + ix;
@@ -135,7 +135,7 @@ retrieveEncodings(char* fpath, uint64_t*& enc_arr, uint32_t num_kmers, unsigned 
       kmerEncodingBPCompute(kmer_seq, enc_bp);
       enc_arr[fix] = enc_bp;
     }
-    total_ix += (uint32_t)seqBatch.size();
+    total_ix += seqBatch.size();
     if (seqBatch.size() == batch_size)
       seqBatch = IO::readBatch(reader, batch_size);
     else
@@ -149,5 +149,5 @@ computeHammingDistance64(const uint64_t x, const uint64_t y)
   uint64_t z1 = x ^ y;
   uint32_t z2 = z1 >> 32;
   uint32_t zc = z1 | z2;
-  return (uint8_t)__builtin_popcount(zc);
+  return static_cast<uint8_t>(__builtin_popcount(zc));
 }
