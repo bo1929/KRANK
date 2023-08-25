@@ -18,6 +18,9 @@ struct sseq_t
 KSEQ_INIT(gzFile, gzread)
 
 namespace IO {
+bool
+ensureDirectory(char* dirpath);
+
 kseq_t*
 getReader(const char* path);
 

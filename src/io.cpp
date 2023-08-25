@@ -4,6 +4,23 @@
 #include <fstream>
 #include <utility>
 
+bool
+IO::ensureDirectory(char* dirpath)
+{
+  bool is_ok;
+  struct stat info;
+  if (stat(dirpath, &info) != 0) {
+    std::cerr << "Cannot access to given directory path " << dirpath << std::endl;
+    is_ok = false;
+  } else if (info.st_mode & S_IFDIR) {
+    is_ok = true;
+  } else {
+    std::cerr << "Given path is not a directory " << dirpath << std::endl;
+    is_ok = false;
+  }
+  return is_ok;
+}
+
 kseq_t*
 IO::getReader(const char* fpath)
 {

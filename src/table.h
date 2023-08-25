@@ -7,12 +7,11 @@
 #include "io.h"
 #include "lsh.h"
 
-typedef uint32_t scT;
-
-enum RemovalStrategy
+enum PriorityMethod
 {
   random_kmer,
-  small_scount
+  large_scount,
+  nice_scount
 };
 
 template<typename encT>
@@ -20,21 +19,27 @@ struct StreamIM
 {
   uint8_t k, h;
   uint32_t l_rix;
+  uint64_t tnum_kmers;
   uint32_t curr_vix;
+  const char* filepath;
   maskLSH* ptr_lsh_vg;
   std::vector<std::pair<uint32_t, encT>> lsh_enc_vec;
 
-  StreamIM(uint8_t k, uint8_t h, maskLSH* ptr_lsh_vg)
-    : k(h)
-    , h(h)
-    , l_rix(0)
+  StreamIM(const char* filepath, uint8_t k, uint8_t h, maskLSH* ptr_lsh_vg)
+    : l_rix(0)
     , curr_vix(0)
+    , tnum_kmers(0)
+    , filepath(filepath)
+    , k(h)
+    , h(h)
     , ptr_lsh_vg(ptr_lsh_vg)
-  {}
+  {
+  }
   bool save(const char* filepath);
   bool load(const char* filepath);
-  uint64_t readBatch(const char* filepath, unsigned int batch_size);
-  uint64_t getBatch(vvec<encT>& batch_table, uint32_t batch_size);
+  void clear();
+  uint64_t processInput(uint32_t rbatch_size);
+  uint64_t getBatch(vvec<encT>& batch_table, uint32_t tbatch_size);
   std::unordered_map<uint8_t, uint64_t> histRowSizes();
 };
 
@@ -53,17 +58,15 @@ struct StreamOD
     , curr_rix(0)
     , f_rix(0)
   {
-    is_open = this->openStream();
-    if (is_open)
-      curr_pos = vec_ifs.tellg();
   }
-  bool openStream();
-  uint64_t getBatch(vvec<encT>& batch_table, uint32_t batch_size);
+  void openStream();
+  uint64_t getBatch(vvec<encT>& batch_table, uint32_t tbatch_size);
 };
 
 template<typename encT>
 struct HTs
 {
+  tT tID;
   uint8_t k, h, b;
   uint32_t num_rows;
   uint64_t num_kmers;
@@ -73,17 +76,20 @@ struct HTs
   encT* enc_arr;
   scT* scount_arr;
   uint8_t* ind_arr;
-  RemovalStrategy rm_strategy;
+  PriorityMethod kmer_priority;
+  std::vector<HTs<encT>> childrenHT;
+  std::set<tT> tIDsBasis;
 
-  HTs(uint8_t k, uint8_t h, uint8_t b, uint32_t num_rows, maskLSH* ptr_lsh_vg)
-    : k(h)
+  HTs(tT tID, uint8_t k, uint8_t h, uint8_t b, uint32_t num_rows, maskLSH* ptr_lsh_vg, PriorityMethod kmer_priority)
+    : tID(tID)
+    , k(h)
     , h(h)
     , b(b)
-    , num_rows(num_rows) // i.e., batch_size
+    , num_rows(num_rows) // i.e., tbatch_size
     , num_kmers(0)
     , num_species(0)
     , ptr_lsh_vg(ptr_lsh_vg)
-    , rm_strategy(small_scount)
+    , kmer_priority(kmer_priority)
   {
     enc_arr = new encT[num_rows * b];
     std::fill(enc_arr, enc_arr + num_rows * b, 0);
@@ -113,6 +119,7 @@ struct HTs
 template<typename encT>
 struct HTd
 {
+  tT tID;
   uint8_t k, h;
   uint32_t num_rows;
   uint64_t num_kmers;
@@ -121,16 +128,19 @@ struct HTd
   maskLSH* ptr_lsh_vg;
   vvec<encT> enc_vvec;
   vvec<scT> scount_vvec;
-  RemovalStrategy rm_strategy;
+  PriorityMethod kmer_priority;
+  std::vector<HTd<encT>> childrenHT;
+  std::set<tT> tIDsBasis;
 
-  HTd(uint8_t k, uint8_t h, uint32_t num_rows, maskLSH* ptr_lsh_vg)
-    : k(h)
+  HTd(tT tID, uint8_t k, uint8_t h, uint32_t num_rows, maskLSH* ptr_lsh_vg, PriorityMethod kmer_priority)
+    : tID(tID)
+    , k(h)
     , h(h)
-    , num_rows(num_rows) // i.e., batch_size
+    , num_rows(num_rows) // i.e., tbatch_size
     , num_kmers(0)
     , num_species(0)
     , ptr_lsh_vg(ptr_lsh_vg)
-    , rm_strategy(small_scount)
+    , kmer_priority(kmer_priority)
   {
     enc_vvec.resize(num_rows);
     scount_vvec.resize(num_rows);
@@ -139,7 +149,7 @@ struct HTd
 
   void clearRows();
   void updateSize();
-  void initCounts();
+  void initBasis(tT tID);
   void sortColumns();
   bool areColumnsSorted();
   void makeUnique(bool update_size = true);

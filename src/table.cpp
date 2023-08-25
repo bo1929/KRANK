@@ -21,12 +21,12 @@ sortColumns(vvec<T>& table)
 
 template<typename encT>
 uint64_t
-StreamIM<encT>::readBatch(const char* filepath, unsigned int batch_size)
+StreamIM<encT>::processInput(uint32_t rbatch_size)
 {
-  kseq_t* reader = IO::getReader(filepath);
-  batch_size = IO::adjustBatchSize(batch_size, num_threads);
-  std::vector<sseq_t> seqBatch = IO::readBatch(reader, batch_size);
-  uint64_t total_kmer = 0;
+  kseq_t* reader = IO::getReader(StreamIM<encT>::filepath);
+  rbatch_size = IO::adjustBatchSize(rbatch_size, num_threads);
+  std::vector<sseq_t> seqBatch = IO::readBatch(reader, rbatch_size);
+  uint64_t tnum_kmers = 0;
   uint32_t max_rix = pow(2, 2 * StreamIM<encT>::h);
   StreamIM<encT>::lsh_enc_vec.reserve(SIZE_ESTIMATE);
   while (!(seqBatch.empty())) {
@@ -46,9 +46,9 @@ StreamIM<encT>::readBatch(const char* filepath, unsigned int batch_size)
         StreamIM<encT>::lsh_enc_vec.push_back(std::make_pair(rix, enc_lr));
       }
     }
-    total_kmer += seqBatch.size();
-    if (seqBatch.size() == batch_size)
-      seqBatch = IO::readBatch(reader, batch_size);
+    tnum_kmers += seqBatch.size();
+    if (seqBatch.size() == rbatch_size)
+      seqBatch = IO::readBatch(reader, rbatch_size);
     else
       seqBatch.clear();
   }
@@ -56,7 +56,8 @@ StreamIM<encT>::readBatch(const char* filepath, unsigned int batch_size)
   std::sort(StreamIM<encT>::lsh_enc_vec.begin(),
             StreamIM<encT>::lsh_enc_vec.end(),
             [](const std::pair<uint32_t, uint64_t>& l, const std::pair<uint32_t, uint64_t>& r) { return l.first < r.first; });
-  return total_kmer;
+  StreamIM<encT>::tnum_kmers = tnum_kmers;
+  return tnum_kmers;
 }
 
 template<typename encT>
@@ -140,14 +141,23 @@ StreamIM<encT>::load(const char* filepath)
 }
 
 template<typename encT>
-uint64_t
-StreamIM<encT>::getBatch(vvec<encT>& batch_table, uint32_t batch_size)
+void
+StreamIM<encT>::clear()
 {
-  assert(batch_table.size() >= batch_size);
+  StreamIM<encT>::lsh_enc_vec.clear();
+  l_rix = 0;
+  curr_vix = 0;
+}
+
+template<typename encT>
+uint64_t
+StreamIM<encT>::getBatch(vvec<encT>& batch_table, uint32_t tbatch_size)
+{
+  assert(batch_table.size() >= tbatch_size);
   uint64_t num_kmers = 0;
   while (StreamIM<encT>::curr_vix < StreamIM<encT>::lsh_enc_vec.size()) {
     std::pair<uint32_t, encT> lsh_enc = StreamIM<encT>::lsh_enc_vec[StreamIM<encT>::curr_vix];
-    if (lsh_enc.first < (StreamIM<encT>::l_rix + batch_size)) {
+    if (lsh_enc.first < (StreamIM<encT>::l_rix + tbatch_size)) {
       batch_table[lsh_enc.first - StreamIM<encT>::l_rix].push_back(lsh_enc.second);
       num_kmers++;
     } else {
@@ -155,35 +165,36 @@ StreamIM<encT>::getBatch(vvec<encT>& batch_table, uint32_t batch_size)
     }
     StreamIM<encT>::curr_vix++;
   }
-  StreamIM<encT>::l_rix += batch_size;
+  StreamIM<encT>::l_rix += tbatch_size;
   sortColumns(batch_table);
   return num_kmers;
 }
 
 template<typename encT>
-bool
+void
 StreamOD<encT>::openStream()
 {
-  bool is_ok = true;
-  StreamOD<encT>::vec_ifs = IO::open_ifstream(StreamOD::filepath, is_ok);
-  return is_ok;
+  is_open = true;
+  StreamOD<encT>::vec_ifs = IO::open_ifstream(StreamOD::filepath, is_open);
+  if (is_open)
+    curr_pos = vec_ifs.tellg();
 }
 
 template<typename encT>
 uint64_t
-StreamOD<encT>::getBatch(vvec<encT>& batch_table, uint32_t batch_size)
+StreamOD<encT>::getBatch(vvec<encT>& batch_table, uint32_t tbatch_size)
 {
-  assert(batch_table.size() >= batch_size);
+  assert(batch_table.size() >= tbatch_size);
   uint64_t num_kmers = 0;
   uint64_t row_ix = 0;
   uint32_t curr_rix = StreamOD<encT>::curr_rix;
   uint32_t f_rix = StreamOD<encT>::f_rix;
-  while ((row_ix < batch_size) && (!StreamOD::vec_ifs.eof() && StreamOD::vec_ifs.good())) {
+  while ((row_ix < tbatch_size) && (!StreamOD::vec_ifs.eof() && StreamOD::vec_ifs.good())) {
     std::pair<uint32_t, encT> lsh_enc;
     StreamOD::vec_ifs.read((char*)&lsh_enc, sizeof(std::pair<uint32_t, encT>));
     curr_rix = lsh_enc.first;
     row_ix = curr_rix - f_rix;
-    if (!StreamOD::vec_ifs.eof() && (row_ix < batch_size)) {
+    if (!StreamOD::vec_ifs.eof() && (row_ix < tbatch_size)) {
       assert(row_ix < batch_table.size());
       batch_table[row_ix].push_back(lsh_enc.second);
       StreamOD<encT>::curr_rix = curr_rix + 1;
@@ -197,7 +208,7 @@ StreamOD<encT>::getBatch(vvec<encT>& batch_table, uint32_t batch_size)
     StreamOD<encT>::vec_ifs.close();
   } else {
     StreamOD<encT>::vec_ifs.seekg(curr_pos);
-    StreamOD<encT>::f_rix = f_rix + batch_size;
+    StreamOD<encT>::f_rix = f_rix + tbatch_size;
   }
   sortColumns(batch_table);
   return num_kmers;
@@ -321,10 +332,11 @@ HTd<encT>::clearRows()
 {
   HTd<encT>::enc_vvec.clear();
   HTd<encT>::enc_vvec.resize(HTd<encT>::num_rows);
-  HTd<encT>::updateSize();
   HTd<encT>::scount_vvec.clear();
   HTd<encT>::scount_vvec.resize(HTd<encT>::num_rows);
+  HTd<encT>::updateSize();
   HTd<encT>::num_species = 0;
+  HTd<encT>::tIDsBasis = {};
 }
 
 template<typename encT>
@@ -336,7 +348,9 @@ HTs<encT>::clearRows()
   for (uint32_t rix = 0; rix < num_rows; ++rix) {
     HTs<encT>::ind_arr[rix] = 0;
   }
+  HTs<encT>::updateSize();
   HTs<encT>::num_species = 0;
+  HTs<encT>::tIDsBasis = {};
 }
 
 template<typename encT>
@@ -368,8 +382,9 @@ HTs<encT>::updateSize()
 
 template<typename encT>
 void
-HTd<encT>::initCounts()
+HTd<encT>::initBasis(tT tID)
 {
+  HTd<encT>::updateSize();
   uint32_t num_rows = HTd<encT>::num_rows;
   uint32_t value;
   if (HTd<encT>::num_kmers > 0)
@@ -386,6 +401,7 @@ HTd<encT>::initCounts()
     }
   }
   HTd<encT>::num_species = value;
+  HTd<encT>::tIDsBasis = { tID };
 }
 
 template<typename encT>
@@ -413,11 +429,11 @@ HTd<encT>::pruneColumns(uint8_t b_max)
   for (uint32_t rix = 0; rix < num_rows; ++rix) {
     if (HTd<encT>::enc_vvec[rix].size() > b_max) {
       std::vector<unsigned int> ixs;
-      switch (HTd<encT>::rm_strategy) {
+      switch (HTd<encT>::kmer_priority) {
         case random_kmer:
           getIxsRandom(ixs, HTd<encT>::enc_vvec[rix].size(), HTd<encT>::enc_vvec[rix].size() - b_max);
           break;
-        case small_scount:
+        case large_scount:
           vecIxsNumber(ixs, HTd<encT>::scount_vvec[rix], HTd<encT>::enc_vvec[rix].size() - b_max);
           break;
       }
@@ -467,6 +483,7 @@ HTd<encT>::unionRows(HTd<encT>& sibling, bool update_size)
     }
   }
   HTd<encT>::num_species += sibling.num_species;
+  HTd<encT>::tIDsBasis.insert(sibling.tIDsBasis.begin(), sibling.tIDsBasis.end());
   if (update_size)
     HTd<encT>::updateSize();
 }
@@ -503,11 +520,11 @@ HTs<encT>::unionRows(HTs<encT>& sibling, bool update_size)
                      std::back_inserter(v));
       if (v.size() > b) {
         std::vector<unsigned int> ixs;
-        switch (HTs<encT>::rm_strategy) {
+        switch (HTs<encT>::kmer_priority) {
           case random_kmer:
             getIxsRandom(ixs, v.size(), v.size() - b);
             break;
-          case small_scount:
+          case large_scount:
             std::vector<scT> s_v;
             s_v.resize(v.size());
             std::transform(v.begin(), v.end(), back_inserter(s_v), [&count_map](encT val) { return count_map[val]; });
@@ -526,6 +543,7 @@ HTs<encT>::unionRows(HTs<encT>& sibling, bool update_size)
     }
   }
   HTs<encT>::num_species += sibling.num_species;
+  HTs<encT>::tIDsBasis.insert(sibling.tIDsBasis.begin(), sibling.tIDsBasis.end());
   if (update_size)
     HTs<encT>::updateSize();
 }
@@ -562,6 +580,7 @@ HTd<encT>::mergeRows(HTd<encT>& sibling, bool update_size)
     }
   }
   HTd<encT>::num_species += sibling.num_species;
+  HTd<encT>::tIDsBasis.insert(sibling.tIDsBasis.begin(), sibling.tIDsBasis.end());
   if (update_size)
     HTd<encT>::updateSize();
 }
@@ -601,11 +620,11 @@ HTs<encT>::mergeRows(HTs<encT>& sibling, bool update_size)
       }
       if (v.size() > b) {
         std::vector<unsigned int> ixs;
-        switch (HTs<encT>::rm_strategy) {
+        switch (HTs<encT>::kmer_priority) {
           case random_kmer:
             getIxsRandom(ixs, v.size(), v.size() - b);
             break;
-          case small_scount:
+          case large_scount:
             std::vector<scT> s_v;
             s_v.resize(v.size());
             std::transform(v.begin(), v.end(), back_inserter(s_v), [&count_map](encT val) { return count_map[val]; });
@@ -624,6 +643,7 @@ HTs<encT>::mergeRows(HTs<encT>& sibling, bool update_size)
     }
   }
   HTs<encT>::num_species += sibling.num_species;
+  HTs<encT>::tIDsBasis.insert(sibling.tIDsBasis.begin(), sibling.tIDsBasis.end());
   if (update_size)
     HTs<encT>::updateSize();
 }
@@ -641,7 +661,7 @@ HTd<encT>::shrinkHT(uint64_t num_rm, uint8_t b_max)
   while (to_rm > 0) {
     std::vector<unsigned int> row_order;
     vvecSizeOrder(row_order, HTd<encT>::scount_vvec, true);
-    switch (HTd<encT>::rm_strategy) {
+    switch (HTd<encT>::kmer_priority) {
       case random_kmer:
 #pragma omp parallel for num_threads(num_threads) schedule(static, 1) shared(to_rm)
         for (uint32_t ix = 0; ix < row_order.size(); ++ix) {
@@ -661,7 +681,7 @@ HTd<encT>::shrinkHT(uint64_t num_rm, uint8_t b_max)
           }
         }
         break;
-      case small_scount:
+      case large_scount:
         scT threshold = vvecArgmax2D(HTd<encT>::scount_vvec, static_cast<uint64_t>(to_rm));
 #pragma omp parallel for num_threads(num_threads) schedule(static, 1) shared(to_rm)
         for (uint32_t ix = 0; ix < row_order.size(); ++ix) {
@@ -682,6 +702,7 @@ HTd<encT>::shrinkHT(uint64_t num_rm, uint8_t b_max)
         break;
     }
   }
+  HTd<encT>::updateSize();
 }
 
 template<typename encT>
@@ -695,7 +716,7 @@ HTs<encT>::shrinkHT(uint64_t num_rm)
   while (to_rm > 0) {
     std::vector<unsigned int> row_order;
     arrSizeOrder(row_order, HTs<encT>::ind_arr, HTs<encT>::num_rows, true);
-    switch (HTs<encT>::rm_strategy) {
+    switch (HTs<encT>::kmer_priority) {
       case random_kmer:
 #pragma omp parallel for num_threads(num_threads) schedule(static, 1) shared(to_rm)
         for (uint32_t ix = 0; ix < row_order.size(); ++ix) {
@@ -715,7 +736,7 @@ HTs<encT>::shrinkHT(uint64_t num_rm)
           }
         }
         break;
-      case small_scount:
+      case large_scount:
         scT threshold = arrArgmax2D(HTs<encT>::scount_arr, HTs<encT>::ind_arr, HTs<encT>::num_rows, HTs<encT>::b, static_cast<uint64_t>(num_rm));
 #pragma omp parallel for num_threads(num_threads) schedule(static, 1) shared(to_rm)
         for (uint32_t ix = 0; ix < row_order.size(); ++ix) {
@@ -736,6 +757,7 @@ HTs<encT>::shrinkHT(uint64_t num_rm)
         break;
     }
   }
+  HTs<encT>::updateSize();
 }
 
 template<typename encT>
@@ -763,6 +785,7 @@ HTd<encT>::convertHTs(HTs<encT>& new_table)
     }
   }
   new_table.num_species = HTd<encT>::num_species;
+  new_table.tIDsBasis = HTd<encT>::tIDsBasis;
   new_table.updateSize();
 }
 

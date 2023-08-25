@@ -50,4 +50,8 @@ extern unsigned int num_threads;
 template<typename T>
 using vvec = std::vector<std::vector<T>>;
 
+typedef uint16_t tT;
+typedef uint64_t encT;
+typedef uint32_t scT;
+
 #endif
