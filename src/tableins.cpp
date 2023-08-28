@@ -2,10 +2,10 @@
 #define _TABLED_H
 
 template uint64_t
-StreamIM<uint32_t>::processInput(uint32_t rbatch_size);
+StreamIM<uint32_t>::processInput(uint64_t rbatch_size);
 
 template uint64_t
-StreamIM<uint64_t>::processInput(uint32_t rbatch_size);
+StreamIM<uint64_t>::processInput(uint64_t rbatch_size);
 
 template bool
 StreamIM<uint64_t>::save(const char* filepath);

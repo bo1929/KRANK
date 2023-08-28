@@ -1,4 +1,13 @@
 #include "kestane.h"
+#include "table.h"
+
+void
+testLCAtaxID(TaxonomyRecord<uint16_t> record, uint64_t t1, uint64_t t2)
+{
+  uint16_t t = record.getLowestCommonAncestor(record.changeIDt(t1), record.changeIDt(t2));
+  std::cout << "LCA(" << t1 << "," << t2 << ")";
+  std::cout << " = " << record.changeIDtax(t) << std::endl;
+}
 
 int
 main(int argc, char** argv)
@@ -60,129 +69,17 @@ main(int argc, char** argv)
   }
 
   uint8_t k = 32;
-  uint8_t h = 8;
-  uint8_t b = 15;
-  unsigned int read_batch_size = (unsigned int)DEFAULT_BATCH_SIZE;
-  num_threads = 16;
-  omp_set_dynamic(0);     // Explicitly disable dynamic teams
-  omp_set_num_threads(1); // Use num_threads threads if explicitly stated
-
-  std::cout << "-----------------" << std::endl;
-  std::cout << "Length of k-mers : " << (int)k << std::endl;
-  std::cout << "Number of positions for LSH : " << (int)h << std::endl;
-  std::cout << "Number of threads : " << num_threads << std::endl;
-  std::cout << "Read batch size : " << read_batch_size << std::endl;
-  std::cout << "-----------------" << std::endl;
-
+  uint8_t h = 12;
+  uint8_t b = 7;
+  uint32_t tbatch_size = pow(2, 2 * h) / 128;
+  uint64_t capacity = pow(2, 2 * h) * b / 2;
+  num_threads = 32;
   maskLSH lsh_vg = generateMaskLSH(k, h);
-
-  std::string str_pathA = "./test/test-A_and_B/counts-A";
-  std::string str_pathB = "./test/test-A_and_B/counts-B";
-  unsigned int num_reprs = 20;
-
-  uint32_t num_batch_rows = pow(2, 16);
-  HTd<uint64_t> tdA(k, h, num_batch_rows, &lsh_vg);
-  HTd<uint64_t> tdB(k, h, num_batch_rows, &lsh_vg);
-
-  uint64_t read_num_kmersA = 0;
-  uint64_t read_num_kmersB = 0;
-
-  for (unsigned int i = 1; i <= num_reprs; ++i) {
-    /* std::cout << str_pathA + std::to_string(i) + ".fa" */
-    /*           << " & " << str_pathB + std::to_string(i) + ".fa" << std::endl; */
-    StreamIM<uint64_t> tcAi(k, h, &lsh_vg);
-    StreamIM<uint64_t> tcBi(k, h, &lsh_vg);
-
-    uint64_t total_num_kmersAi = tcAi.readBatch((str_pathA + std::to_string(i) + ".fa").c_str(), read_batch_size);
-    uint64_t total_num_kmersBi = tcBi.readBatch((str_pathB + std::to_string(i) + ".fa").c_str(), read_batch_size);
-
-    HTd<uint64_t> tdAi(k, h, num_batch_rows, &lsh_vg);
-    HTd<uint64_t> tdBi(k, h, num_batch_rows, &lsh_vg);
-
-    read_num_kmersA += tcAi.getBatch(tdAi.enc_vvec, num_batch_rows);
-    read_num_kmersB += tcBi.getBatch(tdBi.enc_vvec, num_batch_rows);
-    tdAi.updateSize();
-    tdBi.updateSize();
-    tdAi.initCounts();
-    tdBi.initCounts();
-
-    tcAi.save(("./test/test-A_and_B/lsh_enc-A" + std::to_string(i)).c_str());
-    tcBi.save(("./test/test-A_and_B/lsh_enc-B" + std::to_string(i)).c_str());
-
-    tdA.mergeRows(tdAi, true);
-    tdB.mergeRows(tdBi, true);
-    tdA.sortColumns();
-    tdB.sortColumns();
-    /* std::cout << "After merge (A): " << tdA.num_kmers << "/" << read_num_kmersA << std::endl; */
-    /* std::cout << "After merge (B): " << tdB.num_kmers << "/" << read_num_kmersB << std::endl; */
-    tdA.makeUnique(true);
-    tdB.makeUnique(true);
-    /* std::cout << "After make unique (A): " << tdA.num_kmers << "/" << read_num_kmersA << std::endl; */
-    /* std::cout << "After make unique (B): " << tdB.num_kmers << "/" << read_num_kmersB << std::endl; */
-    /* std::cout << std::endl; */
-  }
-
-  for (unsigned int i = 1; i <= num_reprs; ++i) {
-    /* std::cout << str_pathA + std::to_string(i) + ".fa" */
-    /*           << " & " << str_pathB + std::to_string(i) + ".fa" << std::endl; */
-    StreamOD<uint64_t> tsAi(("./test/test-A_and_B/lsh_enc-A" + std::to_string(i)).c_str());
-    StreamOD<uint64_t> tsBi(("./test/test-A_and_B/lsh_enc-B" + std::to_string(i)).c_str());
-
-    HTd<uint64_t> tdAi(k, h, num_batch_rows, &lsh_vg);
-    HTd<uint64_t> tdBi(k, h, num_batch_rows, &lsh_vg);
-    read_num_kmersA += tsAi.getBatch(tdAi.enc_vvec, num_batch_rows);
-    read_num_kmersB += tsBi.getBatch(tdBi.enc_vvec, num_batch_rows);
-    tdAi.updateSize();
-    tdBi.updateSize();
-    tdAi.initCounts();
-    tdBi.initCounts();
-
-    tdA.unionRows(tdAi, true);
-    tdB.unionRows(tdBi, true);
-    /* std::cout << "After union (A): " << tdA.num_kmers << "/" << read_num_kmersA << std::endl; */
-    /* std::cout << "After union (B): " << tdB.num_kmers << "/" << read_num_kmersB << std::endl; */
-    tdA.makeUnique(true);
-    tdB.makeUnique(true);
-    /* std::cout << "After make unique (A): " << tdA.num_kmers << "/" << read_num_kmersA << std::endl; */
-    /* std::cout << "After make unique (B): " << tdB.num_kmers << "/" << read_num_kmersB << std::endl; */
-    /* std::cout << std::endl; */
-  }
-
-  tdA.updateSize();
-  tdB.updateSize();
-
-  /* std::cout << "Final: " << tdA.num_kmers << ", # of species: " << tdA.num_species << std::endl; */
-  /* std::cout << "Final: " << tdB.num_kmers << ", # of species: " << tdB.num_species << std::endl; */
-
-  HTs<uint64_t> tfA(k, h, b, num_batch_rows, &lsh_vg);
-  tdA.transformHTs(tfA);
-
-  HTs<uint64_t> tfB(k, h, b, num_batch_rows, &lsh_vg);
-  tdB.transformHTs(tfB);
-
-  tfA.mergeRows(tfB);
-  tfA.mergeRows(tfB);
-  tfA.makeUnique(true);
-
-  // std::cout << "Af+Bf after make unique: (F) " << tfA.num_kmers << std::endl;
-
-  // for (int i = 0; i < tfA.num_rows; ++i) {
-  //   for (int j = 0; j < tfA.ind_arr[i]; ++j) {
-  //     std::cout << tfA.scounts_arr[i * tfA.b + j] << std::endl;
-  //   }
-  // }
-
-  tdA.mergeRows(tdB);
-  tdA.mergeRows(tdB);
-  tdA.makeUnique(true);
-
-  std::cout << "Ad+Bd after make unique: (D) " << tdA.num_kmers << std::endl;
-
-  for (int i = 0; i < tdA.num_rows; ++i) {
-    for (auto val : tdA.scounts_vvec[i]) {
-      std::cout << val << std::endl;
-    }
-  }
+  Library lib("./test/library/", "./test/Nodes10000.dmp", "./test/test_inputpath.tsv", k, h, b, capacity, tbatch_size, true);
+  /* HTd<encT> td_root(1, k, h, tbatch_size, &lsh_vg, large_scount); */
+  /* lib.getBatchHTd(td_root); */
+  HTs<encT> ts_root(1, k, h, b, tbatch_size, &lsh_vg, random_kmer);
+  lib.getBatchHTs(ts_root, 0, 3);
 
   return 0;
 }

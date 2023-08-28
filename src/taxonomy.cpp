@@ -202,7 +202,7 @@ template<typename T>
 bool
 TaxonomyRecord<T>::isBasis(T tID)
 {
-  return _tID_to_input.find(tID) == _tID_to_input.end();
+  return _tID_to_input.find(tID) != _tID_to_input.end();
 }
 
 template TaxonomyRecord<uint32_t>::TaxonomyRecord(char* input_filepath, TaxonomyNCBI taxonomy);

@@ -24,11 +24,11 @@ ensureDirectory(char* dirpath);
 kseq_t*
 getReader(const char* path);
 
-unsigned int
-adjustBatchSize(unsigned int batch_size, unsigned int num_threads);
+uint64_t
+adjustBatchSize(uint64_t batch_size, uint8_t num_threads);
 
 std::vector<sseq_t>
-readBatch(kseq_t* kseq, unsigned int batch_size);
+readBatch(kseq_t* kseq, uint64_t batch_size);
 
 FILE*
 open_file(const char* filepath, bool is_ok, const char* mode);
@@ -37,6 +37,6 @@ std::ifstream
 open_ifstream(const char* filepath, bool is_ok);
 }
 
-#define DEFAULT_BATCH_SIZE 65536
+#define DEFAULT_BATCH_SIZE 1048576
 
 #endif

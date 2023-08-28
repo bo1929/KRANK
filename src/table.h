@@ -38,7 +38,7 @@ struct StreamIM
   bool save(const char* filepath);
   bool load(const char* filepath);
   void clear();
-  uint64_t processInput(uint32_t rbatch_size);
+  uint64_t processInput(uint64_t rbatch_size);
   uint64_t getBatch(vvec<encT>& batch_table, uint32_t tbatch_size);
   std::unordered_map<uint8_t, uint64_t> histRowSizes();
 };
@@ -101,7 +101,11 @@ struct HTs
   }
   ~HTs()
   {
+    enc_arr = nullptr;
     delete[] enc_arr;
+    scount_arr = nullptr;
+    delete[] scount_arr;
+    ind_arr = nullptr;
     delete[] ind_arr;
   }
 

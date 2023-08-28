@@ -36,7 +36,7 @@ public:
   TaxonomyRecord(char* input_filepath, TaxonomyNCBI taxonomy);
   void printTaxonomyRecord();
   T getLowestCommonAncestor(T a, T b);
-  uint64_t changeIDtax(T taxID);
+  uint64_t changeIDtax(T tID);
   T changeIDt(uint64_t taxID);
   bool isBasis(T tID);
   decltype(_tID_to_input)& tID_to_input() { return _tID_to_input; }

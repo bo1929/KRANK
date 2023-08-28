@@ -37,14 +37,14 @@ IO::getReader(const char* fpath)
   return kseq;
 }
 
-unsigned int
-IO::adjustBatchSize(unsigned int batch_size, unsigned int num_threads)
+uint64_t
+IO::adjustBatchSize(uint64_t batch_size, uint8_t num_threads)
 {
   return (batch_size / num_threads) * num_threads;
 }
 
 std::vector<sseq_t>
-IO::readBatch(kseq_t* kseq, unsigned int batch_size)
+IO::readBatch(kseq_t* kseq, uint64_t batch_size)
 {
   int l;
   unsigned int i = 0;

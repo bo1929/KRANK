@@ -1,6 +1,6 @@
+#include "common.h"
 #include "table.h"
-
-#define SIZE_ESTIMATE 4194304
+#include <ostream>
 
 // TODO: Benchmark different thread schedules etc.
 // TODO: Check what is sorted and what is not.
@@ -12,7 +12,7 @@ inline void
 sortColumns(vvec<T>& table)
 {
   uint32_t num_rows = table.size();
-#pragma omp parallel for num_threads(num_threads) schedule(static, 1)
+#pragma omp parallel for num_threads(num_threads), schedule(static)
   for (uint32_t rix = 0; rix < num_rows; ++rix) {
     if (!table[rix].empty())
       std::sort(table[rix].begin(), table[rix].end());
@@ -21,16 +21,17 @@ sortColumns(vvec<T>& table)
 
 template<typename encT>
 uint64_t
-StreamIM<encT>::processInput(uint32_t rbatch_size)
+StreamIM<encT>::processInput(uint64_t rbatch_size)
 {
   kseq_t* reader = IO::getReader(StreamIM<encT>::filepath);
   rbatch_size = IO::adjustBatchSize(rbatch_size, num_threads);
   std::vector<sseq_t> seqBatch = IO::readBatch(reader, rbatch_size);
   uint64_t tnum_kmers = 0;
   uint32_t max_rix = pow(2, 2 * StreamIM<encT>::h);
-  StreamIM<encT>::lsh_enc_vec.reserve(SIZE_ESTIMATE);
   while (!(seqBatch.empty())) {
-#pragma omp parallel for num_threads(num_threads) schedule(static, 1)
+    uint32_t pix = lsh_enc_vec.size();
+    lsh_enc_vec.resize(lsh_enc_vec.size() + seqBatch.size());
+#pragma omp parallel for num_threads(num_threads), schedule(static)
     for (uint32_t ix = 0; ix < seqBatch.size(); ++ix) {
       const char* kmer_seq;
       // TODO: Consider 32bit encodings if possible.
@@ -41,10 +42,7 @@ StreamIM<encT>::processInput(uint32_t rbatch_size)
       kmerEncodingCompute(kmer_seq, enc_lr, enc_bp);
       rix = computeValueLSH(enc_bp, *(StreamIM<encT>::ptr_lsh_vg));
       assert(rix < max_rix);
-#pragma omp critical
-      {
-        StreamIM<encT>::lsh_enc_vec.push_back(std::make_pair(rix, enc_lr));
-      }
+      StreamIM<encT>::lsh_enc_vec[pix + ix] = std::make_pair(rix, enc_lr);
     }
     tnum_kmers += seqBatch.size();
     if (seqBatch.size() == rbatch_size)
@@ -102,17 +100,17 @@ template<typename encT>
 bool
 StreamIM<encT>::save(const char* filepath)
 {
-  bool is_ok = false;
+  bool is_ok = true;
   if (StreamIM<encT>::lsh_enc_vec.empty()) {
     std::puts("The LSH-value and encoding pair vector is empty, nothing to save!");
+    is_ok = false;
     return is_ok;
   }
   FILE* vec_f = IO::open_file(filepath, is_ok, "wb");
   std::fwrite(StreamIM<encT>::lsh_enc_vec.data(), StreamIM<encT>::lsh_enc_vec.size(), sizeof(std::pair<uint32_t, encT>), vec_f);
   if (std::ferror(vec_f)) {
     std::puts("I/O error when writing LSH-value and encoding pairs.");
-  } else if (std::feof(vec_f)) {
-    is_ok = true;
+    is_ok = false;
   }
   std::fclose(vec_f);
   return is_ok;
@@ -225,7 +223,7 @@ HTd<encT>::makeUnique(bool update_size)
   }
 #endif
   uint32_t num_rows = HTd<encT>::num_rows;
-#pragma omp parallel for num_threads(num_threads) schedule(static, 1)
+#pragma omp parallel for num_threads(num_threads), schedule(static)
   for (uint32_t rix = 0; rix < num_rows; ++rix) {
     if (!HTd<encT>::enc_vvec[rix].empty()) {
       std::unordered_map<encT, scT> count_map = mapCountsHTd(HTd<encT>::enc_vvec[rix], HTd<encT>::scount_vvec[rix]);
@@ -249,7 +247,7 @@ HTs<encT>::makeUnique(bool update_size)
 #endif
   uint8_t b = HTs<encT>::b;
   uint32_t num_rows = HTs<encT>::num_rows;
-#pragma omp parallel for num_threads(num_threads) schedule(static, 1)
+#pragma omp parallel for num_threads(num_threads), schedule(static)
   for (uint32_t rix = 0; rix < num_rows; ++rix) {
     if (HTs<encT>::ind_arr[rix] > 0) {
       std::unordered_map<encT, scT> count_map = mapCountsHTs(HTs<encT>::enc_arr + (rix * b), HTs<encT>::scount_arr + (rix * b), HTs<encT>::ind_arr[rix]);
@@ -267,7 +265,7 @@ void
 HTd<encT>::sortColumns()
 {
   uint32_t num_rows = HTd<encT>::num_rows;
-#pragma omp parallel for num_threads(num_threads) schedule(static, 1)
+#pragma omp parallel for num_threads(num_threads), schedule(static)
   for (uint32_t rix = 0; rix < num_rows; ++rix) {
     if (!HTd<encT>::enc_vvec[rix].empty()) {
       std::unordered_map<encT, scT> count_map = mapCountsHTd(HTd<encT>::enc_vvec[rix], HTd<encT>::scount_vvec[rix]);
@@ -283,7 +281,7 @@ HTs<encT>::sortColumns()
 {
   uint8_t b = HTs<encT>::b;
   uint32_t num_rows = HTs<encT>::num_rows;
-#pragma omp parallel for num_threads(num_threads) schedule(static, 1)
+#pragma omp parallel for num_threads(num_threads), schedule(static)
   for (uint32_t rix = 0; rix < num_rows; ++rix) {
     if (HTs<encT>::ind_arr[rix] > 0) {
       std::unordered_map<encT, scT> count_map = mapCountsHTs(HTs<encT>::enc_arr + (rix * b), HTs<encT>::scount_arr + (rix * b), HTs<encT>::ind_arr[rix]);
@@ -299,7 +297,7 @@ HTd<encT>::areColumnsSorted()
 {
   bool is_ok = true;
   uint32_t num_rows = HTd<encT>::num_rows;
-#pragma omp parallel for num_threads(num_threads) schedule(static, 1)
+#pragma omp parallel for num_threads(num_threads), schedule(static)
   for (uint32_t rix = 0; rix < num_rows; ++rix) {
     if (!HTd<encT>::enc_vvec[rix].empty() && !std::is_sorted(HTd<encT>::enc_vvec[rix].begin(), HTd<encT>::enc_vvec[rix].end())) {
 #pragma omp atomic write
@@ -316,7 +314,7 @@ HTs<encT>::areColumnsSorted()
   bool is_ok = true;
   uint8_t b = HTs<encT>::b;
   uint32_t num_rows = HTs<encT>::num_rows;
-#pragma omp parallel for num_threads(num_threads) schedule(static, 1)
+#pragma omp parallel for num_threads(num_threads), schedule(static)
   for (uint32_t rix = 0; rix < num_rows; ++rix) {
     if ((HTs<encT>::ind_arr[rix] > 0) && !std::is_sorted(HTs<encT>::enc_arr + (rix * b), HTs<encT>::enc_arr + (rix * b) + HTs<encT>::ind_arr[rix])) {
 #pragma omp atomic write
@@ -344,7 +342,7 @@ void
 HTs<encT>::clearRows()
 {
   uint32_t num_rows = HTs<encT>::num_rows;
-#pragma omp parallel for num_threads(num_threads) schedule(static, 1)
+#pragma omp parallel for num_threads(num_threads), schedule(static)
   for (uint32_t rix = 0; rix < num_rows; ++rix) {
     HTs<encT>::ind_arr[rix] = 0;
   }
@@ -391,7 +389,7 @@ HTd<encT>::initBasis(tT tID)
     value = 1;
   else
     value = 0;
-#pragma omp parallel for num_threads(num_threads) schedule(static, 1)
+#pragma omp parallel for num_threads(num_threads), schedule(static)
   for (uint32_t rix = 0; rix < num_rows; ++rix) {
     if (!HTd<encT>::enc_vvec[rix].empty()) {
       HTd<encT>::scount_vvec[rix].resize(HTd<encT>::enc_vvec[rix].size());
@@ -409,7 +407,7 @@ void
 HTd<encT>::trimColumns(uint8_t b_max)
 {
   uint32_t num_rows = HTd<encT>::num_rows;
-#pragma omp parallel for num_threads(num_threads) schedule(static, 1)
+#pragma omp parallel for num_threads(num_threads), schedule(static)
   for (uint32_t rix = 0; rix < num_rows; ++rix) {
     if (HTd<encT>::enc_vvec[rix].size() > b_max) {
       HTd<encT>::enc_vvec[rix].resize(b_max);
@@ -425,7 +423,7 @@ HTd<encT>::pruneColumns(uint8_t b_max)
 {
   assert(b_max > 0);
   uint32_t num_rows = HTd<encT>::num_rows;
-#pragma omp parallel for num_threads(num_threads) schedule(static, 1)
+#pragma omp parallel for num_threads(num_threads), schedule(static)
   for (uint32_t rix = 0; rix < num_rows; ++rix) {
     if (HTd<encT>::enc_vvec[rix].size() > b_max) {
       std::vector<unsigned int> ixs;
@@ -434,7 +432,7 @@ HTd<encT>::pruneColumns(uint8_t b_max)
           getIxsRandom(ixs, HTd<encT>::enc_vvec[rix].size(), HTd<encT>::enc_vvec[rix].size() - b_max);
           break;
         case large_scount:
-          vecIxsNumber(ixs, HTd<encT>::scount_vvec[rix], HTd<encT>::enc_vvec[rix].size() - b_max);
+          vecIxsNumber(ixs, HTd<encT>::scount_vvec[rix], HTd<encT>::enc_vvec[rix].size() - b_max, false);
           break;
       }
       vecRemoveIxs(HTd<encT>::enc_vvec[rix], ixs);
@@ -466,7 +464,7 @@ HTd<encT>::unionRows(HTd<encT>& sibling, bool update_size)
 #endif
   assert(HTd<encT>::num_rows == sibling.num_rows);
   uint32_t num_rows = HTd<encT>::num_rows;
-#pragma omp parallel for num_threads(num_threads) schedule(static, 1)
+#pragma omp parallel for num_threads(num_threads), schedule(static)
   for (uint32_t rix = 0; rix < num_rows; ++rix) {
     if (!HTd<encT>::enc_vvec[rix].empty() && !sibling.enc_vvec[rix].empty()) {
       std::unordered_map<encT, scT> count_map =
@@ -506,7 +504,7 @@ HTs<encT>::unionRows(HTs<encT>& sibling, bool update_size)
   assert(HTs<encT>::num_rows * HTs<encT>::b == sibling.num_rows * sibling.b);
   uint8_t b = HTs<encT>::b;
   uint32_t num_rows = HTs<encT>::num_rows;
-#pragma omp parallel for num_threads(num_threads) schedule(static, 1)
+#pragma omp parallel for num_threads(num_threads), schedule(static)
   for (uint32_t rix = 0; rix < num_rows; ++rix) {
     unsigned int ix = rix * b;
     if ((sibling.ind_arr[rix] > 0) && (HTs<encT>::ind_arr[rix] > 0)) {
@@ -526,9 +524,8 @@ HTs<encT>::unionRows(HTs<encT>& sibling, bool update_size)
             break;
           case large_scount:
             std::vector<scT> s_v;
-            s_v.resize(v.size());
             std::transform(v.begin(), v.end(), back_inserter(s_v), [&count_map](encT val) { return count_map[val]; });
-            vecIxsNumber(ixs, s_v, v.size() - b);
+            vecIxsNumber(ixs, s_v, v.size() - b, false);
             break;
         }
         vecRemoveIxs(v, ixs);
@@ -564,7 +561,7 @@ HTd<encT>::mergeRows(HTd<encT>& sibling, bool update_size)
 #endif
   assert(HTd<encT>::num_rows == sibling.num_rows);
   uint32_t num_rows = HTd<encT>::num_rows;
-#pragma omp parallel for num_threads(num_threads) schedule(static, 1)
+#pragma omp parallel for num_threads(num_threads), schedule(static)
   for (uint32_t rix = 0; rix < num_rows; ++rix) {
     if (!HTd<encT>::enc_vvec[rix].empty() && !sibling.enc_vvec[rix].empty()) {
       std::unordered_map<encT, scT> count_map =
@@ -603,7 +600,7 @@ HTs<encT>::mergeRows(HTs<encT>& sibling, bool update_size)
   assert(HTs<encT>::num_rows * HTs<encT>::b == sibling.num_rows * sibling.b);
   uint8_t b = HTs<encT>::b;
   uint32_t num_rows = HTs<encT>::num_rows;
-#pragma omp parallel for num_threads(num_threads) schedule(static, 1)
+#pragma omp parallel for num_threads(num_threads), schedule(static)
   for (uint32_t rix = 0; rix < num_rows; ++rix) {
     unsigned int ix = rix * b;
     if ((sibling.ind_arr[rix] > 0) && (HTs<encT>::ind_arr[rix] > 0)) {
@@ -626,9 +623,8 @@ HTs<encT>::mergeRows(HTs<encT>& sibling, bool update_size)
             break;
           case large_scount:
             std::vector<scT> s_v;
-            s_v.resize(v.size());
             std::transform(v.begin(), v.end(), back_inserter(s_v), [&count_map](encT val) { return count_map[val]; });
-            vecIxsNumber(ixs, s_v, v.size() - b);
+            vecIxsNumber(ixs, s_v, v.size() - b, false);
             break;
         }
         vecRemoveIxs(v, ixs);
@@ -652,54 +648,59 @@ template<typename encT>
 void
 HTd<encT>::shrinkHT(uint64_t num_rm, uint8_t b_max)
 {
-  uint64_t init_num_kmers = HTd<encT>::num_kmers;
   assert(num_rm < HTd<encT>::num_kmers);
+  uint64_t init_num_kmers = HTd<encT>::num_kmers;
+  std::cout << "In shrinkHT b_max: " << (int)b_max << ", num_rm: " << num_rm << std::endl;
   HTd<encT>::pruneColumns(b_max);
-  num_rm = num_rm - (init_num_kmers - HTd<encT>::num_kmers);
-  assert(num_rm < std::numeric_limits<int64_t>::max());
-  volatile int64_t to_rm = static_cast<uint64_t>(num_rm);
+  volatile int64_t to_rm = num_rm - (init_num_kmers - HTd<encT>::num_kmers);
+  std::cout << "After pruning, to_rm: " << to_rm << std::endl;
   while (to_rm > 0) {
+    assert(to_rm < std::numeric_limits<int64_t>::max());
+    assert(to_rm < HTd<encT>::num_kmers);
     std::vector<unsigned int> row_order;
     vvecSizeOrder(row_order, HTd<encT>::scount_vvec, true);
     switch (HTd<encT>::kmer_priority) {
-      case random_kmer:
-#pragma omp parallel for num_threads(num_threads) schedule(static, 1) shared(to_rm)
+      case random_kmer: {
+        uint8_t n = to_rm / HTd<encT>::num_rows + 1;
+#pragma omp parallel for num_threads(num_threads) shared(to_rm) schedule(static)
         for (uint32_t ix = 0; ix < row_order.size(); ++ix) {
-          int64_t r_to_rm;
+          if (HTd<encT>::scount_vvec[row_order[ix]].size() >= n) {
+            int64_t r_to_rm;
 #pragma omp atomic read
-          r_to_rm = to_rm;
-          if (r_to_rm > 0) {
-            std::vector<unsigned int> ixs;
-            uint8_t n = r_to_rm / HTd<encT>::num_rows + 1;
-            getIxsRandom(ixs, HTd<encT>::scount_vvec[row_order[ix]].size(), n);
-            vecRemoveIxs(HTd<encT>::scount_vvec[row_order[ix]], ixs);
-            vecRemoveIxs(HTd<encT>::enc_vvec[row_order[ix]], ixs);
+            r_to_rm = to_rm;
+            if (r_to_rm > 0) {
+              std::vector<unsigned int> ixs;
+              getIxsRandom(ixs, HTd<encT>::scount_vvec[row_order[ix]].size(), n);
+              vecRemoveIxs(HTd<encT>::scount_vvec[row_order[ix]], ixs);
+              vecRemoveIxs(HTd<encT>::enc_vvec[row_order[ix]], ixs);
 #pragma omp atomic update
-            to_rm = to_rm - ixs.size();
-          } else {
-            continue;
+              to_rm = to_rm - ixs.size();
+            }
           }
         }
         break;
-      case large_scount:
-        scT threshold = vvecArgmax2D(HTd<encT>::scount_vvec, static_cast<uint64_t>(to_rm));
-#pragma omp parallel for num_threads(num_threads) schedule(static, 1) shared(to_rm)
+      }
+      case large_scount: {
+        scT threshold = vvecArgmax2D(HTd<encT>::scount_vvec, static_cast<uint64_t>(to_rm), false);
+        std::cout << "Threshold:" << threshold << std::endl;
+#pragma omp parallel for num_threads(num_threads) shared(to_rm) schedule(static)
         for (uint32_t ix = 0; ix < row_order.size(); ++ix) {
-          int64_t r_to_rm;
+          if (HTd<encT>::scount_vvec[row_order[ix]].size() > 0) {
+            int64_t r_to_rm;
 #pragma omp atomic read
-          r_to_rm = to_rm;
-          if (r_to_rm > 0) {
-            std::vector<unsigned int> ixs;
-            vecIxsThreshold(ixs, HTd<encT>::scount_vvec[row_order[ix]], threshold);
-            vecRemoveIxs(HTd<encT>::scount_vvec[row_order[ix]], ixs);
-            vecRemoveIxs(HTd<encT>::enc_vvec[row_order[ix]], ixs);
+            r_to_rm = to_rm;
+            if (r_to_rm > 0) {
+              std::vector<unsigned int> ixs;
+              vecIxsThreshold(ixs, HTd<encT>::scount_vvec[row_order[ix]], threshold, true);
+              vecRemoveIxs(HTd<encT>::scount_vvec[row_order[ix]], ixs);
+              vecRemoveIxs(HTd<encT>::enc_vvec[row_order[ix]], ixs);
 #pragma omp atomic update
-            to_rm = to_rm - ixs.size();
-          } else {
-            continue;
+              to_rm = to_rm - ixs.size();
+            }
           }
         }
         break;
+      }
     }
   }
   HTd<encT>::updateSize();
@@ -710,6 +711,7 @@ void
 HTs<encT>::shrinkHT(uint64_t num_rm)
 {
   uint8_t b = HTs<encT>::b;
+  std::cout << "In shrinkHT b: " << (int)b << ", num_rm: " << num_rm << std::endl;
   assert(num_rm <= HTs<encT>::num_kmers);
   assert(num_rm < std::numeric_limits<int64_t>::max());
   volatile int64_t to_rm = static_cast<int64_t>(num_rm);
@@ -717,44 +719,49 @@ HTs<encT>::shrinkHT(uint64_t num_rm)
     std::vector<unsigned int> row_order;
     arrSizeOrder(row_order, HTs<encT>::ind_arr, HTs<encT>::num_rows, true);
     switch (HTs<encT>::kmer_priority) {
-      case random_kmer:
-#pragma omp parallel for num_threads(num_threads) schedule(static, 1) shared(to_rm)
+      case random_kmer: {
+        uint8_t n = to_rm / HTs<encT>::num_rows + 1;
+#pragma omp parallel for num_threads(num_threads) shared(to_rm) schedule(static)
         for (uint32_t ix = 0; ix < row_order.size(); ++ix) {
-          int64_t r_to_rm;
+          if (HTs<encT>::ind_arr[row_order[ix]] > 0) {
+            int64_t r_to_rm;
 #pragma omp atomic read
-          r_to_rm = to_rm;
-          if (r_to_rm > 0) {
-            std::vector<unsigned int> ixs;
-            uint8_t n = r_to_rm / HTs<encT>::num_rows + 1;
-            getIxsRandom(ixs, HTs<encT>::ind_arr[row_order[ix]], n);
-            arrRemoveIxs(HTs<encT>::enc_arr + (row_order[ix] * b), HTs<encT>::ind_arr[row_order[ix]], ixs);
-            arrRemoveIxs(HTs<encT>::scount_arr + (row_order[ix] * b), HTs<encT>::ind_arr[row_order[ix]], ixs);
+            r_to_rm = to_rm;
+            if (r_to_rm > 0) {
+              std::vector<unsigned int> ixs;
+              getIxsRandom(ixs, HTs<encT>::ind_arr[row_order[ix]], n);
+              arrRemoveIxs(HTs<encT>::enc_arr + (row_order[ix] * b), HTs<encT>::ind_arr[row_order[ix]], ixs);
+              arrRemoveIxs(HTs<encT>::scount_arr + (row_order[ix] * b), HTs<encT>::ind_arr[row_order[ix]], ixs);
+              HTs<encT>::ind_arr[row_order[ix]] = HTs<encT>::ind_arr[row_order[ix]] - ixs.size();
 #pragma omp atomic update
-            to_rm = to_rm - ixs.size();
-          } else {
-            continue;
+              to_rm = to_rm - ixs.size();
+            }
           }
         }
         break;
-      case large_scount:
-        scT threshold = arrArgmax2D(HTs<encT>::scount_arr, HTs<encT>::ind_arr, HTs<encT>::num_rows, HTs<encT>::b, static_cast<uint64_t>(num_rm));
-#pragma omp parallel for num_threads(num_threads) schedule(static, 1) shared(to_rm)
+      }
+      case large_scount: {
+        scT threshold = arrArgmax2D(HTs<encT>::scount_arr, HTs<encT>::ind_arr, HTs<encT>::num_rows, HTs<encT>::b, static_cast<uint64_t>(to_rm), false);
+        std::cout << "Threshold:" << threshold << std::endl;
+#pragma omp parallel for num_threads(num_threads) shared(to_rm) schedule(static)
         for (uint32_t ix = 0; ix < row_order.size(); ++ix) {
-          int64_t r_to_rm;
+          if (HTs<encT>::ind_arr[row_order[ix]] > 0) {
+            int64_t r_to_rm;
 #pragma omp atomic read
-          r_to_rm = to_rm;
-          if (r_to_rm > 0) {
-            std::vector<unsigned int> ixs;
-            arrIxsThreshold(ixs, HTs<encT>::scount_arr + (row_order[ix] * b), HTs<encT>::ind_arr[row_order[ix]], threshold);
-            arrRemoveIxs(HTs<encT>::enc_arr + (row_order[ix] * b), HTs<encT>::ind_arr[row_order[ix]], ixs);
-            arrRemoveIxs(HTs<encT>::scount_arr + (row_order[ix] * b), HTs<encT>::ind_arr[row_order[ix]], ixs);
+            r_to_rm = to_rm;
+            if (r_to_rm > 0) {
+              std::vector<unsigned int> ixs;
+              arrIxsThreshold(ixs, HTs<encT>::scount_arr + (row_order[ix] * b), HTs<encT>::ind_arr[row_order[ix]], threshold, true);
+              arrRemoveIxs(HTs<encT>::enc_arr + (row_order[ix] * b), HTs<encT>::ind_arr[row_order[ix]], ixs);
+              arrRemoveIxs(HTs<encT>::scount_arr + (row_order[ix] * b), HTs<encT>::ind_arr[row_order[ix]], ixs);
+              HTs<encT>::ind_arr[row_order[ix]] = HTs<encT>::ind_arr[row_order[ix]] - ixs.size();
 #pragma omp atomic update
-            to_rm = to_rm - ixs.size();
-          } else {
-            continue;
+              to_rm = to_rm - ixs.size();
+            }
           }
         }
         break;
+      }
     }
   }
   HTs<encT>::updateSize();

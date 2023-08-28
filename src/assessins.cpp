@@ -53,40 +53,40 @@ template uint64_t
 vvecArgmax2D(const vvec<uint64_t>& vvec, uint64_t n, bool reverse);
 
 template void
-vecIxsNumber(std::vector<unsigned int>& ixs, const std::vector<uint16_t>& s_vec, uint8_t number);
+vecIxsNumber(std::vector<unsigned int>& ixs, const std::vector<uint16_t>& s_vec, uint8_t number, bool reverse);
 
 template void
-vecIxsNumber(std::vector<unsigned int>& ixs, const std::vector<uint32_t>& s_vec, uint8_t number);
+vecIxsNumber(std::vector<unsigned int>& ixs, const std::vector<uint32_t>& s_vec, uint8_t number, bool reverse);
 
 template void
-vecIxsNumber(std::vector<unsigned int>& ixs, const std::vector<uint64_t>& s_vec, uint8_t number);
+vecIxsNumber(std::vector<unsigned int>& ixs, const std::vector<uint64_t>& s_vec, uint8_t number, bool reverse);
 
 template void
-vecIxsThreshold(std::vector<unsigned int>& ixs, const std::vector<uint16_t>& s_vec, uint16_t threshold);
+vecIxsThreshold(std::vector<unsigned int>& ixs, const std::vector<uint16_t>& s_vec, uint16_t threshold, bool reverse);
 
 template void
-vecIxsThreshold(std::vector<unsigned int>& ixs, const std::vector<uint32_t>& s_vec, uint32_t threshold);
+vecIxsThreshold(std::vector<unsigned int>& ixs, const std::vector<uint32_t>& s_vec, uint32_t threshold, bool reverse);
 
 template void
-vecIxsThreshold(std::vector<unsigned int>& ixs, const std::vector<uint64_t>& s_vec, uint64_t threshold);
+vecIxsThreshold(std::vector<unsigned int>& ixs, const std::vector<uint64_t>& s_vec, uint64_t threshold, bool reverse);
 
 template void
-arrIxsNumber(std::vector<unsigned int>& ixs, const uint16_t* s_arr, uint8_t number);
+arrIxsNumber(std::vector<unsigned int>& ixs, const uint16_t* s_arr, uint8_t number, bool reverse);
 
 template void
-arrIxsNumber(std::vector<unsigned int>& ixs, const uint32_t* s_arr, uint8_t number);
+arrIxsNumber(std::vector<unsigned int>& ixs, const uint32_t* s_arr, uint8_t number, bool reverse);
 
 template void
-arrIxsNumber(std::vector<unsigned int>& ixs, const uint64_t* s_arr, uint8_t number);
+arrIxsNumber(std::vector<unsigned int>& ixs, const uint64_t* s_arr, uint8_t number, bool reverse);
 
 template void
-arrIxsThreshold(std::vector<unsigned int>& ixs, const uint16_t* s_arr, uint8_t last, uint16_t threshold);
+arrIxsThreshold(std::vector<unsigned int>& ixs, const uint16_t* s_arr, uint8_t last, uint16_t threshold, bool reverse);
 
 template void
-arrIxsThreshold(std::vector<unsigned int>& ixs, const uint32_t* s_arr, uint8_t last, uint32_t threshold);
+arrIxsThreshold(std::vector<unsigned int>& ixs, const uint32_t* s_arr, uint8_t last, uint32_t threshold, bool reverse);
 
 template void
-arrIxsThreshold(std::vector<unsigned int>& ixs, const uint64_t* s_arr, uint8_t last, uint64_t threshold);
+arrIxsThreshold(std::vector<unsigned int>& ixs, const uint64_t* s_arr, uint8_t last, uint64_t threshold, bool reverse);
 
 template void
 vvecSizeOrder(std::vector<unsigned int>& ixs, const vvec<uint16_t>& vvec, bool reverse);

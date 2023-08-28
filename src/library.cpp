@@ -36,8 +36,9 @@ Library::Library(char* library_dirpath,
   uint64_t root_size = 0;
 
   for (auto kv : _taxonomy_record.tID_to_input()) {
+    std::cout << "Processing k-mer set for taxon " << _taxonomy_record.changeIDtax(kv.first) << std::endl;
     StreamIM<encT> sIM(kv.second.c_str(), _k, h, &_lsh_vg);
-    uint64_t size_basis = sIM.processInput(static_cast<uint32_t>(DEFAULT_BATCH_SIZE));
+    uint64_t size_basis = sIM.processInput(static_cast<uint64_t>(DEFAULT_BATCH_SIZE));
     _basis_to_size[kv.first] = size_basis;
     root_size += size_basis;
     if (_onDisk) {
@@ -45,23 +46,25 @@ Library::Library(char* library_dirpath,
       save_filepath = save_filepath + "/" + std::to_string(kv.first);
       bool is_ok = sIM.save(save_filepath.c_str());
       if (!is_ok) {
-        std::cerr << "Error saving to " << library_dirpath << std::endl;
+        std::cerr << "Error saving to " << save_filepath << std::endl;
         exit(EXIT_FAILURE);
       }
       _streamOD_map.emplace(std::make_pair(kv.first, StreamOD<encT>(save_filepath.c_str())));
       _streamOD_map.at(kv.first).openStream();
+      sIM.clear();
     } else {
       _streamIM_map.insert(std::make_pair(kv.first, sIM));
     }
   }
   _root_size = root_size;
+  std::cout << "Total number of (non-unique) k-mers under the root: " << _root_size << std::endl;
 }
 
 uint64_t
 Library::getConstrainedSize(std::set<tT> tIDsBasis)
 {
   uint64_t constrained_size;
-  uint64_t sum_size;
+  uint64_t sum_size = 0;
   for (tT tID : tIDsBasis) {
     sum_size = sum_size + _basis_to_size[tID];
   }
@@ -83,28 +86,31 @@ Library::getBatchHTs(HTs<encT>& ts, uint8_t curr_depth, uint8_t last_depth)
     }
     td.initBasis(td.tID);
     td.convertHTs(ts);
-  } else if (curr_depth <= last_depth) {
+  } else if (curr_depth >= last_depth) {
     HTd<encT> td(ts.tID, ts.k, ts.h, ts.num_rows, ts.ptr_lsh_vg, ts.kmer_priority);
     getBatchHTd(td);
     td.convertHTs(ts);
   } else {
     for (tT tID_c : _taxonomy_record.child_map()[ts.tID]) {
-      HTs<encT> ts_c(ts.tID, ts.k, ts.b, ts.h, ts.num_rows, ts.ptr_lsh_vg, ts.kmer_priority);
+      HTs<encT> ts_c(tID_c, ts.k, ts.h, ts.b, ts.num_rows, ts.ptr_lsh_vg, ts.kmer_priority);
       ts.childrenHT.push_back(ts_c);
-      getBatchHTs(ts.childrenHT.back(), curr_depth - 1, last_depth);
+      getBatchHTs(ts.childrenHT.back(), curr_depth + 1, last_depth);
     }
     for (auto& ts_c : ts.childrenHT) {
       ts.unionRows(ts_c);
     }
-    if (ts.tID != _rootID) {
-      int64_t num_rm;
-      uint64_t constrained_size = getConstrainedSize(ts.tIDsBasis);
-      num_rm = static_cast<int64_t>(constrained_size) - static_cast<int64_t>(ts.num_kmers);
-      if (num_rm > 0) {
-        ts.shrinkHT(static_cast<uint64_t>(num_rm));
-      }
-      ts.childrenHT.clear();
+    std::cout << "Constructed HTs for tID: " << ts.tID << ", taxID: " << _taxonomy_record.changeIDtax(ts.tID) << std::endl;
+    std::cout << "Number of k-mers in the table " << ts.num_kmers << std::endl;
+    int64_t num_rm;
+    uint64_t constrained_size = getConstrainedSize(ts.tIDsBasis);
+    num_rm = static_cast<int64_t>(ts.num_kmers) - static_cast<int64_t>(constrained_size);
+    std::cout << "Number of k-mers constrained under the taxon " << constrained_size << std::endl;
+    std::cout << "Number of k-mers to be removed from the table " << num_rm << std::endl;
+    if (num_rm > 0) {
+      ts.shrinkHT(static_cast<uint64_t>(num_rm));
     }
+    std::cout << "Number of k-mers in the table after shrinkHT " << ts.num_kmers << std::endl;
+    ts.childrenHT.clear();
   }
 }
 
@@ -120,19 +126,24 @@ Library::getBatchHTd(HTd<encT>& td)
     td.initBasis(td.tID);
   } else {
     for (tT tID_c : _taxonomy_record.child_map()[td.tID]) {
-      HTd<encT> td_c(td.tID, td.k, td.h, td.num_rows, td.ptr_lsh_vg, td.kmer_priority);
+      HTd<encT> td_c(tID_c, td.k, td.h, td.num_rows, td.ptr_lsh_vg, td.kmer_priority);
       td.childrenHT.push_back(td_c);
       getBatchHTd(td.childrenHT.back());
     }
     for (auto& td_c : td.childrenHT) {
       td.unionRows(td_c);
     }
+    std::cout << "Constructed HTd for tID: " << td.tID << ", taxID: " << _taxonomy_record.changeIDtax(td.tID) << std::endl;
+    std::cout << "Number of k-mers in the table " << td.num_kmers << std::endl;
     int64_t num_rm;
     uint64_t constrained_size = getConstrainedSize(td.tIDsBasis);
-    num_rm = static_cast<int64_t>(constrained_size) - static_cast<int64_t>(td.num_kmers);
+    num_rm = static_cast<int64_t>(td.num_kmers) - static_cast<int64_t>(constrained_size);
+    std::cout << "Number of k-mers constrained under the taxon " << constrained_size << std::endl;
+    std::cout << "Number of k-mers to be removed from the table " << num_rm << std::endl;
     if (num_rm > 0) {
       td.shrinkHT(static_cast<uint64_t>(num_rm), _b);
     }
+    std::cout << "Number of k-mers in the table after shrinkHT " << td.num_kmers << std::endl;
     td.childrenHT.clear();
   }
 }

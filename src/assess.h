@@ -37,25 +37,25 @@ arrArgmax2D(const T* arr, const uint8_t* ind_arr, uint32_t num_rows, uint8_t b, 
 
 template<typename T>
 void
-vecIxsNumber(std::vector<unsigned int>& ixs, const std::vector<T>& s_v, uint8_t number);
+vecIxsNumber(std::vector<unsigned int>& ixs, const std::vector<T>& s_v, uint8_t number, bool reverse = false);
 
 template<typename T>
 void
-vecIxsThreshold(std::vector<unsigned int>& ixs, const std::vector<T>& s_v, T threshold);
+vecIxsThreshold(std::vector<unsigned int>& ixs, const std::vector<T>& s_v, T threshold, bool reverse = false);
 
 template<typename T>
 void
-arrIxsNumber(std::vector<unsigned int>& ixs, const T* s_arr, uint8_t number);
+arrIxsNumber(std::vector<unsigned int>& ixs, const T* s_arr, uint8_t number, bool reverse = false);
 
 template<typename T>
 void
-arrIxsThreshold(std::vector<unsigned int>& ixs, const T* s_arr, uint8_t last, T threshold);
+arrIxsThreshold(std::vector<unsigned int>& ixs, const T* s_arr, uint8_t last, T threshold, bool reverse = false);
 
 template<typename T>
 void
-vvecSizeOrder(std::vector<unsigned int>& ixs, const vvec<T>& vv, bool reverse = true);
+vvecSizeOrder(std::vector<unsigned int>& ixs, const vvec<T>& vv, bool reverse = false);
 
 void
-arrSizeOrder(std::vector<unsigned int>& ixs, const uint8_t* inr_r, uint32_t num_rows, bool reverse = true);
+arrSizeOrder(std::vector<unsigned int>& ixs, const uint8_t* inr_r, uint32_t num_rows, bool reverse = false);
 
 #endif
