@@ -20,7 +20,10 @@ void
 kmerEncodingUpdateC(const char* seq, uint64_t& enc_lr, uint64_t& enc_bp);
 
 void
-retrieveEncodings(const char* fpath, uint64_t*& enc_arr, uint32_t num_kmers, unsigned int batch_size);
+retrieveEncodings(const char* fpath,
+                  uint64_t*& enc_arr,
+                  uint32_t num_kmers,
+                  unsigned int batch_size);
 
 uint8_t
 computeHammingDistance64(uint64_t x, uint64_t y); // TODO: CHECK

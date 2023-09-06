@@ -43,15 +43,16 @@
 #ifdef _OPENMP
   #include <omp.h>
 #else
-  #warning                                                                     \
-      "OpenMP not found, multi-threading will be DISABLED and --num-threads option will be ignored!"
+  #warning                                                                                         \
+    "OpenMP not found, multi-threading will be DISABLED and --num-threads option will be ignored!"
 #endif
 
 extern unsigned int num_threads;
 extern std::random_device rd;
 extern std::mt19937 gen;
 
-template <typename T> using vvec = std::vector<std::vector<T>>;
+template<typename T>
+using vvec = std::vector<std::vector<T>>;
 
 // TODO: Check if types are adequate.
 // TODO: Is it possible to set types automatically?
@@ -59,23 +60,27 @@ typedef uint16_t tT;
 typedef uint64_t encT;
 typedef uint16_t scT;
 
-class AddTimeStamp : public std::streambuf {
+class AddTimeStamp : public std::streambuf
+{
 public:
-  AddTimeStamp(std::basic_ios<char> &out)
-      : out_(out), sink_(), newline_(false) {
+  AddTimeStamp(std::basic_ios<char>& out)
+    : out_(out)
+    , sink_()
+    , newline_(false)
+  {
     sink_ = out_.rdbuf(this);
     assert(sink_);
   }
   ~AddTimeStamp() { out_.rdbuf(sink_); }
 
 protected:
-  int_type overflow(int_type m = traits_type::eof()) {
+  int_type overflow(int_type m = traits_type::eof())
+  {
     if (traits_type::eq_int_type(m, traits_type::eof()))
       return sink_->pubsync() == -1 ? m : traits_type::not_eof(m);
     if (newline_) {
       std::ostream str(sink_);
-      auto curr_time = std::chrono::system_clock::to_time_t(
-          std::chrono::system_clock::now());
+      auto curr_time = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
       if (!(str << std::ctime(&curr_time)))
         return traits_type::eof();
     }
@@ -84,10 +89,10 @@ protected:
   }
 
 private:
-  AddTimeStamp(const AddTimeStamp &);
-  AddTimeStamp &operator=(const AddTimeStamp &);
-  std::basic_ios<char> &out_;
-  std::streambuf *sink_;
+  AddTimeStamp(const AddTimeStamp&);
+  AddTimeStamp& operator=(const AddTimeStamp&);
+  std::basic_ios<char>& out_;
+  std::streambuf* sink_;
   bool newline_;
 };
 

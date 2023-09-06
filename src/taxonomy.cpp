@@ -229,9 +229,11 @@ TaxonomyRecord<T>::saveTaxonomyRecord(const char* library_dirpath)
   return is_ok;
 }
 
-template TaxonomyRecord<uint32_t>::TaxonomyRecord(const char* input_filepath, TaxonomyNCBI taxonomy);
+template TaxonomyRecord<uint32_t>::TaxonomyRecord(const char* input_filepath,
+                                                  TaxonomyNCBI taxonomy);
 
-template TaxonomyRecord<uint16_t>::TaxonomyRecord(const char* input_filepath, TaxonomyNCBI taxonomy);
+template TaxonomyRecord<uint16_t>::TaxonomyRecord(const char* input_filepath,
+                                                  TaxonomyNCBI taxonomy);
 
 template void
 TaxonomyRecord<uint32_t>::printTaxonomyRecord();

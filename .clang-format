@@ -1,6 +1,6 @@
 ---
 Language: Cpp
 BasedOnStyle: Mozilla
-ColumnLimit: 160
+ColumnLimit: 100
 IndentPPDirectives: BeforeHash
 ---

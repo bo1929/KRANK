@@ -39,8 +39,7 @@ struct StreamIM
     , h(h)
     , ptr_lsh_vg(ptr_lsh_vg)
     , ptr_npositions(ptr_npositions)
-  {
-  }
+  {}
   bool save(const char* filepath);
   bool load(const char* filepath);
   void clear();
@@ -63,8 +62,7 @@ struct StreamOD
     : filepath(filepath)
     , curr_rix(0)
     , f_rix(0)
-  {
-  }
+  {}
   void openStream();
   uint64_t getBatch(vvec<encT>& batch_table, uint32_t tbatch_size);
 };
