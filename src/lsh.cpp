@@ -1,27 +1,15 @@
 #include "lsh.h"
-#include <cstdint>
 
 maskLSH
-generateMaskLSH(uint8_t k, uint8_t h)
+generateMaskLSH(std::vector<uint8_t>& positions)
 {
-  uint8_t n;
-  std::vector<uint8_t> positions;
-  for (uint8_t m = 0; m < h; m++) {
-    n = rand() % k;
-    if (count(positions.begin(), positions.end(), n)) {
-      m -= 1;
-    } else {
-      positions.push_back(n);
-    }
-  }
   sort(positions.begin(), positions.end(), std::greater<uint8_t>());
-
   std::vector<int8_t> v;
   std::vector<int8_t> g;
   int8_t lp = 31;
   int8_t jp = 0;
 
-  for (int8_t j = 0; j < h; j++) {
+  for (int8_t j = 0; j < positions.size(); j++) {
     if (j == 0) {
       v.push_back((lp - positions[j]) * 2);
       lp = positions[j];
@@ -37,7 +25,6 @@ generateMaskLSH(uint8_t k, uint8_t h)
   }
   g.push_back(jp);
 
-  // Complete above one-dimensional vector.
   v.push_back(-1);
   g.push_back(-1);
 

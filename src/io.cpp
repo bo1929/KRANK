@@ -5,7 +5,7 @@
 #include <utility>
 
 bool
-IO::ensureDirectory(char* dirpath)
+IO::ensureDirectory(const char* dirpath)
 {
   bool is_ok;
   struct stat info;
@@ -65,12 +65,12 @@ IO::readBatch(kseq_t* kseq, uint64_t batch_size)
 }
 
 FILE*
-IO::open_file(const char* filepath, bool is_ok, const char* mode)
+IO::open_file(const char* filepath, bool& is_ok, const char* mode)
 {
   FILE* f;
   f = std::fopen(filepath, mode);
   if (!f) {
-    std::fprintf(stderr, "File opening failed! %s", filepath);
+    std::cerr << "File opening failed!" << filepath << std::endl;
     is_ok = false;
   }
   return f;

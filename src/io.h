@@ -19,7 +19,7 @@ KSEQ_INIT(gzFile, gzread)
 
 namespace IO {
 bool
-ensureDirectory(char* dirpath);
+ensureDirectory(const char* dirpath);
 
 kseq_t*
 getReader(const char* path);
@@ -31,7 +31,7 @@ std::vector<sseq_t>
 readBatch(kseq_t* kseq, uint64_t batch_size);
 
 FILE*
-open_file(const char* filepath, bool is_ok, const char* mode);
+open_file(const char* filepath, bool& is_ok, const char* mode);
 
 std::ifstream
 open_ifstream(const char* filepath, bool is_ok);

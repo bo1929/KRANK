@@ -176,9 +176,21 @@ template std::unordered_map<uint8_t, uint64_t>
 HTs<uint32_t>::histRowSizes();
 
 template void
-HTd<uint32_t>::convertHTs(HTs<uint32_t>& table);
+HTd<uint32_t>::convertHTs(HTs<uint32_t>* table);
 
 template void
-HTd<uint64_t>::convertHTs(HTs<uint64_t>& table);
+HTd<uint64_t>::convertHTs(HTs<uint64_t>* table);
+
+template void
+HTd<uint32_t>::updateLCA();
+
+template void
+HTd<uint64_t>::updateLCA();
+
+template void
+HTs<uint64_t>::updateLCA();
+
+template void
+HTs<uint32_t>::updateLCA();
 
 #endif

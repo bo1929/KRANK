@@ -1,6 +1,6 @@
 #include "taxonomy.h"
 
-TaxonomyNCBI::TaxonomyNCBI(char* nodes_filepath)
+TaxonomyNCBI::TaxonomyNCBI(const char* nodes_filepath)
 {
   std::ifstream nodes_file(nodes_filepath);
   if (!nodes_file.good()) {
@@ -68,7 +68,7 @@ TaxonomyNCBI::getRank(uint64_t taxID)
 }
 
 template<typename T>
-TaxonomyRecord<T>::TaxonomyRecord(char* input_filepath, TaxonomyNCBI taxonomy)
+TaxonomyRecord<T>::TaxonomyRecord(const char* input_filepath, TaxonomyNCBI taxonomy)
 {
   std::map<std::string, uint64_t> input_to_taxID;
   std::ifstream input_file(input_filepath);
@@ -205,9 +205,33 @@ TaxonomyRecord<T>::isBasis(T tID)
   return _tID_to_input.find(tID) != _tID_to_input.end();
 }
 
-template TaxonomyRecord<uint32_t>::TaxonomyRecord(char* input_filepath, TaxonomyNCBI taxonomy);
+template<typename T>
+bool
+TaxonomyRecord<T>::saveTaxonomyRecord(const char* library_dirpath)
+{
+  bool is_ok = true;
+  std::string save_filepath(library_dirpath);
+  std::vector<std::pair<T, uint64_t>> tIDs_taxIDs(_tID_to_taxID.begin(), _tID_to_taxID.end());
 
-template TaxonomyRecord<uint16_t>::TaxonomyRecord(char* input_filepath, TaxonomyNCBI taxonomy);
+  FILE* taxonomyf = IO::open_file((save_filepath + "/taxonomy").c_str(), is_ok, "wb");
+  std::fwrite(&_num_input, sizeof(T), 1, taxonomyf);
+  std::fwrite(&_num_nodes, sizeof(T), 1, taxonomyf);
+  std::fwrite(tIDs_taxIDs.data(), sizeof(std::pair<T, uint64_t>), _num_nodes, taxonomyf);
+  std::fwrite(_parent_vec.data(), sizeof(T), _num_nodes, taxonomyf);
+  std::fwrite(_depth_vec.data(), sizeof(uint8_t), _num_nodes, taxonomyf);
+
+  if (std::ferror(taxonomyf)) {
+    std::puts("I/O error when writing taxonomy-record file to the library.\n");
+    is_ok = false;
+  }
+  std::fclose(taxonomyf);
+
+  return is_ok;
+}
+
+template TaxonomyRecord<uint32_t>::TaxonomyRecord(const char* input_filepath, TaxonomyNCBI taxonomy);
+
+template TaxonomyRecord<uint16_t>::TaxonomyRecord(const char* input_filepath, TaxonomyNCBI taxonomy);
 
 template void
 TaxonomyRecord<uint32_t>::printTaxonomyRecord();
@@ -238,3 +262,12 @@ TaxonomyRecord<uint16_t>::isBasis(uint16_t tID);
 
 template bool
 TaxonomyRecord<uint32_t>::isBasis(uint32_t tID);
+
+template bool
+TaxonomyRecord<uint64_t>::saveTaxonomyRecord(const char* library_dirpath);
+
+template bool
+TaxonomyRecord<uint32_t>::saveTaxonomyRecord(const char* library_dirpath);
+
+template bool
+TaxonomyRecord<uint16_t>::saveTaxonomyRecord(const char* library_dirpath);
