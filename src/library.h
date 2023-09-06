@@ -43,6 +43,7 @@ private:
   std::unordered_map<tT, StreamIM<encT>> _streamIM_map;
   std::unordered_map<tT, StreamOD<encT>> _streamOD_map;
   std::unordered_map<tT, uint64_t> _basis_to_size;
+  std::vector<tT> _tID_vec;
   uint64_t _num_species;
   bool _switch_selection;
   bool _on_disk;

@@ -64,7 +64,7 @@ struct StreamOD
     , f_rix(0)
   {}
   void openStream();
-  uint64_t getBatch(vvec<encT>& batch_table, uint32_t tbatch_size);
+  uint64_t getBatch(vvec<encT>& batch_table, uint32_t tbatch_size, bool contd = false);
 };
 
 template<typename encT>

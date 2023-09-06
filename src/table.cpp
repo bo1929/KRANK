@@ -190,9 +190,10 @@ StreamOD<encT>::openStream()
 
 template<typename encT>
 uint64_t
-StreamOD<encT>::getBatch(vvec<encT>& batch_table, uint32_t tbatch_size)
+StreamOD<encT>::getBatch(vvec<encT>& batch_table, uint32_t tbatch_size, bool contd)
 {
-  assert(batch_table.size() >= tbatch_size);
+  if (!contd)
+    assert(batch_table.size() >= tbatch_size);
   uint64_t num_kmers = 0;
   uint64_t row_ix = 0;
   uint32_t curr_rix = StreamOD<encT>::curr_rix;
@@ -206,8 +207,10 @@ StreamOD<encT>::getBatch(vvec<encT>& batch_table, uint32_t tbatch_size)
     curr_rix = lsh_enc.first;
     row_ix = curr_rix - f_rix;
     if (!StreamOD::vec_ifs.eof() && (row_ix < tbatch_size)) {
-      assert(row_ix < batch_table.size());
-      batch_table[row_ix].push_back(lsh_enc.second);
+      if (!contd) {
+        assert(row_ix < batch_table.size());
+        batch_table[row_ix].push_back(lsh_enc.second);
+      }
       StreamOD<encT>::curr_rix = curr_rix + 1;
       StreamOD<encT>::curr_pos = StreamOD<encT>::vec_ifs.tellg();
       num_kmers++;
@@ -221,7 +224,8 @@ StreamOD<encT>::getBatch(vvec<encT>& batch_table, uint32_t tbatch_size)
     StreamOD<encT>::vec_ifs.seekg(curr_pos);
     StreamOD<encT>::f_rix = f_rix + tbatch_size;
   }
-  sortColumns(batch_table);
+  if (!contd)
+    sortColumns(batch_table);
   return num_kmers;
 }
 

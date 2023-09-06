@@ -1,5 +1,5 @@
-#include "library.h"
 #include "common.h"
+#include "library.h"
 
 Library::Library(const char* library_dirpath,
                  const char* nodes_filepath,
@@ -60,14 +60,13 @@ Library::Library(const char* library_dirpath,
 
   uint64_t root_size = 0;
   _num_species = _taxonomy_record.tID_to_input().size();
-  std::vector<tT> tID_vec;
-  tID_vec.reserve(_num_species);
+  _tID_vec.reserve(_num_species);
   for (auto const& kv : _taxonomy_record.tID_to_input())
-    tID_vec.push_back(kv.first);
+    _tID_vec.push_back(kv.first);
 
 #pragma omp parallel for schedule(dynamic), num_threads(num_threads)
-  for (unsigned int i = 0; i < tID_vec.size(); ++i) {
-    tT tID_key = tID_vec[i];
+  for (unsigned int i = 0; i < _tID_vec.size(); ++i) {
+    tT tID_key = _tID_vec[i];
     std::string filepath = _taxonomy_record.tID_to_input()[tID_key];
 #pragma omp critical
     {
@@ -164,14 +163,17 @@ void
 Library::continueBatch()
 {
   vvec<encT> tmp;
-  tmp.resize(_tbatch_size);
   if (_on_disk) {
-    for (auto& kv : _streamOD_map) {
-      _streamOD_map.at(kv.first).getBatch(tmp, _tbatch_size);
+#pragma omp parallel for schedule(dynamic), num_threads(num_threads)
+    for (unsigned int i = 0; i < _tID_vec.size(); ++i) {
+      tT tID_key = _tID_vec[i];
+      _streamOD_map.at(tID_key).getBatch(tmp, _tbatch_size, true);
     }
   } else {
-    for (auto& kv : _streamIM_map) {
-      _streamIM_map.at(kv.first).getBatch(tmp, _tbatch_size);
+#pragma omp parallel for schedule(dynamic), num_threads(num_threads)
+    for (unsigned int i = 0; i < _tID_vec.size(); ++i) {
+      tT tID_key = _tID_vec[i];
+      _streamIM_map.at(tID_key).getBatch(tmp, _tbatch_size);
     }
   }
 }

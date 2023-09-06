@@ -38,10 +38,10 @@ template void
 StreamOD<uint32_t>::openStream();
 
 template uint64_t
-StreamOD<uint64_t>::getBatch(vvec<uint64_t>& batch_table, uint32_t tbatch_size);
+StreamOD<uint64_t>::getBatch(vvec<uint64_t>& batch_table, uint32_t tbatch_size, bool cont);
 
 template uint64_t
-StreamOD<uint32_t>::getBatch(vvec<uint32_t>& batch_table, uint32_t tbatch_size);
+StreamOD<uint32_t>::getBatch(vvec<uint32_t>& batch_table, uint32_t tbatch_size, bool cont);
 
 template std::unordered_map<uint8_t, uint64_t>
 StreamIM<uint64_t>::histRowSizes();

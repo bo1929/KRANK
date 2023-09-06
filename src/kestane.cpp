@@ -113,11 +113,6 @@ main(int argc, char** argv)
   uint32_t tbatch_size = pow(2, 2 * h - batch_size);
   uint64_t capacity = pow(2, 2 * h) * b;
 
-  float library_size =
-    static_cast<float>(capacity * (sizeof(encT) + sizeof(tT)) + (capacity / b) * sizeof(uint8_t)) /
-    (1.074 * pow(10, 9));
-  std::cout << "Estimated library is is about ~" << library_size << " gigabyte." << std::endl;
-
   if (sub_build->parsed()) {
     Library lib(library_dir.c_str(),
                 taxonomy_dmp.c_str(),
