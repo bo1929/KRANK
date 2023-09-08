@@ -81,8 +81,8 @@ TaxonomyRecord<T>::TaxonomyRecord(const char* input_filepath, TaxonomyNCBI taxon
   while (std::getline(input_file, line)) {
     std::istringstream iss(line);
     std::string genome, taxID;
-    if (!(std::getline(iss, genome, '\t') && std::getline(iss, taxID, '\t'))) {
-      std::cerr << "Failed to read file for genome to taxon ID map." << std::endl;
+    if (!(std::getline(iss, taxID, '\t') && std::getline(iss, genome, '\t'))) {
+      std::cerr << "Failed to read file for taxon ID to genome input map." << std::endl;
       exit(EXIT_FAILURE);
     }
     input_to_taxID[genome] = (uint64_t)stoul(taxID);
