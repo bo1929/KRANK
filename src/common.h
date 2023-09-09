@@ -1,6 +1,7 @@
 #ifndef _COMMON_H
 #define _COMMON_H
 
+#include "aixlog.hpp"
 #include <algorithm>
 #include <assert.h>
 #include <bitset>

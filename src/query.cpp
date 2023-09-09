@@ -1,11 +1,18 @@
 #include "query.h"
 
-Query::Query(const char *library_dirpath, const char *output_dirpath,
-             const char *query_filepath, uint8_t max_match_hdist,
-             bool save_match_info, bool verbose)
-    : _library_dirpath(library_dirpath), _output_dirpath(output_dirpath),
-      _query_filepath(query_filepath), _max_match_hdist(max_match_hdist),
-      _save_match_info(save_match_info), _verbose(verbose) {
+Query::Query(const char* library_dirpath,
+             const char* output_dirpath,
+             const char* query_filepath,
+             uint8_t max_match_hdist,
+             bool save_match_info,
+             bool log)
+  : _library_dirpath(library_dirpath)
+  , _output_dirpath(output_dirpath)
+  , _query_filepath(query_filepath)
+  , _max_match_hdist(max_match_hdist)
+  , _save_match_info(save_match_info)
+  , _log(log)
+{
   Query::loadMetadata();
   _lsh_vg = generateMaskLSH(_positions);
   Query::loadTaxonomy();
@@ -13,15 +20,13 @@ Query::Query(const char *library_dirpath, const char *output_dirpath,
   if (IO::ensureDirectory(_library_dirpath)) {
     std::cout << "Library will be read from " << _library_dirpath << std::endl;
   } else {
-    std::cerr << "Library can not be found at " << _library_dirpath
-              << std::endl;
+    std::cerr << "Library can not be found at " << _library_dirpath << std::endl;
     exit(EXIT_FAILURE);
   }
   if (IO::ensureDirectory(_output_dirpath)) {
     std::cout << "Results will be written to " << _output_dirpath << std::endl;
   } else {
-    std::cerr << "Directory to output results can not be found "
-              << _output_dirpath << std::endl;
+    std::cerr << "Directory to output results can not be found " << _output_dirpath << std::endl;
     exit(EXIT_FAILURE);
   }
 
@@ -35,8 +40,7 @@ Query::Query(const char *library_dirpath, const char *output_dirpath,
     std::istringstream iss(line);
     std::string queryID, path;
     if (!(std::getline(iss, queryID, '\t') && std::getline(iss, path, '\t'))) {
-      std::cerr << "Failed to read file for query ID to query path map."
-                << std::endl;
+      std::cerr << "Failed to read file for query ID to query path map" << std::endl;
       exit(EXIT_FAILURE);
     }
     _queryID_to_path[queryID] = path;
@@ -45,107 +49,119 @@ Query::Query(const char *library_dirpath, const char *output_dirpath,
   try {
     _enc_arr = new encT[_num_rows * _b];
     std::fill(_enc_arr, _enc_arr + _num_rows * _b, 0);
+    if (_log)
+      LOG(INFO) << "Allocated memory for the encoding array" << std::endl;
     _tlca_arr = new tT[_num_rows * _b];
     std::fill(_tlca_arr, _tlca_arr + _num_rows * _b, 0);
+    if (_log)
+      LOG(INFO) << "Allocated memory for the taxon-LCA array" << std::endl;
     /* scount_arr = new scT[_num_rows * _b]; */
     /* std::fill(scount_arr, scount_arr + _num_rows * _b, 0); */
     _ind_arr = new uint8_t[_num_rows];
     std::fill(_ind_arr, _ind_arr + _num_rows, 0);
-  } catch (std::bad_alloc &ba) {
-    std::cerr << "Failed to allocate memory for the library." << ba.what()
-              << std::endl;
+    if (_log)
+      LOG(INFO) << "Allocated memory for the indicator array" << std::endl;
+  } catch (std::bad_alloc& ba) {
+    std::cerr << "Failed to allocate memory for the library" << ba.what() << std::endl;
   }
-  std::cout << "Memory allocation for the library is completed successfully."
-            << std::endl;
+  std::cout << "Memory allocation for the library is completed successfully" << std::endl;
 
   std::string save_dirpath(_library_dirpath);
 
-#pragma omp parallel for num_threads(num_threads),                             \
-    schedule(static) shared(_enc_arr, _tlca_arr, _ind_arr)
+#pragma omp parallel for num_threads(num_threads),                                                 \
+  schedule(static) shared(_enc_arr, _tlca_arr, _ind_arr)
   for (unsigned int i = 1; i <= _total_batches; ++i) {
     bool is_ok = true;
-    FILE *encf = IO::open_file(
-        (save_dirpath + "/enc_arr-" + std::to_string(i)).c_str(), is_ok, "r");
+    FILE* encf =
+      IO::open_file((save_dirpath + "/enc_arr-" + std::to_string(i)).c_str(), is_ok, "r");
     if (std::ferror(encf)) {
-      std::puts("I/O error when reading encoding array from the library.\n");
+      std::puts("I/O error when reading encoding array from the library\n");
       is_ok = false;
     } else
-      std::fread(_enc_arr + (i - 1) * _tbatch_size * _b, sizeof(encT),
-                 _tbatch_size * _b, encf);
+      std::fread(_enc_arr + (i - 1) * _tbatch_size * _b, sizeof(encT), _tbatch_size * _b, encf);
     std::fclose(encf);
-    FILE *tlcaf = IO::open_file(
-        (save_dirpath + "/tlca_arr-" + std::to_string(i)).c_str(), is_ok, "r");
+    FILE* tlcaf =
+      IO::open_file((save_dirpath + "/tlca_arr-" + std::to_string(i)).c_str(), is_ok, "r");
     if (std::ferror(tlcaf)) {
-      std::puts("I/O error when reading taxon-LCA array from the library.\n");
+      std::puts("I/O error when reading taxon-LCA array from the library\n");
       is_ok = false;
     } else
-      std::fread(_tlca_arr + (i - 1) * _tbatch_size * _b, sizeof(tT),
-                 _tbatch_size * _b, tlcaf);
+      std::fread(_tlca_arr + (i - 1) * _tbatch_size * _b, sizeof(tT), _tbatch_size * _b, tlcaf);
     std::fclose(tlcaf);
-    FILE *indf = IO::open_file(
-        (save_dirpath + "/ind_arr-" + std::to_string(i)).c_str(), is_ok, "r");
+    FILE* indf =
+      IO::open_file((save_dirpath + "/ind_arr-" + std::to_string(i)).c_str(), is_ok, "r");
     if (std::ferror(indf)) {
-      std::puts("I/O error when reading indicator array from the library.\n");
+      std::puts("I/O error when reading indicator array from the library\n");
       is_ok = false;
     } else
-      std::fread(_ind_arr + (i - 1) * _tbatch_size, sizeof(uint8_t),
-                 _tbatch_size, indf);
+      std::fread(_ind_arr + (i - 1) * _tbatch_size, sizeof(uint8_t), _tbatch_size, indf);
     std::fclose(indf);
-    if (!is_ok)
+    if (!is_ok) {
+      if (_log)
+        LOG(INFO) << "Failed to load the library into the memory" << std::endl;
       exit(EXIT_FAILURE);
+    } else {
+      if (_log)
+        LOG(ERROR) << "Library has been loaded into the memory" << std::endl;
+    }
   }
-  std::cout << "Library is loaded. Ready for performing queries." << std::endl;
+  std::cout << "Library is loaded and ready for performing queries" << std::endl;
   std::cout << "Details:" << std::endl;
   std::cout << "\tLength of the k-mer, k: " << std::to_string(_k) << std::endl;
-  std::cout << "\tNumber of positions of LSH, h: " << std::to_string(_h)
-            << std::endl;
-  std::cout << "\tNumber of columns in the table, b: " << std::to_string(_b)
-            << std::endl;
+  std::cout << "\tNumber of positions of LSH, h: " << std::to_string(_h) << std::endl;
+  std::cout << "\tNumber of columns in the table, b: " << std::to_string(_b) << std::endl;
   std::cout << "\tMaximum capacity size: " << _capacity_size << std::endl;
   std::cout << "\tTable row batch size: " << _tbatch_size << std::endl;
   std::cout << "\tTotal number of rows: " << _num_rows << std::endl;
   std::cout << "\tNumber of species: " << _num_species << std::endl;
-  std::cout << "\tTotal number of (non-unique) kmers: " << _root_size
-            << std::endl;
+  std::cout << "\tTotal number of (non-unique) kmers: " << _root_size << std::endl;
   std::cout << std::endl;
 
-  if (_verbose) {
+  if (_log) {
     std::unordered_map<uint8_t, uint64_t> hist_map;
     for (unsigned int rix = 0; rix < _num_rows; ++rix) {
       hist_map[_ind_arr[rix]]++;
     }
-    std::cout << "Histogram of # columns in the table across rows:"
-              << std::endl;
-    std::cout << "Number of Columns"
+    LOG(INFO) << "Percentages of # columns in the table across rows:" << std::endl;
+    std::cout << "\tNumber of Columns"
               << " : "
               << "Percentage" << std::endl;
     for (auto kv : hist_map)
-      std::cout << static_cast<uint16_t>(kv.first) << " : "
+      std::cout << "\t" << static_cast<uint16_t>(kv.first) << " : "
                 << static_cast<float>(kv.second) / _num_rows << std::endl;
   }
 }
 
-void Query::run(uint64_t rbatch_size) {
+void
+Query::run(uint64_t rbatch_size)
+{
   uint32_t max_rix = std::numeric_limits<uint32_t>::max();
   max_rix = max_rix >> (32 - 2 * _h);
   std::vector<std::string> keys;
-  for (auto &kv : _queryID_to_path) {
+  for (auto& kv : _queryID_to_path) {
     keys.push_back(kv.first);
   }
   for (unsigned int i = 0; i < _queryID_to_path.size(); ++i) {
     std::string queryID = keys[i];
+    if (_log)
+      LOG(NOTICE) << "Searching for k-mer matches for the query " << queryID << std::endl;
     std::fstream ofs_match_info;
     if (_save_match_info) {
+      if (_log)
+        LOG(INFO) << "Opening file to output match information" << std::endl;
       std::string output_file(_output_dirpath);
       output_file = output_file + "/match_info-" + queryID;
       ofs_match_info.open(output_file, std::fstream::out);
       if (!ofs_match_info.is_open())
-        std::cout << "Failed to open " << output_file << std::endl;
+        std::cerr << "Failed to open " << output_file << std::endl;
     }
-    kseq_t *reader = IO::getReader(_queryID_to_path[queryID].c_str());
+    kseq_t* reader = IO::getReader(_queryID_to_path[queryID].c_str());
     rbatch_size = IO::adjustBatchSize(rbatch_size, num_threads);
     std::vector<sseq_t> seqBatch = IO::readBatch(reader, rbatch_size);
     uint64_t tnum_reads = 0;
+    if (_log)
+      LOG(INFO) << "Batch size for the query reads in the current query file is " << seqBatch.size()
+                << std::endl;
     while (!(seqBatch.empty())) {
       std::vector<std::string> names_vec(seqBatch.size());
       std::vector<std::vector<uint8_t>> hdist_vec_or(seqBatch.size());
@@ -156,9 +172,8 @@ void Query::run(uint64_t rbatch_size) {
       for (uint32_t ix = 0; ix < seqBatch.size(); ++ix) {
         names_vec[ix] = seqBatch[ix].name;
         std::string or_read(seqBatch[ix].nseq.begin(), seqBatch[ix].nseq.end());
-        std::string rc_read(seqBatch[ix].nseq.rbegin(),
-                            seqBatch[ix].nseq.rend());
-        for (bool r : {false, true}) {
+        std::string rc_read(seqBatch[ix].nseq.rbegin(), seqBatch[ix].nseq.rend());
+        for (bool r : { false, true }) {
           std::istringstream iss_read;
           if (r)
             iss_read.str(rc_read);
@@ -197,13 +212,10 @@ void Query::run(uint64_t rbatch_size) {
                 for (uint8_t di = 0; di < _ind_arr[rix]; ++di) {
                   uint8_t dist;
                   if (std::is_same<encT, uint64_t>::value) {
-                    dist = computeHammingDistance64(enc64_lr,
-                                                    _enc_arr[rix * _b + di]);
+                    dist = computeHammingDistance64(enc64_lr, _enc_arr[rix * _b + di]);
                   } else if (std::is_same<encT, uint32_t>::value) {
-                    drop64Encoding32(_npositions, enc64_bp, enc64_lr, enc32_bp,
-                                     enc32_lr);
-                    dist = computeHammingDistance32(enc32_lr,
-                                                    _enc_arr[rix * _b + di]);
+                    drop64Encoding32(_npositions, enc64_bp, enc64_lr, enc32_bp, enc32_lr);
+                    dist = computeHammingDistance32(enc32_lr, _enc_arr[rix * _b + di]);
                   } else {
                     std::puts("Available encoding types are 'uint64_t' and "
                               "'uint32_t'\n.");
@@ -253,17 +265,23 @@ void Query::run(uint64_t rbatch_size) {
       else
         seqBatch.clear();
     }
-    if (_save_match_info)
+    if (_save_match_info) {
+      if (_log)
+        LOG(INFO) << "Closing match information output file" << std::endl;
       ofs_match_info.close();
+    }
   }
 }
 
-bool Query::loadMetadata() {
+bool
+Query::loadMetadata()
+{
   bool is_ok = true;
+  if (_log)
+    LOG(INFO) << "Loading metadata of the library" << std::endl;
   std::string save_dirpath(_library_dirpath);
 
-  FILE *metadataf =
-      IO::open_file((save_dirpath + "/metadata").c_str(), is_ok, "rb");
+  FILE* metadataf = IO::open_file((save_dirpath + "/metadata").c_str(), is_ok, "rb");
   std::fread(&_k, sizeof(uint16_t), 1, metadataf);
   std::fread(&_h, sizeof(uint16_t), 1, metadataf);
   std::fread(&_b, sizeof(uint16_t), 1, metadataf);
@@ -274,13 +292,11 @@ bool Query::loadMetadata() {
   std::fread(&_num_species, sizeof(uint64_t), 1, metadataf);
   std::fread(&_root_size, sizeof(uint64_t), 1, metadataf);
   _bases_sizes.resize(_num_species);
-  std::fread(_bases_sizes.data(), sizeof(std::pair<tT, uint16_t>), _num_species,
-             metadataf);
+  std::fread(_bases_sizes.data(), sizeof(std::pair<tT, uint16_t>), _num_species, metadataf);
   _positions.resize(_h);
   std::fread(_positions.data(), sizeof(uint8_t), _positions.size(), metadataf);
   _npositions.resize(_k - _h);
-  std::fread(_npositions.data(), sizeof(uint8_t), _npositions.size(),
-             metadataf);
+  std::fread(_npositions.data(), sizeof(uint8_t), _npositions.size(), metadataf);
 
   if (std::ferror(metadataf)) {
     std::puts("I/O error when reading metadata file from the library.\n");
@@ -288,35 +304,50 @@ bool Query::loadMetadata() {
   }
   std::fclose(metadataf);
 
+  if (_log) {
+    if (is_ok)
+      LOG(NOTICE) << "Successfully loaded library metadata" << std::endl;
+    else
+      LOG(ERROR) << "Failed loading library metadata" << std::endl;
+  }
+
   return is_ok;
 }
 
-bool Query::loadTaxonomy() {
+bool
+Query::loadTaxonomy()
+{
   bool is_ok = true;
+  if (_log)
+    LOG(INFO) << "Loading taxonomy data and records of the library" << std::endl;
   std::string save_dirpath(_library_dirpath);
   std::vector<std::pair<tT, uint64_t>> tIDs_taxIDs;
 
-  FILE *taxonomyf =
-      IO::open_file((save_dirpath + "/taxonomy").c_str(), is_ok, "rb");
+  FILE* taxonomyf = IO::open_file((save_dirpath + "/taxonomy").c_str(), is_ok, "rb");
   std::fread(&_tax_num_input, sizeof(tT), 1, taxonomyf);
   std::fread(&_tax_num_nodes, sizeof(tT), 1, taxonomyf);
   tIDs_taxIDs.resize(_tax_num_nodes);
   _tax_parent_vec.resize(_tax_num_nodes);
   _tax_depth_vec.resize(_tax_num_nodes);
-  std::fread(tIDs_taxIDs.data(), sizeof(std::pair<tT, uint64_t>),
-             _tax_num_nodes, taxonomyf);
+  std::fread(tIDs_taxIDs.data(), sizeof(std::pair<tT, uint64_t>), _tax_num_nodes, taxonomyf);
   std::fread(_tax_parent_vec.data(), sizeof(tT), _tax_num_nodes, taxonomyf);
   std::fread(_tax_depth_vec.data(), sizeof(uint8_t), _tax_num_nodes, taxonomyf);
 
-  for (auto &kv : tIDs_taxIDs)
+  for (auto& kv : tIDs_taxIDs)
     _tID_to_taxID[kv.first] = kv.second;
 
   if (std::ferror(taxonomyf)) {
-    std::puts(
-        "I/O error when reading taxonomy-record file from the library.\n");
+    std::puts("I/O error when reading taxonomy-record file from the library.\n");
     is_ok = false;
   }
   std::fclose(taxonomyf);
+
+  if (_log) {
+    if (is_ok)
+      LOG(NOTICE) << "Successfully loaded taxonomy data and records" << std::endl;
+    else
+      LOG(ERROR) << "Failed loading taxonomy data and records" << std::endl;
+  }
 
   return is_ok;
 }

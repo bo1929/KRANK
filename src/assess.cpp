@@ -252,8 +252,8 @@ vecIxsThreshold(std::vector<unsigned int>& ixs,
       if (s_v[ix] >= threshold)
         ixs.push_back(ix);
     }
-    if ((s_v.size() - ixs.size() <= 2))
-      break;
+    /* if ((s_v.size() - ixs.size() <= 2)) */
+    /*   break; */
   }
 }
 
@@ -283,8 +283,8 @@ arrIxsThreshold(std::vector<unsigned int>& ixs,
       if (s_r[ix] >= threshold)
         ixs.push_back(ix);
     }
-    if ((last - ixs.size() <= 2))
-      break;
+    /* if ((last - ixs.size() <= 2)) */
+    /*   break; */
   }
 }
 

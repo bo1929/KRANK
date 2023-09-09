@@ -140,7 +140,7 @@ StreamIM<encT>::load(const char* filepath)
       StreamIM<encT>::lsh_enc_vec.push_back(lsh_enc);
   }
   if (vec_ifs.fail() && !vec_ifs.eof()) {
-    std::puts("I/Oerror when reading LSH-value and encoding pairs.\n");
+    std::puts("I/O rror when reading LSH-value and encoding pairs.\n");
   } else if (vec_ifs.eof()) {
     is_ok = true;
   }
@@ -217,7 +217,7 @@ StreamOD<encT>::getBatch(vvec<encT>& batch_table, uint32_t tbatch_size, bool con
     }
   }
   if (StreamOD<encT>::vec_ifs.fail() && !StreamOD<encT>::vec_ifs.eof()) {
-    std::puts("I/Oerror when reading LSH-value and encoding pairs.\n");
+    std::puts("I/O rror when reading LSH-value and encoding pairs.\n");
   } else if (StreamOD<encT>::vec_ifs.eof()) {
     StreamOD<encT>::vec_ifs.close();
   } else {
@@ -252,6 +252,9 @@ HTd<encT>::makeUnique(bool update_size)
   }
   if (update_size)
     HTd<encT>::updateSize();
+#ifdef DEBUG
+  LOG(INFO) << "The current size of the table is " << num_kmers << std::endl;
+#endif
 }
 
 template<typename encT>
@@ -280,6 +283,9 @@ HTs<encT>::makeUnique(bool update_size)
   }
   if (update_size)
     HTs<encT>::updateSize();
+#ifdef DEBUG
+  LOG(INFO) << "The current size of the table is " << num_kmers << std::endl;
+#endif
 }
 
 template<typename encT>
@@ -352,6 +358,9 @@ template<typename encT>
 void
 HTd<encT>::clearRows()
 {
+#ifdef DEBUG
+  LOG(INFO) << "The current size, before clearing, of the table is " << num_kmers << std::endl;
+#endif
   enc_vvec.clear();
   enc_vvec.resize(num_rows);
   scount_vvec.clear();
@@ -361,12 +370,18 @@ HTd<encT>::clearRows()
   HTd<encT>::updateSize();
   HTd<encT>::num_species = 0;
   HTd<encT>::tIDsBasis = {};
+#ifdef DEBUG
+  LOG(INFO) << "The current size, after clearing, of the table is " << num_kmers << std::endl;
+#endif
 }
 
 template<typename encT>
 void
 HTs<encT>::clearRows()
 {
+#ifdef DEBUG
+  LOG(INFO) << "The current size, before clearing, of the table is " << num_kmers << std::endl;
+#endif
 #pragma omp parallel for num_threads(num_threads), schedule(dynamic)
   for (uint32_t rix = 0; rix < num_rows; ++rix) {
     ind_arr[rix] = 0;
@@ -374,6 +389,9 @@ HTs<encT>::clearRows()
   HTs<encT>::updateSize();
   num_species = 0;
   tIDsBasis = {};
+#ifdef DEBUG
+  LOG(INFO) << "The current size, after clearing, of the table is " << num_kmers << std::endl;
+#endif
 }
 
 template<typename encT>
@@ -413,6 +431,9 @@ void
 HTd<encT>::initBasis(tT tID)
 {
   HTd<encT>::updateSize();
+#ifdef DEBUG
+  LOG(INFO) << "The current size of the table is " << num_kmers << std::endl;
+#endif
   uint32_t value;
   if (num_kmers > 0)
     value = 1;
@@ -446,12 +467,18 @@ HTd<encT>::trimColumns(uint8_t b_max)
     }
   }
   HTd<encT>::updateSize();
+#ifdef DEBUG
+  LOG(INFO) << "The current size of the table is " << num_kmers << std::endl;
+#endif
 }
 
 template<typename encT>
 void
 HTd<encT>::pruneColumns(uint8_t b_max)
 {
+#ifdef DEBUG
+  LOG(INFO) << "The current size, before pruning, of the table is " << num_kmers << std::endl;
+#endif
 #pragma omp parallel for num_threads(num_threads), schedule(dynamic)
   for (uint32_t rix = 0; rix < num_rows; ++rix) {
     if (enc_vvec[rix].size() >= std::numeric_limits<uint8_t>::max()) {
@@ -461,7 +488,7 @@ HTd<encT>::pruneColumns(uint8_t b_max)
     }
     if (enc_vvec[rix].size() > b_max) {
       std::vector<unsigned int> ixs;
-      switch (kmer_selection) {
+      switch (kmer_ranking) {
         case random_kmer:
           getIxsRandom(ixs, enc_vvec[rix].size(), enc_vvec[rix].size() - b_max);
           break;
@@ -487,6 +514,7 @@ HTd<encT>::pruneColumns(uint8_t b_max)
     HTd<encT>::sortColumns();
     std::puts("HTd has unsorted columns after pruning.\n");
   }
+  LOG(INFO) << "The current size, after pruning, of the table is " << num_kmers << std::endl;
 #endif
 }
 
@@ -530,6 +558,9 @@ HTd<encT>::unionRows(HTd<encT>& sibling, bool update_size)
   HTd<encT>::pruneColumns(std::numeric_limits<uint8_t>::max());
   if (update_size)
     HTd<encT>::updateSize();
+#ifdef DEBUG
+  LOG(INFO) << "The current size of the table is " << num_kmers << std::endl;
+#endif
 }
 
 template<typename encT>
@@ -566,7 +597,7 @@ HTs<encT>::unionRows(HTs<encT>& sibling, bool update_size)
                      std::back_inserter(v));
       if (v.size() > b) {
         std::vector<unsigned int> ixs;
-        switch (kmer_selection) {
+        switch (kmer_ranking) {
           case random_kmer: {
             getIxsRandom(ixs, v.size(), v.size() - b);
             break;
@@ -606,6 +637,9 @@ HTs<encT>::unionRows(HTs<encT>& sibling, bool update_size)
   tIDsBasis.insert(sibling.tIDsBasis.begin(), sibling.tIDsBasis.end());
   if (update_size)
     HTs<encT>::updateSize();
+#ifdef DEBUG
+  LOG(INFO) << "The current size of the table is " << num_kmers << std::endl;
+#endif
 }
 
 template<typename encT>
@@ -646,6 +680,9 @@ HTd<encT>::mergeRows(HTd<encT>& sibling, bool update_size)
   HTd<encT>::pruneColumns(std::numeric_limits<uint8_t>::max());
   if (update_size)
     HTd<encT>::updateSize();
+#ifdef DEBUG
+  LOG(INFO) << "The current size of the table is " << num_kmers << std::endl;
+#endif
 }
 
 template<typename encT>
@@ -685,7 +722,7 @@ HTs<encT>::mergeRows(HTs<encT>& sibling, bool update_size)
       }
       if (v.size() > b) {
         std::vector<unsigned int> ixs;
-        switch (kmer_selection) {
+        switch (kmer_ranking) {
           case random_kmer: {
             getIxsRandom(ixs, v.size(), v.size() - b);
             break;
@@ -725,6 +762,9 @@ HTs<encT>::mergeRows(HTs<encT>& sibling, bool update_size)
   tIDsBasis.insert(sibling.tIDsBasis.begin(), sibling.tIDsBasis.end());
   if (update_size)
     HTs<encT>::updateSize();
+#ifdef DEBUG
+  LOG(INFO) << "The current size of the table is " << num_kmers << std::endl;
+#endif
 }
 
 template<typename encT>
@@ -736,12 +776,16 @@ HTd<encT>::shrinkHT(uint64_t num_rm, uint8_t b_max)
   HTd<encT>::pruneColumns(b_max);
   volatile int64_t to_rm = num_rm;
   to_rm = to_rm - (init_num_kmers - num_kmers);
+  volatile int64_t pto_rm = to_rm;
+#ifdef DEBUG
+  LOG(INFO) << "Initial number of k-mers to remove is" << to_rm << std::endl;
+#endif
   while (to_rm > 0) {
     assert(to_rm < std::numeric_limits<int64_t>::max());
     assert(to_rm < num_kmers);
     std::vector<unsigned int> row_order;
     vvecSizeOrder(row_order, scount_vvec, true);
-    switch (kmer_selection) {
+    switch (kmer_ranking) {
       case random_kmer: {
         uint8_t n = static_cast<uint64_t>(to_rm) / num_rows + 1;
 #pragma omp parallel for num_threads(num_threads) schedule(dynamic)
@@ -828,8 +872,16 @@ HTd<encT>::shrinkHT(uint64_t num_rm, uint8_t b_max)
         break;
       }
     }
+#ifdef DEBUG
+    LOG(INFO) << "Number of k-mers removed in this round is " << pto_rm - to_rm << std::endl;
+#endif
+    assert(pto_rm != to_rm);
+    pto_rm = to_rm;
   }
   HTd<encT>::updateSize();
+#ifdef DEBUG
+  LOG(INFO) << "The current size of the table is " << num_kmers << std::endl;
+#endif
 }
 
 template<typename encT>
@@ -839,10 +891,14 @@ HTs<encT>::shrinkHT(uint64_t num_rm)
   assert(num_rm <= num_kmers);
   assert(num_rm < std::numeric_limits<int64_t>::max());
   volatile int64_t to_rm = static_cast<int64_t>(num_rm);
+  volatile int64_t pto_rm = to_rm;
+#ifdef DEBUG
+  LOG(INFO) << "Initial number of k-mers to remove is" << to_rm << std::endl;
+#endif
   while (to_rm > 0) {
     std::vector<unsigned int> row_order;
     arrSizeOrder(row_order, ind_arr, num_rows, true);
-    switch (kmer_selection) {
+    switch (kmer_ranking) {
       case random_kmer: {
         uint8_t n = to_rm / num_rows + 1;
 #pragma omp parallel for num_threads(num_threads) schedule(dynamic)
@@ -933,8 +989,16 @@ HTs<encT>::shrinkHT(uint64_t num_rm)
         break;
       }
     }
+#ifdef DEBUG
+    LOG(INFO) << "Number of k-mers removed in this round is " << pto_rm - to_rm << std::endl;
+#endif
+    assert(pto_rm != to_rm);
+    pto_rm = to_rm;
   }
   HTs<encT>::updateSize();
+#ifdef DEBUG
+  LOG(INFO) << "The current size of the table is " << num_kmers << std::endl;
+#endif
 }
 
 template<typename encT>

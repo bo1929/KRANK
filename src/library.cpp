@@ -9,10 +9,11 @@ Library::Library(const char* library_dirpath,
                  uint8_t b,
                  uint64_t capacity_size,
                  uint32_t tbatch_size,
-                 bool swicth_selection,
+                 bool swicth_ranking,
                  bool in_library,
                  bool on_disk,
-                 uint8_t specified_batch)
+                 uint8_t specified_batch,
+                 bool log)
   : _library_dirpath(library_dirpath)
   , _taxonomy_ncbi(nodes_filepath)
   , _taxonomy_record(input_filepath, _taxonomy_ncbi)
@@ -23,10 +24,11 @@ Library::Library(const char* library_dirpath,
   , _b(b)
   , _capacity_size(capacity_size)
   , _tbatch_size(tbatch_size)
-  , _switch_selection(swicth_selection)
+  , _switch_ranking(swicth_ranking)
   , _in_library(in_library)
   , _on_disk(on_disk)
   , _specified_batch(specified_batch)
+  , _log(log)
 {
   bool isDir = IO::ensureDirectory(_library_dirpath);
   if (!in_library) {
@@ -68,10 +70,12 @@ Library::Library(const char* library_dirpath,
   for (unsigned int i = 0; i < _tID_vec.size(); ++i) {
     tT tID_key = _tID_vec[i];
     std::string filepath = _taxonomy_record.tID_to_input()[tID_key];
+    if (_log) {
 #pragma omp critical
-    {
-      std::cout << "Processing k-mer set for taxon " << _taxonomy_record.changeIDtax(tID_key)
-                << std::endl;
+      {
+        LOG(INFO) << "Processing k-mer set for taxon " << _taxonomy_record.changeIDtax(tID_key)
+                  << std::endl;
+      }
     }
     uint64_t size_basis = 0;
     StreamIM<encT> sIM(filepath.c_str(), _k, h, &_lsh_vg, &_npositions);
@@ -98,6 +102,13 @@ Library::Library(const char* library_dirpath,
         if (!is_ok) {
           std::cerr << "Error saving to " << disk_path << std::endl;
           exit(EXIT_FAILURE);
+        }
+        if (_log) {
+#pragma omp critical
+          {
+            LOG(INFO) << "LSH-value and encoding pairs has been saved for "
+                      << _taxonomy_record.changeIDtax(tID_key) << std::endl;
+          }
         }
       }
 #pragma omp critical
@@ -134,33 +145,43 @@ Library::Library(const char* library_dirpath,
   std::cout << "\tTotal number of (non-unique) kmers: " << _root_size << std::endl;
   std::cout << std::endl;
 
-  if (_specified_batch == 0)
+  if (_log)
+    LOG(INFO) << "Specified batch is " << _specified_batch << std::endl;
+
+  if (_specified_batch == 0) {
     Library::saveMetadata();
+    if (_log)
+      LOG(INFO) << "Metadata has been saved to the library." << std::endl;
+  } else {
+    if (_log)
+      LOG(INFO) << "Metadata has been read from the library, won't be saved again." << std::endl;
+  }
 }
 
 void
-Library::run(uint8_t sdepth, SelectionMethod init_selection)
+Library::run(uint8_t sdepth, RankingMethod init_ranking)
 {
-  if (_switch_selection && init_selection == random_kmer)
-    std::puts("No counterpart to current selection method, no switching and "
-              "only random.\n");
+  if (_log && _switch_ranking && (init_ranking == random_kmer)) {
+    LOG(NOTICE) << "No counterpart to given k-mer ranking method, no switching." << std::endl;
+  }
   std::cout << "Total number of batches is  " << _total_batches << std::endl;
   unsigned int curr_batch = 0;
   for (unsigned int i = 0; i < _total_batches; ++i) {
     curr_batch++;
     if ((_specified_batch == 0) || (_specified_batch == curr_batch)) {
       std::cout << "Building the library for batch " << curr_batch << "..." << std::endl;
-      HTs<encT> ts_root(1, _k, _h, _b, _tbatch_size, &_lsh_vg, init_selection);
+      HTs<encT> ts_root(1, _k, _h, _b, _tbatch_size, &_lsh_vg, init_ranking);
       Library::getBatchHTs(&ts_root, 0, sdepth);
       Library::saveBatchHTs(ts_root, curr_batch);
     } else {
-      Library::continueBatch();
+      Library::skipBatch();
+      std::cout << "Skipping the library building for batch  " << curr_batch << std::endl;
     }
   }
 }
 
 void
-Library::continueBatch()
+Library::skipBatch()
 {
   vvec<encT> tmp;
   if (_on_disk) {
@@ -219,33 +240,52 @@ Library::getConstrainedSize(std::set<tT> tIDsBasis)
 void
 Library::getBatchHTs(HTs<encT>* ts, uint8_t curr_depth, uint8_t last_depth)
 {
+  if (_log)
+    LOG(INFO) << "Constructing the HTd for " << _taxonomy_record.changeIDtax(ts->tID) << std::endl;
+  if (_log)
+    LOG(INFO) << "Current depth in the taxonomic tree is " << curr_depth << std::endl;
   if ((curr_depth >= last_depth) || _taxonomy_record.isBasis(ts->tID)) {
-    HTd<encT> td(ts->tID, ts->k, ts->h, ts->num_rows, ts->ptr_lsh_vg, ts->kmer_selection);
+    HTd<encT> td(ts->tID, ts->k, ts->h, ts->num_rows, ts->ptr_lsh_vg, ts->kmer_ranking);
     getBatchHTd(&td);
+    if (_log)
+      LOG(INFO) << "Converting from HTd to HTs for the taxon "
+                << _taxonomy_record.changeIDtax(ts->tID) << std::endl;
     td.convertHTs(ts);
   } else {
-    SelectionMethod next_selection;
-    if (_switch_selection && (curr_depth >= (last_depth - 1))) {
-      if (ts->kmer_selection == information_score) {
-        next_selection = large_scount;
-      } else if (ts->kmer_selection == large_scount) {
-        next_selection = information_score;
+    RankingMethod next_ranking;
+    if (_switch_ranking && (curr_depth >= (last_depth - 1))) {
+      if (ts->kmer_ranking == information_score) {
+        if (_log)
+          LOG(INFO) << "Switching from ranking based on information score to large species count."
+                    << std::endl;
+        next_ranking = large_scount;
+      } else if (ts->kmer_ranking == large_scount) {
+        if (_log)
+          LOG(INFO) << "Switching from ranking based on large species count to information score."
+                    << std::endl;
+        next_ranking = information_score;
       } else {
-        next_selection = random_kmer;
+        next_ranking = random_kmer;
       }
     } else {
-      next_selection = ts->kmer_selection;
+      next_ranking = ts->kmer_ranking;
     }
     std::set<tT>& children_set = _taxonomy_record.child_map()[ts->tID];
     size_t num_child = children_set.size();
     std::vector<double> children(num_child);
     std::copy(children_set.begin(), children_set.end(), children.begin());
     ts->childrenHT.assign(
-      num_child, HTs<encT>(0, ts->k, ts->h, ts->b, ts->num_rows, ts->ptr_lsh_vg, next_selection));
+      num_child, HTs<encT>(0, ts->k, ts->h, ts->b, ts->num_rows, ts->ptr_lsh_vg, next_ranking));
     for (unsigned int ti = 0; ti < num_child; ++ti) {
+      if (_log)
+        LOG(INFO) << "Building for the child " << _taxonomy_record.changeIDtax(children[ti])
+                  << " of " << _taxonomy_record.changeIDtax(ts->tID) << std::endl;
       ts->childrenHT[ti].tID = children[ti];
       getBatchHTs(&(ts->childrenHT[ti]), curr_depth + 1, last_depth);
     }
+    if (_log)
+      LOG(INFO) << "Taking the union of tables of children of "
+                << _taxonomy_record.changeIDtax(ts->tID) << std::endl;
     for (auto& ts_c : ts->childrenHT) {
       ts->unionRows(ts_c);
     }
@@ -253,8 +293,15 @@ Library::getBatchHTs(HTs<encT>* ts, uint8_t curr_depth, uint8_t last_depth)
       int64_t num_rm;
       uint64_t constrained_size = getConstrainedSize(ts->tIDsBasis);
       num_rm = static_cast<int64_t>(ts->num_kmers) - static_cast<int64_t>(constrained_size);
+      if (_log)
+        LOG(INFO) << _taxonomy_record.changeIDtax(ts->tID)
+                  << " has more than one child, updating LCA labels" << std::endl;
       ts->updateLCA();
       if (num_rm > 0) {
+        if (_log)
+          LOG(INFO) << _taxonomy_record.changeIDtax(ts->tID) << " has more than one child, and "
+                    << num_rm << " many k-mers above the constraint, shrinking the table"
+                    << std::endl;
         ts->shrinkHT(static_cast<uint64_t>(num_rm));
       }
     }
@@ -267,6 +314,8 @@ Library::getBatchHTs(HTs<encT>* ts, uint8_t curr_depth, uint8_t last_depth)
 void
 Library::getBatchHTd(HTd<encT>* td)
 {
+  if (_log)
+    LOG(INFO) << "Constructing the HTd for " << _taxonomy_record.changeIDtax(td->tID) << std::endl;
   if (_taxonomy_record.isBasis(td->tID)) {
     if (_on_disk) {
       _streamOD_map.at(td->tID).getBatch(td->enc_vvec, _tbatch_size);
@@ -283,11 +332,17 @@ Library::getBatchHTd(HTd<encT>* td)
     std::vector<double> children(num_child);
     std::copy(children_set.begin(), children_set.end(), children.begin());
     td->childrenHT.assign(
-      num_child, HTd<encT>(0, td->k, td->h, td->num_rows, td->ptr_lsh_vg, td->kmer_selection));
+      num_child, HTd<encT>(0, td->k, td->h, td->num_rows, td->ptr_lsh_vg, td->kmer_ranking));
     for (unsigned int ti = 0; ti < num_child; ++ti) {
+      if (_log)
+        LOG(INFO) << "Building for the child " << _taxonomy_record.changeIDtax(children[ti])
+                  << " of " << _taxonomy_record.changeIDtax(td->tID) << std::endl;
       td->childrenHT[ti].tID = children[ti];
       getBatchHTd(&(td->childrenHT[ti]));
     }
+    if (_log)
+      LOG(INFO) << "Taking the union of tables of children of "
+                << _taxonomy_record.changeIDtax(td->tID) << std::endl;
     for (auto& td_c : td->childrenHT) {
       td->unionRows(td_c);
     }
@@ -295,8 +350,15 @@ Library::getBatchHTd(HTd<encT>* td)
       int64_t num_rm;
       uint64_t constrained_size = getConstrainedSize(td->tIDsBasis);
       num_rm = static_cast<int64_t>(td->num_kmers) - static_cast<int64_t>(constrained_size);
+      if (_log)
+        LOG(INFO) << _taxonomy_record.changeIDtax(td->tID)
+                  << " has more than one child, updating LCA labels" << std::endl;
       td->updateLCA();
       if (num_rm > 0) {
+        if (_log)
+          LOG(INFO) << _taxonomy_record.changeIDtax(td->tID) << " has more than one child, and "
+                    << num_rm << " many k-mers above the constraint, shrinking the table"
+                    << std::endl;
         td->shrinkHT(static_cast<uint64_t>(num_rm), _b);
       }
     }
@@ -311,6 +373,10 @@ Library::saveBatchHTs(HTs<encT>& ts, uint16_t curr_batch)
 {
   bool is_ok = true;
   std::string save_dirpath(_library_dirpath);
+
+  if (_log)
+    LOG(INFO) << "Saving the built library batch for " << _taxonomy_record.changeIDtax(ts.tID)
+              << std::endl;
 
   {
     FILE* encf =
@@ -356,6 +422,15 @@ Library::saveBatchHTs(HTs<encT>& ts, uint16_t curr_batch)
     std::fclose(scountf);
   }
 
+  if (_log) {
+    if (is_ok)
+      LOG(NOTICE) << "Successfully saved the built batch library for "
+                  << _taxonomy_record.changeIDtax(ts.tID) << std::endl;
+    else
+      LOG(ERROR) << "Failed saving the built batch library for "
+                 << _taxonomy_record.changeIDtax(ts.tID) << std::endl;
+  }
+
   return is_ok;
 }
 
@@ -363,6 +438,8 @@ bool
 Library::loadMetadata()
 {
   bool is_ok = true;
+  if (_log)
+    LOG(INFO) << "Loading metadata of the library" << std::endl;
   std::string save_dirpath(_library_dirpath);
   std::vector<std::pair<tT, uint16_t>> bases_sizes;
 
@@ -389,6 +466,13 @@ Library::loadMetadata()
   }
   std::fclose(metadataf);
 
+  if (_log) {
+    if (is_ok)
+      LOG(NOTICE) << "Successfully loaded library metadata" << std::endl;
+    else
+      LOG(ERROR) << "Failed loading library metadata" << std::endl;
+  }
+
   return is_ok;
 }
 
@@ -396,6 +480,8 @@ bool
 Library::saveMetadata()
 {
   bool is_ok = true;
+  if (_log)
+    LOG(INFO) << "Saving metadata of the library" << std::endl;
   std::string save_dirpath(_library_dirpath);
   std::vector<std::pair<tT, uint16_t>> bases_sizes(_basis_to_size.begin(), _basis_to_size.end());
 
@@ -418,6 +504,13 @@ Library::saveMetadata()
     is_ok = false;
   }
   std::fclose(metadataf);
+
+  if (_log) {
+    if (is_ok)
+      LOG(NOTICE) << "Successfully saved library metadata" << std::endl;
+    else
+      LOG(ERROR) << "Failed saving library metadata" << std::endl;
+  }
 
   return is_ok;
 }

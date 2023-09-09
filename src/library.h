@@ -18,10 +18,11 @@ public:
           uint8_t b,
           uint64_t capacitiy_size,
           uint32_t num_batch_rows,
-          bool switch_selection = true,
+          bool switch_ranking = true,
           bool in_library = false,
           bool on_disk = true,
-          uint8_t specified_batch = 0);
+          uint8_t specified_batch = 0,
+          bool log = true);
 
 private:
   TaxonomyNCBI _taxonomy_ncbi;
@@ -45,10 +46,11 @@ private:
   std::unordered_map<tT, uint64_t> _basis_to_size;
   std::vector<tT> _tID_vec;
   uint64_t _num_species;
-  bool _switch_selection;
+  bool _switch_ranking;
   bool _on_disk;
   bool _in_library;
   uint8_t _specified_batch;
+  bool _log;
   const uint16_t _rootID = 1;
 
 public:
@@ -59,8 +61,8 @@ public:
   bool saveMetadata();
   bool loadMetadata();
   void getRandomPositions();
-  void continueBatch();
-  void run(uint8_t sdepth = 3, SelectionMethod init_selection = information_score);
+  void skipBatch();
+  void run(uint8_t sdepth = 3, RankingMethod init_ranking = information_score);
   decltype(_npositions)& npositions() { return _npositions; }
   decltype(_positions)& positions() { return _positions; }
   decltype(_lsh_vg)& lsh_vg() { return _lsh_vg; }

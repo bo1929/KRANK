@@ -7,17 +7,21 @@
 #include "lsh.h"
 #include "taxonomy.h"
 
-class Query {
+class Query
+{
 public:
-  Query(const char *library_dirpath, const char *output_dirpath,
-        const char *query_filepath, uint8_t max_match_hdist = 5,
-        bool save_match_info = true, bool verbose = false);
+  Query(const char* library_dirpath,
+        const char* output_dirpath,
+        const char* query_filepath,
+        uint8_t max_match_hdist = 5,
+        bool save_match_info = true,
+        bool log = false);
 
 private:
-  bool _verbose;
-  const char *_library_dirpath;
-  const char *_output_dirpath;
-  const char *_query_filepath;
+  bool _log;
+  const char* _library_dirpath;
+  const char* _output_dirpath;
+  const char* _query_filepath;
   uint8_t _k;
   uint8_t _h;
   uint8_t _b;
@@ -38,10 +42,10 @@ private:
   const uint16_t _rootID = 1;
   std::vector<std::pair<tT, uint16_t>> _bases_sizes;
   std::unordered_map<std::string, std::string> _queryID_to_path;
-  encT *_enc_arr;
-  tT *_tlca_arr;
+  encT* _enc_arr;
+  tT* _tlca_arr;
   // scT* _scount_ar;
-  uint8_t *_ind_arr;
+  uint8_t* _ind_arr;
   uint8_t _max_match_hdist;
   uint8_t _save_match_info;
 
@@ -49,9 +53,9 @@ public:
   bool loadMetadata();
   bool loadTaxonomy();
   void run(uint64_t rbatch_size = DEFAULT_BATCH_SIZE);
-  decltype(_npositions) &npositions() { return _npositions; }
-  decltype(_positions) &positions() { return _positions; }
-  decltype(_lsh_vg) &lsh_vg() { return _lsh_vg; }
+  decltype(_npositions)& npositions() { return _npositions; }
+  decltype(_positions)& positions() { return _positions; }
+  decltype(_lsh_vg)& lsh_vg() { return _lsh_vg; }
 };
 
 #endif
