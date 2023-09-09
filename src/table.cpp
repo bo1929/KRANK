@@ -734,7 +734,8 @@ HTd<encT>::shrinkHT(uint64_t num_rm, uint8_t b_max)
   assert(num_rm < num_kmers);
   uint64_t init_num_kmers = num_kmers;
   HTd<encT>::pruneColumns(b_max);
-  volatile int64_t to_rm = num_rm - (init_num_kmers - num_kmers);
+  volatile int64_t to_rm = num_rm;
+  to_rm = to_rm - (init_num_kmers - num_kmers);
   while (to_rm > 0) {
     assert(to_rm < std::numeric_limits<int64_t>::max());
     assert(to_rm < num_kmers);
@@ -743,7 +744,7 @@ HTd<encT>::shrinkHT(uint64_t num_rm, uint8_t b_max)
     switch (kmer_selection) {
       case random_kmer: {
         uint8_t n = static_cast<uint64_t>(to_rm) / num_rows + 1;
-#pragma omp parallel for num_threads(num_threads) shared(to_rm) schedule(dynamic)
+#pragma omp parallel for num_threads(num_threads) schedule(dynamic)
         for (uint32_t ix = 0; ix < row_order.size(); ++ix) {
           uint32_t& rix = row_order[ix];
           if (scount_vvec[rix].size() >= n) {
@@ -765,7 +766,7 @@ HTd<encT>::shrinkHT(uint64_t num_rm, uint8_t b_max)
       }
       case large_scount: {
         scT threshold = vvecArgmax2D(scount_vvec, static_cast<uint64_t>(to_rm), true);
-#pragma omp parallel for num_threads(num_threads) shared(to_rm) schedule(dynamic)
+#pragma omp parallel for num_threads(num_threads) schedule(dynamic)
         for (uint32_t ix = 0; ix < row_order.size(); ++ix) {
           uint32_t& rix = row_order[ix];
           if (scount_vvec[rix].size() > 0) {
@@ -796,14 +797,13 @@ HTd<encT>::shrinkHT(uint64_t num_rm, uint8_t b_max)
             vecInformationScores(scores_vec, enc_vvec[rix], values_map);
 #pragma omp critical
             {
-              for (auto& val : scores_vec) {
+              for (auto& val : scores_vec)
                 val_counts[val]++;
-              }
             }
           }
         }
         scT threshold = mapArgmax(val_counts, static_cast<uint64_t>(to_rm), true);
-#pragma omp parallel for num_threads(num_threads) shared(to_rm) schedule(dynamic)
+#pragma omp parallel for num_threads(num_threads) schedule(dynamic)
         for (uint32_t ix = 0; ix < row_order.size(); ++ix) {
           uint32_t& rix = row_order[ix];
           if (enc_vvec[rix].size() > 0) {
@@ -845,7 +845,7 @@ HTs<encT>::shrinkHT(uint64_t num_rm)
     switch (kmer_selection) {
       case random_kmer: {
         uint8_t n = to_rm / num_rows + 1;
-#pragma omp parallel for num_threads(num_threads) shared(to_rm) schedule(dynamic)
+#pragma omp parallel for num_threads(num_threads) schedule(dynamic)
         for (uint32_t ix = 0; ix < row_order.size(); ++ix) {
           uint32_t& rix = row_order[ix];
           if (ind_arr[rix] >= n) {
@@ -869,7 +869,7 @@ HTs<encT>::shrinkHT(uint64_t num_rm)
       case large_scount: {
         scT threshold =
           arrArgmax2D(scount_arr, ind_arr, num_rows, b, static_cast<uint64_t>(to_rm), true);
-#pragma omp parallel for num_threads(num_threads) shared(to_rm) schedule(dynamic)
+#pragma omp parallel for num_threads(num_threads) schedule(dynamic)
         for (uint32_t ix = 0; ix < row_order.size(); ++ix) {
           uint32_t& rix = row_order[ix];
           if (ind_arr[rix] > 0) {
@@ -901,14 +901,13 @@ HTs<encT>::shrinkHT(uint64_t num_rm)
             arrInformationScores(scores_vec, enc_arr + rix * b, ind_arr[rix], values_map);
 #pragma omp critical
             {
-              for (auto& val : scores_vec) {
+              for (auto& val : scores_vec)
                 val_counts[val]++;
-              }
             }
           }
         }
         scT threshold = mapArgmax(val_counts, static_cast<uint64_t>(to_rm), true);
-#pragma omp parallel for num_threads(num_threads) shared(to_rm) schedule(dynamic)
+#pragma omp parallel for num_threads(num_threads) schedule(dynamic)
         for (uint32_t ix = 0; ix < row_order.size(); ++ix) {
           uint32_t& rix = row_order[ix];
           if (ind_arr[rix] > 0) {
