@@ -34,30 +34,36 @@ main(int argc, char** argv)
   sub_build->add_option("-h,--num-positions", h, "Number of positions for the LSH. Default is 14.");
   uint8_t b = 8;
   sub_build->add_option("-b,--num-columns", b, "Number of columns of the table. Default is 8.");
+  uint8_t switch_depth = 4;
+  sub_build->add_option("--switch-depth",
+                        switch_depth,
+                        "The depth in the taxonomic tree at which the type of the table changes "
+                        "from static to dynamic. Default is 4.");
+  bool switch_ranking = false;
+  sub_build->add_flag(
+    "--switch-ranking,!--fixed-ranking",
+    switch_ranking,
+    "Does k-mers ranking strategy switches at --switch-depth? Default is fixed ranking.");
   uint8_t batch_size = 3;
   sub_build->add_option(
     "-s,--batch-size",
     batch_size,
     "Number of bits to divide the table into batches. Default is 3, i.e., 8 batches.");
-  uint8_t switch_depth = 0;
-  sub_build->add_option(
-    "--switch-depth",
-    switch_depth,
-    "The depth in the taxonomic tree at which the k-mer ranking strategy will be switched.");
   uint8_t specify_batch = 0;
   sub_build->add_option(
     "--specify-batch",
     specify_batch,
     "The specific library batch to be built. Default is 0, i.e., all batches will be processed.");
-
   bool in_library = false;
-  sub_build->add_flag(
-    "--in-library,!--raw-input", in_library, "Are k-mers already processed and in the library?");
+  sub_build->add_flag("--in-library,!--raw-input",
+                      in_library,
+                      "Are k-mers already processed and in the library? Default is --raw-input, "
+                      "reads FASTA k-mer sets.");
   bool on_disk = true;
   sub_build->add_flag("--on-disk,!--in-memory",
                       on_disk,
                       "Are stream of k-mers will be on the disk? If so, k-mers will be read in "
-                      "batches from the disk.");
+                      "batches from the disk. Default is true, --in-memory is memory hungry.");
   std::map<std::string, RankingMethod> map{ { "random_kmer", random_kmer },
                                             { "large_scount", large_scount },
                                             { "information_score", information_score } };
@@ -71,7 +77,7 @@ main(int argc, char** argv)
   sub_build->add_option(
     "--num-threads", num_threads, "Number of threads to use for OpenMP based parallelism.");
   bool run_build = true;
-  sub_build->add_flag("--run,!--init",
+  sub_build->add_flag("--run,!--only-init",
                       run_build,
                       "Run library building in addition to initialization, given by default.");
 
@@ -107,17 +113,11 @@ main(int argc, char** argv)
   sub_query->add_option(
     "--num-threads", num_threads, "Number of threads to use for OpenMP based parallelism.");
   bool run_query = true;
-  sub_query->add_flag("--run,!--init",
+  sub_query->add_flag("--run,!--only-init",
                       run_query,
                       "Run queries in addition to instance initialization, given by default.");
 
   CLI11_PARSE(app, argc, argv);
-
-  bool switch_ranking = false;
-  if (switch_depth > 0)
-    switch_ranking = true;
-  uint32_t tbatch_size = pow(2, 2 * h - batch_size);
-  uint64_t capacity = pow(2, 2 * h) * b;
 
   if (sub_build->parsed()) {
     Library lib(library_dir.c_str(),
@@ -126,8 +126,8 @@ main(int argc, char** argv)
                 k,
                 h,
                 b,
-                capacity,
-                tbatch_size,
+                pow(2, 2 * h) * b,          // capacity
+                pow(2, 2 * h - batch_size), // tbatch_size
                 switch_ranking,
                 in_library,
                 on_disk,
