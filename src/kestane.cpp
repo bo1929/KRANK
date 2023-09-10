@@ -83,8 +83,10 @@ main(int argc, char** argv)
 
   CLI::App* sub_query =
     app.add_subcommand("query", "Performs query with respect to a given referenece library.");
+  std::vector<std::string> library_dir_v;
   sub_query
-    ->add_option("-l,--library-dir", library_dir, "Path to the directory containing the library.")
+    ->add_option(
+      "-l,--library-dir", library_dir_v, "Path(s) to the directory containing the library.")
     ->required();
   std::string output_dir = "./";
   sub_query
@@ -138,12 +140,8 @@ main(int argc, char** argv)
   }
 
   if (sub_query->parsed()) {
-    Query query(library_dir.c_str(),
-                output_dir.c_str(),
-                query_file.c_str(),
-                max_match_hdist,
-                save_match_info,
-                log);
+    Query query(
+      library_dir_v, output_dir.c_str(), query_file.c_str(), max_match_hdist, save_match_info, log);
     if (run_query)
       query.run();
   }
