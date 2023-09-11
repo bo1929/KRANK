@@ -17,6 +17,8 @@ public:
         bool save_match_info = true,
         bool log = false);
   void run(uint64_t rbatch_size = DEFAULT_BATCH_SIZE);
+  template<typename T>
+  T getLowestCommonAncestor(T a, T b);
 
 private:
   struct SearchL
@@ -58,12 +60,15 @@ private:
   std::vector<std::string> _library_dirpaths;
   const char* _query_filepath;
   const char* _output_dirpath;
+  uint8_t _k;
   uint8_t _num_libraries;
   uint8_t _max_match_hdist;
   uint8_t _save_match_info;
   std::vector<std::unique_ptr<SearchL>> _slib_ptr_v;
   std::unordered_map<std::string, std::string> _queryID_to_path;
   std::unordered_map<tT, uint64_t> _tID_to_taxID;
+  std::vector<tT> _tax_parent_vec;
+  std::vector<uint8_t> _tax_depth_vec;
 };
 
 #endif

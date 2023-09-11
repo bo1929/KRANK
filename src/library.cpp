@@ -256,12 +256,14 @@ Library::getBatchHTs(HTs<encT>* ts, uint8_t curr_depth, uint8_t last_depth)
     if (_switch_ranking && (curr_depth >= (last_depth - 1))) {
       if (ts->kmer_ranking == information_score) {
         if (_log)
-          LOG(INFO) << "Switching from ranking based on information score to large species count."
+          LOG(INFO) << "Switching from ranking based on information score to "
+                       "large species count."
                     << std::endl;
         next_ranking = large_scount;
       } else if (ts->kmer_ranking == large_scount) {
         if (_log)
-          LOG(INFO) << "Switching from ranking based on large species count to information score."
+          LOG(INFO) << "Switching from ranking based on large species count to "
+                       "information score."
                     << std::endl;
         next_ranking = information_score;
       } else {
@@ -293,10 +295,12 @@ Library::getBatchHTs(HTs<encT>* ts, uint8_t curr_depth, uint8_t last_depth)
       int64_t num_rm;
       uint64_t constrained_size = getConstrainedSize(ts->tIDsBasis);
       num_rm = static_cast<int64_t>(ts->num_kmers) - static_cast<int64_t>(constrained_size);
-      if (_log)
-        LOG(INFO) << _taxonomy_record.changeIDtax(ts->tID)
-                  << " has more than one child, updating LCA labels" << std::endl;
-      ts->updateLCA();
+      if (ts->tID != 0 && ts->tID != 1) {
+        if (_log)
+          LOG(INFO) << _taxonomy_record.changeIDtax(ts->tID)
+                    << " has more than one child, updating LCA labels" << std::endl;
+        ts->updateLCA();
+      }
       if (num_rm > 0) {
         if (_log)
           LOG(INFO) << _taxonomy_record.changeIDtax(ts->tID) << " has more than one child, and "
@@ -350,10 +354,12 @@ Library::getBatchHTd(HTd<encT>* td)
       int64_t num_rm;
       uint64_t constrained_size = getConstrainedSize(td->tIDsBasis);
       num_rm = static_cast<int64_t>(td->num_kmers) - static_cast<int64_t>(constrained_size);
-      if (_log)
-        LOG(INFO) << _taxonomy_record.changeIDtax(td->tID)
-                  << " has more than one child, updating LCA labels" << std::endl;
-      td->updateLCA();
+      if (td->tID != 0 && td->tID != 1) {
+        if (_log)
+          LOG(INFO) << _taxonomy_record.changeIDtax(td->tID)
+                    << " has more than one child, updating LCA labels" << std::endl;
+        td->updateLCA();
+      }
       if (num_rm > 0) {
         if (_log)
           LOG(INFO) << _taxonomy_record.changeIDtax(td->tID) << " has more than one child, and "

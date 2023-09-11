@@ -18,10 +18,25 @@ Query::Query(std::vector<std::string> library_dirpaths,
 
   for (unsigned int i = 0; i < _num_libraries; ++i) {
     _slib_ptr_v[i] = std::make_unique<SearchL>(_library_dirpaths[i].c_str(), _log);
-    if (i == 0)
+    if (i == 0) {
       _tID_to_taxID = _slib_ptr_v[i]->_tID_to_taxID;
-    else
-      assert(map_compare(_slib_ptr_v[i]->_tID_to_taxID, _tID_to_taxID));
+      _k = _slib_ptr_v[i]->_k;
+      _tax_parent_vec = _slib_ptr_v[i]->_tax_parent_vec;
+      _tax_depth_vec = _slib_ptr_v[i]->_tax_depth_vec;
+    } else {
+      if (!map_compare(_slib_ptr_v[i]->_tID_to_taxID, _tID_to_taxID) ||
+          (_tax_depth_vec != _slib_ptr_v[i]->_tax_depth_vec) ||
+          (_tax_parent_vec != _slib_ptr_v[i]->_tax_parent_vec)) {
+        std::cerr << "All libraries to search in have to be built with the "
+                     "same taxonomy"
+                  << std::endl;
+        exit(EXIT_FAILURE);
+      }
+      if (!(_k == _slib_ptr_v[i]->_k)) {
+        std::cerr << "All libraries to search in must have the same k-mer length" << std::endl;
+        exit(EXIT_FAILURE);
+      }
+    }
   }
   if (IO::ensureDirectory(_output_dirpath)) {
     std::cout << "Results will be written to " << _output_dirpath << std::endl;
@@ -94,35 +109,36 @@ Query::run(uint64_t rbatch_size)
             iss_read.str(or_read);
           std::string curr_cont_read;
           while (getline(iss_read, curr_cont_read, 'N')) {
-            for (unsigned int lix = 0; lix < _num_libraries; ++lix) {
-              uint32_t max_rix = std::numeric_limits<uint32_t>::max();
-              max_rix = max_rix >> (32 - 2 * _slib_ptr_v[lix]->_h);
-              std::string kmer_str;
-              uint64_t enc64_bp;
-              uint64_t enc64_lr;
-              uint32_t enc32_lr;
-              uint32_t enc32_bp;
-              uint32_t rix;
-              uint8_t min_dist;
-              uint8_t closest_di;
-              if (curr_cont_read.length() >= _slib_ptr_v[lix]->_k) {
-                for (unsigned int kix = 0; kix < curr_cont_read.length(); kix++) {
-                  min_dist = _slib_ptr_v[lix]->_k;
+            std::string kmer_str;
+            uint64_t enc64_bp;
+            uint64_t enc64_lr;
+            uint32_t enc32_lr;
+            uint32_t enc32_bp;
+            uint32_t rix;
+            uint8_t min_dist;
+            uint8_t closest_di;
+            if (curr_cont_read.length() >= _k) {
+              for (unsigned int kix = 0; kix < curr_cont_read.length(); kix++) {
+                if (kix == 0) {
+                  kmer_str = curr_cont_read.substr(kix, _k);
+                  if (r)
+                    kmerEncodingComputeC(kmer_str.c_str(), enc64_lr, enc64_bp);
+                  else
+                    kmerEncodingCompute(kmer_str.c_str(), enc64_lr, enc64_bp);
+                  kix = _k - 1;
+                } else {
+                  kmer_str = curr_cont_read.substr(kix, 1);
+                  if (r)
+                    kmerEncodingUpdateC(kmer_str.c_str(), enc64_lr, enc64_bp);
+                  else
+                    kmerEncodingUpdate(kmer_str.c_str(), enc64_lr, enc64_bp);
+                }
+                bool pm = false;
+                for (unsigned int lix = 0; lix < _num_libraries; ++lix) {
+                  min_dist = _k;
                   closest_di = 0;
-                  if (kix == 0) {
-                    kmer_str = curr_cont_read.substr(kix, _slib_ptr_v[lix]->_k);
-                    if (r)
-                      kmerEncodingComputeC(kmer_str.c_str(), enc64_lr, enc64_bp);
-                    else
-                      kmerEncodingCompute(kmer_str.c_str(), enc64_lr, enc64_bp);
-                    kix = _slib_ptr_v[lix]->_k - 1;
-                  } else {
-                    kmer_str = curr_cont_read.substr(kix, 1);
-                    if (r)
-                      kmerEncodingUpdateC(kmer_str.c_str(), enc64_lr, enc64_bp);
-                    else
-                      kmerEncodingUpdate(kmer_str.c_str(), enc64_lr, enc64_bp);
-                  }
+                  uint32_t max_rix = std::numeric_limits<uint32_t>::max();
+                  max_rix = max_rix >> (32 - 2 * _slib_ptr_v[lix]->_h);
                   rix = computeValueLSH(enc64_bp, _slib_ptr_v[lix]->_lsh_vg);
                   assert(rix <= max_rix);
                   for (uint8_t di = 0; di < _slib_ptr_v[lix]->_ind_arr[rix]; ++di) {
@@ -148,17 +164,40 @@ Query::run(uint64_t rbatch_size)
                       break;
                   }
                   if (min_dist <= _max_match_hdist) {
-                    /* if (kix == 0) { */
-                    if (r) {
-                      hdist_vec_rc[ix].push_back(min_dist);
-                      tlca_vec_rc[ix].push_back(
-                        _slib_ptr_v[lix]->_tlca_arr[rix * _slib_ptr_v[lix]->_b + closest_di]);
+                    if (!pm) {
+                      if (r) {
+                        hdist_vec_rc[ix].push_back(min_dist);
+                        tlca_vec_rc[ix].push_back(
+                          _slib_ptr_v[lix]->_tlca_arr[rix * _slib_ptr_v[lix]->_b + closest_di]);
+                      } else {
+                        hdist_vec_or[ix].push_back(min_dist);
+                        tlca_vec_or[ix].push_back(
+                          _slib_ptr_v[lix]->_tlca_arr[rix * _slib_ptr_v[lix]->_b + closest_di]);
+                      }
+                      pm = true;
                     } else {
-                      hdist_vec_or[ix].push_back(min_dist);
-                      tlca_vec_or[ix].push_back(
-                        _slib_ptr_v[lix]->_tlca_arr[rix * _slib_ptr_v[lix]->_b + closest_di]);
+                      if (r) {
+                        if (hdist_vec_rc[ix].back() == min_dist) {
+                          tlca_vec_rc[ix].back() = getLowestCommonAncestor(
+                            tlca_vec_rc[ix].back(),
+                            _slib_ptr_v[lix]->_tlca_arr[rix * _slib_ptr_v[lix]->_b + closest_di]);
+                        } else if (hdist_vec_rc[ix].back() > min_dist) {
+                          hdist_vec_rc[ix].back() = min_dist;
+                          tlca_vec_rc[ix].back() =
+                            _slib_ptr_v[lix]->_tlca_arr[rix * _slib_ptr_v[lix]->_b + closest_di];
+                        }
+                      } else {
+                        if (hdist_vec_or[ix].back() == min_dist) {
+                          tlca_vec_or[ix].back() = getLowestCommonAncestor(
+                            tlca_vec_or[ix].back(),
+                            _slib_ptr_v[lix]->_tlca_arr[rix * _slib_ptr_v[lix]->_b + closest_di]);
+                        } else if (hdist_vec_or[ix].back() > min_dist) {
+                          hdist_vec_or[ix].back() = min_dist;
+                          tlca_vec_or[ix].back() =
+                            _slib_ptr_v[lix]->_tlca_arr[rix * _slib_ptr_v[lix]->_b + closest_di];
+                        }
+                      }
                     }
-                    /* } */
                   }
                 }
               }
@@ -268,7 +307,7 @@ Query::SearchL::SearchL(const char* library_dirpath, bool log)
       exit(EXIT_FAILURE);
     } else {
       if (_log)
-        LOG(ERROR) << "Library has been loaded into the memory" << std::endl;
+        LOG(INFO) << "Library has been loaded into the memory" << std::endl;
     }
   }
   std::cout << "Library is loaded and ready for performing queries" << std::endl;
@@ -337,6 +376,26 @@ Query::SearchL::loadMetadata()
   }
 
   return is_ok;
+}
+
+template<typename T>
+T
+Query::getLowestCommonAncestor(T a, T b)
+{
+  if (!a || !b) // LCA(x,0) = LCA(0,x) = x
+    return a ? a : b;
+  while ((a != b) && (a != 1) && (b != 1)) {
+    if (_tax_depth_vec[a] < _tax_depth_vec[b]) {
+      b = _tax_parent_vec[b];
+      assert(b != 0);
+    } else {
+      a = _tax_parent_vec[a];
+      assert(a != 0);
+    }
+  }
+  if ((a == 1) || (b == 1))
+    return a || b;
+  return a;
 }
 
 bool

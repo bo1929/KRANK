@@ -124,6 +124,7 @@ TaxonomyRecord<T>::TaxonomyRecord(const char* input_filepath, TaxonomyNCBI taxon
   }
 
   for (unsigned int i = 1; i < _parent_vec.size(); ++i) {
+    assert((_parent_vec[i] != 0) || i == 1);
     _child_map[_parent_vec[i]].insert(i);
   }
 
