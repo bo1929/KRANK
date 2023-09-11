@@ -98,6 +98,10 @@ Query::run(uint64_t rbatch_size)
       std::vector<std::vector<tT>> tlca_vec_rc(seqBatch.size());
 #pragma omp parallel for num_threads(num_threads), schedule(static)
       for (uint32_t ix = 0; ix < seqBatch.size(); ++ix) {
+        std::vector<uint8_t> hdist_vor;
+        std::vector<uint8_t> hdist_vrc;
+        std::vector<tT> tlca_vor;
+        std::vector<tT> tlca_vrc;
         names_vec[ix] = seqBatch[ix].name;
         std::string or_read(seqBatch[ix].nseq.begin(), seqBatch[ix].nseq.end());
         std::string rc_read(seqBatch[ix].nseq.rbegin(), seqBatch[ix].nseq.rend());
@@ -166,34 +170,34 @@ Query::run(uint64_t rbatch_size)
                   if (min_dist <= _max_match_hdist) {
                     if (!pm) {
                       if (r) {
-                        hdist_vec_rc[ix].push_back(min_dist);
-                        tlca_vec_rc[ix].push_back(
+                        hdist_vrc.push_back(min_dist);
+                        tlca_vrc.push_back(
                           _slib_ptr_v[lix]->_tlca_arr[rix * _slib_ptr_v[lix]->_b + closest_di]);
                       } else {
-                        hdist_vec_or[ix].push_back(min_dist);
-                        tlca_vec_or[ix].push_back(
+                        hdist_vor.push_back(min_dist);
+                        tlca_vor.push_back(
                           _slib_ptr_v[lix]->_tlca_arr[rix * _slib_ptr_v[lix]->_b + closest_di]);
                       }
                       pm = true;
                     } else {
                       if (r) {
-                        if (hdist_vec_rc[ix].back() == min_dist) {
-                          tlca_vec_rc[ix].back() = getLowestCommonAncestor(
-                            tlca_vec_rc[ix].back(),
+                        if (hdist_vrc.back() == min_dist) {
+                          tlca_vrc.back() = getLowestCommonAncestor(
+                            tlca_vrc.back(),
                             _slib_ptr_v[lix]->_tlca_arr[rix * _slib_ptr_v[lix]->_b + closest_di]);
-                        } else if (hdist_vec_rc[ix].back() > min_dist) {
-                          hdist_vec_rc[ix].back() = min_dist;
-                          tlca_vec_rc[ix].back() =
+                        } else if (hdist_vrc.back() > min_dist) {
+                          hdist_vrc.back() = min_dist;
+                          tlca_vrc.back() =
                             _slib_ptr_v[lix]->_tlca_arr[rix * _slib_ptr_v[lix]->_b + closest_di];
                         }
                       } else {
-                        if (hdist_vec_or[ix].back() == min_dist) {
-                          tlca_vec_or[ix].back() = getLowestCommonAncestor(
-                            tlca_vec_or[ix].back(),
+                        if (hdist_vor.back() == min_dist) {
+                          tlca_vor.back() = getLowestCommonAncestor(
+                            tlca_vor.back(),
                             _slib_ptr_v[lix]->_tlca_arr[rix * _slib_ptr_v[lix]->_b + closest_di]);
-                        } else if (hdist_vec_or[ix].back() > min_dist) {
-                          hdist_vec_or[ix].back() = min_dist;
-                          tlca_vec_or[ix].back() =
+                        } else if (hdist_vor.back() > min_dist) {
+                          hdist_vor.back() = min_dist;
+                          tlca_vor.back() =
                             _slib_ptr_v[lix]->_tlca_arr[rix * _slib_ptr_v[lix]->_b + closest_di];
                         }
                       }
@@ -203,6 +207,13 @@ Query::run(uint64_t rbatch_size)
               }
             }
           }
+        }
+#pragma omp critical
+        {
+          hdist_vec_or[ix] = hdist_vor;
+          hdist_vec_rc[ix] = hdist_vrc;
+          tlca_vec_or[ix] = tlca_vor;
+          tlca_vec_rc[ix] = tlca_vrc;
         }
       }
       if (_save_match_info) {
