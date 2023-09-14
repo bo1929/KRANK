@@ -243,7 +243,8 @@ Library::getBatchHTs(HTs<encT>* ts, uint8_t curr_depth, uint8_t last_depth)
   if (_log)
     LOG(INFO) << "Constructing the HTd for " << _taxonomy_record.changeIDtax(ts->tID) << std::endl;
   if (_log)
-    LOG(INFO) << "Current depth in the taxonomic tree is " << curr_depth << std::endl;
+    LOG(INFO) << "Current depth in the taxonomic tree is " << std::to_string(curr_depth)
+              << std::endl;
   if ((curr_depth >= last_depth) || _taxonomy_record.isBasis(ts->tID)) {
     HTd<encT> td(ts->tID, ts->k, ts->h, ts->num_rows, ts->ptr_lsh_vg, ts->kmer_ranking);
     getBatchHTd(&td);

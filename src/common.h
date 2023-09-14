@@ -51,6 +51,7 @@
 extern unsigned int num_threads;
 extern std::random_device rd;
 extern std::mt19937 gen;
+extern std::bernoulli_distribution ct;
 
 template<typename T>
 using vvec = std::vector<std::vector<T>>;

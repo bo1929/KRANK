@@ -86,24 +86,6 @@ vecIxsNumber(std::vector<unsigned int>& ixs,
              bool reverse);
 
 template void
-vecIxsThreshold(std::vector<unsigned int>& ixs,
-                const std::vector<uint16_t>& s_vec,
-                uint16_t threshold,
-                bool reverse);
-
-template void
-vecIxsThreshold(std::vector<unsigned int>& ixs,
-                const std::vector<uint32_t>& s_vec,
-                uint32_t threshold,
-                bool reverse);
-
-template void
-vecIxsThreshold(std::vector<unsigned int>& ixs,
-                const std::vector<uint64_t>& s_vec,
-                uint64_t threshold,
-                bool reverse);
-
-template void
 arrIxsNumber(std::vector<unsigned int>& ixs, const uint16_t* s_arr, uint8_t number, bool reverse);
 
 template void
@@ -111,27 +93,6 @@ arrIxsNumber(std::vector<unsigned int>& ixs, const uint32_t* s_arr, uint8_t numb
 
 template void
 arrIxsNumber(std::vector<unsigned int>& ixs, const uint64_t* s_arr, uint8_t number, bool reverse);
-
-template void
-arrIxsThreshold(std::vector<unsigned int>& ixs,
-                const uint16_t* s_arr,
-                uint8_t last,
-                uint16_t threshold,
-                bool reverse);
-
-template void
-arrIxsThreshold(std::vector<unsigned int>& ixs,
-                const uint32_t* s_arr,
-                uint8_t last,
-                uint32_t threshold,
-                bool reverse);
-
-template void
-arrIxsThreshold(std::vector<unsigned int>& ixs,
-                const uint64_t* s_arr,
-                uint8_t last,
-                uint64_t threshold,
-                bool reverse);
 
 template void
 vvecSizeOrder(std::vector<unsigned int>& ixs, const vvec<uint16_t>& vvec, bool reverse);
@@ -201,15 +162,3 @@ arrInformationScores(std::vector<uint32_t>& s,
                      uint32_t* r,
                      uint8_t last,
                      std::unordered_map<uint32_t, std::vector<uint32_t>>& values_map);
-
-template uint64_t
-mapArgmax(std::map<uint64_t, uint64_t>& val_counts, uint64_t n, bool reverse);
-
-template uint32_t
-mapArgmax(std::map<uint32_t, uint64_t>& val_counts, uint64_t n, bool reverse);
-
-template uint16_t
-mapArgmax(std::map<uint16_t, uint64_t>& val_counts, uint64_t n, bool reverse);
-
-template uint8_t
-mapArgmax(std::map<uint8_t, uint64_t>& val_counts, uint64_t n, bool reverse);

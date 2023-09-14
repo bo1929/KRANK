@@ -1,8 +1,5 @@
 #include "table.h"
-
-// TODO: Check what is sorted and what is not.
-// TODO: Check if size is updated or not.
-// TODO: Add macros for debugging to avoid redundant computation.
+#undef DEBUG
 
 template<typename T>
 inline void
@@ -785,9 +782,9 @@ HTd<encT>::shrinkHT(uint64_t num_rm, uint8_t b_max)
     assert(to_rm < num_kmers);
     std::vector<unsigned int> row_order;
     vvecSizeOrder(row_order, scount_vvec, true);
+    uint8_t n = static_cast<uint64_t>(to_rm) / num_rows + 1;
     switch (kmer_ranking) {
       case random_kmer: {
-        uint8_t n = static_cast<uint64_t>(to_rm) / num_rows + 1;
 #pragma omp parallel for num_threads(num_threads) schedule(dynamic)
         for (uint32_t ix = 0; ix < row_order.size(); ++ix) {
           uint32_t& rix = row_order[ix];
@@ -797,7 +794,7 @@ HTd<encT>::shrinkHT(uint64_t num_rm, uint8_t b_max)
             r_to_rm = to_rm;
             if (r_to_rm > 0) {
               std::vector<unsigned int> ixs;
-              getIxsRandom(ixs, scount_vvec[rix].size(), n);
+              getIxsRandom(ixs, enc_vvec[rix].size(), n);
               vecRemoveIxs(scount_vvec[rix], ixs);
               vecRemoveIxs(enc_vvec[rix], ixs);
               vecRemoveIxs(tlca_vvec[rix], ixs);
@@ -809,17 +806,16 @@ HTd<encT>::shrinkHT(uint64_t num_rm, uint8_t b_max)
         break;
       }
       case large_scount: {
-        scT threshold = vvecArgmax2D(scount_vvec, static_cast<uint64_t>(to_rm), true);
 #pragma omp parallel for num_threads(num_threads) schedule(dynamic)
         for (uint32_t ix = 0; ix < row_order.size(); ++ix) {
           uint32_t& rix = row_order[ix];
-          if (scount_vvec[rix].size() > 0) {
+          if (scount_vvec[rix].size() >= n) {
             int64_t r_to_rm;
 #pragma omp atomic read
             r_to_rm = to_rm;
             if (r_to_rm > 0) {
               std::vector<unsigned int> ixs;
-              vecIxsThreshold(ixs, scount_vvec[rix], threshold, true);
+              vecIxsNumber(ixs, scount_vvec[rix], n, true);
               vecRemoveIxs(scount_vvec[rix], ixs);
               vecRemoveIxs(enc_vvec[rix], ixs);
               vecRemoveIxs(tlca_vvec[rix], ixs);
@@ -831,36 +827,20 @@ HTd<encT>::shrinkHT(uint64_t num_rm, uint8_t b_max)
         break;
       }
       case information_score: {
-        std::map<scT, uint64_t> val_counts{};
-#pragma omp parallel for num_threads(num_threads) schedule(dynamic)
-        for (uint32_t rix = 0; rix < num_rows; ++rix) {
-          if (enc_vvec[rix].size() > 0) {
-            std::unordered_map<encT, std::vector<scT>> values_map =
-              mapValuesCountsHTd(childrenHT, rix);
-            std::vector<scT> scores_vec;
-            vecInformationScores(scores_vec, enc_vvec[rix], values_map);
-#pragma omp critical
-            {
-              for (auto& val : scores_vec)
-                val_counts[val]++;
-            }
-          }
-        }
-        scT threshold = mapArgmax(val_counts, static_cast<uint64_t>(to_rm), true);
 #pragma omp parallel for num_threads(num_threads) schedule(dynamic)
         for (uint32_t ix = 0; ix < row_order.size(); ++ix) {
           uint32_t& rix = row_order[ix];
-          if (enc_vvec[rix].size() > 0) {
+          if (enc_vvec[rix].size() >= n) {
             int64_t r_to_rm;
 #pragma omp atomic read
             r_to_rm = to_rm;
             if (r_to_rm > 0) {
+              std::vector<unsigned int> ixs;
               std::unordered_map<encT, std::vector<scT>> values_map =
                 mapValuesCountsHTd(childrenHT, rix);
               std::vector<scT> scores_vec;
               vecInformationScores(scores_vec, enc_vvec[rix], values_map);
-              std::vector<unsigned int> ixs;
-              vecIxsThreshold(ixs, scores_vec, threshold, true);
+              vecIxsNumber(ixs, scores_vec, n, true);
               vecRemoveIxs(scount_vvec[rix], ixs);
               vecRemoveIxs(enc_vvec[rix], ixs);
               vecRemoveIxs(tlca_vvec[rix], ixs);
@@ -898,9 +878,9 @@ HTs<encT>::shrinkHT(uint64_t num_rm)
   while (to_rm > 0) {
     std::vector<unsigned int> row_order;
     arrSizeOrder(row_order, ind_arr, num_rows, true);
+    uint8_t n = to_rm / num_rows + 1;
     switch (kmer_ranking) {
       case random_kmer: {
-        uint8_t n = to_rm / num_rows + 1;
 #pragma omp parallel for num_threads(num_threads) schedule(dynamic)
         for (uint32_t ix = 0; ix < row_order.size(); ++ix) {
           uint32_t& rix = row_order[ix];
@@ -923,18 +903,16 @@ HTs<encT>::shrinkHT(uint64_t num_rm)
         break;
       }
       case large_scount: {
-        scT threshold =
-          arrArgmax2D(scount_arr, ind_arr, num_rows, b, static_cast<uint64_t>(to_rm), true);
 #pragma omp parallel for num_threads(num_threads) schedule(dynamic)
         for (uint32_t ix = 0; ix < row_order.size(); ++ix) {
           uint32_t& rix = row_order[ix];
-          if (ind_arr[rix] > 0) {
+          if (ind_arr[rix] >= n) {
             int64_t r_to_rm;
 #pragma omp atomic read
             r_to_rm = to_rm;
             if (r_to_rm > 0) {
               std::vector<unsigned int> ixs;
-              arrIxsThreshold(ixs, scount_arr + (rix * b), ind_arr[rix], threshold, true);
+              arrIxsNumber(ixs, scount_arr + (rix * b), n, true);
               arrRemoveIxs(enc_arr + (rix * b), ind_arr[rix], ixs);
               arrRemoveIxs(scount_arr + (rix * b), ind_arr[rix], ixs);
               arrRemoveIxs(tlca_arr + (rix * b), ind_arr[rix], ixs);
@@ -947,26 +925,10 @@ HTs<encT>::shrinkHT(uint64_t num_rm)
         break;
       }
       case information_score: {
-        std::map<scT, uint64_t> val_counts{};
-#pragma omp parallel for num_threads(num_threads) schedule(dynamic)
-        for (uint32_t rix = 0; rix < num_rows; ++rix) {
-          if (ind_arr[rix] > 0) {
-            std::unordered_map<encT, std::vector<scT>> values_map =
-              mapValuesCountsHTs(childrenHT, rix);
-            std::vector<scT> scores_vec;
-            arrInformationScores(scores_vec, enc_arr + rix * b, ind_arr[rix], values_map);
-#pragma omp critical
-            {
-              for (auto& val : scores_vec)
-                val_counts[val]++;
-            }
-          }
-        }
-        scT threshold = mapArgmax(val_counts, static_cast<uint64_t>(to_rm), true);
 #pragma omp parallel for num_threads(num_threads) schedule(dynamic)
         for (uint32_t ix = 0; ix < row_order.size(); ++ix) {
           uint32_t& rix = row_order[ix];
-          if (ind_arr[rix] > 0) {
+          if (ind_arr[rix] >= n) {
             int64_t r_to_rm;
 #pragma omp atomic read
             r_to_rm = to_rm;
@@ -976,7 +938,7 @@ HTs<encT>::shrinkHT(uint64_t num_rm)
               std::vector<scT> scores_vec;
               arrInformationScores(scores_vec, enc_arr + rix * b, ind_arr[rix], values_map);
               std::vector<unsigned int> ixs;
-              vecIxsThreshold(ixs, scores_vec, threshold, true);
+              vecIxsNumber(ixs, scores_vec, n, true);
               arrRemoveIxs(enc_arr + (rix * b), ind_arr[rix], ixs);
               arrRemoveIxs(scount_arr + (rix * b), ind_arr[rix], ixs);
               arrRemoveIxs(tlca_arr + (rix * b), ind_arr[rix], ixs);
