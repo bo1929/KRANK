@@ -16,9 +16,10 @@ public:
           uint8_t k,
           uint8_t h,
           uint8_t b,
+          RankingMethod upper_ranking,
+          RankingMethod lower_ranking,
           uint64_t capacitiy_size,
           uint32_t num_batch_rows,
-          bool switch_ranking = true,
           bool in_library = false,
           bool on_disk = true,
           uint8_t specified_batch = 0,
@@ -33,6 +34,8 @@ private:
   uint8_t _k;
   uint8_t _h;
   uint8_t _b;
+  RankingMethod _upper_ranking;
+  RankingMethod _lower_ranking;
   uint64_t _num_rows; // Total number of rows: pow(2, 2h).
   uint64_t _capacity_size;
   uint32_t _tbatch_size;
@@ -46,7 +49,6 @@ private:
   std::unordered_map<tT, uint64_t> _basis_to_size;
   std::vector<tT> _tID_vec;
   uint64_t _num_species;
-  bool _switch_ranking;
   bool _on_disk;
   bool _in_library;
   uint8_t _specified_batch;
@@ -62,7 +64,7 @@ public:
   bool loadMetadata();
   void getRandomPositions();
   void skipBatch();
-  void run(uint8_t sdepth = 3, RankingMethod init_ranking = information_score);
+  void run(uint8_t sdepth = 3);
   decltype(_npositions)& npositions() { return _npositions; }
   decltype(_positions)& positions() { return _positions; }
   decltype(_lsh_vg)& lsh_vg() { return _lsh_vg; }

@@ -10,8 +10,9 @@
 enum RankingMethod
 {
   random_kmer,
-  large_scount,
-  information_score
+  species_count,
+  information_score,
+  taxa_count
 };
 
 template<typename encT>
@@ -81,7 +82,7 @@ struct HTs
   scT* scount_arr;
   tT* tlca_arr;
   uint8_t* ind_arr;
-  RankingMethod kmer_ranking;
+  RankingMethod ranking_method;
   std::vector<HTs<encT>> childrenHT;
   std::set<tT> tIDsBasis;
 
@@ -91,7 +92,7 @@ struct HTs
       uint8_t b,
       uint32_t num_rows,
       maskLSH* ptr_lsh_vg,
-      RankingMethod kmer_ranking)
+      RankingMethod ranking_method)
     : tID(tID)
     , k(k)
     , h(h)
@@ -100,7 +101,7 @@ struct HTs
     , num_kmers(0)
     , num_species(0)
     , ptr_lsh_vg(ptr_lsh_vg)
-    , kmer_ranking(kmer_ranking)
+    , ranking_method(ranking_method)
   {
     enc_arr = new encT[num_rows * b];
     std::fill(enc_arr, enc_arr + num_rows * b, 0);
@@ -122,7 +123,7 @@ struct HTs
     , num_kmers(ts.num_kmers)
     , num_species(ts.num_species)
     , ptr_lsh_vg(ts.ptr_lsh_vg)
-    , kmer_ranking(ts.kmer_ranking)
+    , ranking_method(ts.ranking_method)
     , childrenHT(ts.childrenHT)
     , tIDsBasis(ts.tIDsBasis)
   {
@@ -151,7 +152,7 @@ struct HTs
     num_kmers = rhs.num_kmers;
     num_species = rhs.num_species;
     ptr_lsh_vg = rhs.ptr_lsh_vg;
-    kmer_ranking = rhs.kmer_ranking;
+    ranking_method = rhs.ranking_method;
     childrenHT = rhs.childrenHT;
     tIDsBasis = rhs.tIDsBasis;
     return *this;
@@ -190,7 +191,7 @@ struct HTd
   vvec<encT> enc_vvec;
   vvec<scT> scount_vvec;
   vvec<tT> tlca_vvec;
-  RankingMethod kmer_ranking;
+  RankingMethod ranking_method;
   std::vector<HTd<encT>> childrenHT;
   std::set<tT> tIDsBasis;
 
@@ -199,7 +200,7 @@ struct HTd
       uint8_t h,
       uint32_t num_rows,
       maskLSH* ptr_lsh_vg,
-      RankingMethod kmer_ranking)
+      RankingMethod ranking_method)
     : tID(tID)
     , k(k)
     , h(h)
@@ -207,7 +208,7 @@ struct HTd
     , num_kmers(0)
     , num_species(0)
     , ptr_lsh_vg(ptr_lsh_vg)
-    , kmer_ranking(kmer_ranking)
+    , ranking_method(ranking_method)
   {
     enc_vvec.resize(num_rows);
     scount_vvec.resize(num_rows);

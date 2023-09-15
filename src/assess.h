@@ -49,22 +49,7 @@ vecIxsNumber(std::vector<unsigned int>& ixs,
 
 template<typename T>
 void
-vecIxsThreshold(std::vector<unsigned int>& ixs,
-                const std::vector<T>& s_v,
-                T threshold,
-                bool reverse = false);
-
-template<typename T>
-void
 arrIxsNumber(std::vector<unsigned int>& ixs, const T* s_arr, uint8_t number, bool reverse = false);
-
-template<typename T>
-void
-arrIxsThreshold(std::vector<unsigned int>& ixs,
-                const T* s_arr,
-                uint8_t last,
-                T threshold,
-                bool reverse = false);
 
 template<typename T>
 void
@@ -89,8 +74,17 @@ arrInformationScores(std::vector<T1>& s,
                      uint8_t last,
                      std::unordered_map<T2, std::vector<T1>>& values_map);
 
-template<typename T>
-T
-mapArgmax(std::map<T, uint64_t>& val_counts, uint64_t n, bool reverse);
+template<typename T1, typename T2>
+void
+vecTaxaCounts(std::vector<T1>& s,
+              std::vector<T2>& v,
+              std::unordered_map<T2, std::vector<bool>>& values_map);
+
+template<typename T1, typename T2>
+void
+arrTaxaCounts(std::vector<T1>& s,
+              T2* r,
+              uint8_t last,
+              std::unordered_map<T2, std::vector<bool>>& values_map);
 
 #endif

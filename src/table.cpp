@@ -1,5 +1,6 @@
 #include "table.h"
 #undef DEBUG
+#define FL true
 
 template<typename T>
 inline void
@@ -441,11 +442,12 @@ HTd<encT>::initBasis(tT tID)
     if (!enc_vvec[rix].empty()) {
       scount_vvec[rix].resize(enc_vvec[rix].size());
       std::fill(scount_vvec[rix].begin(), scount_vvec[rix].end(), value);
+      tlca_vvec[rix].resize(enc_vvec[rix].size());
+      std::fill(tlca_vvec[rix].begin(), tlca_vvec[rix].end(), tID);
     } else {
       scount_vvec[rix].clear();
+      tlca_vvec[rix].clear();
     }
-    tlca_vvec[rix].resize(enc_vvec[rix].size());
-    std::fill(tlca_vvec[rix].begin(), tlca_vvec[rix].end(), tID);
   }
   num_species = value;
   tIDsBasis = { tID };
@@ -485,20 +487,31 @@ HTd<encT>::pruneColumns(uint8_t b_max)
     }
     if (enc_vvec[rix].size() > b_max) {
       std::vector<unsigned int> ixs;
-      switch (kmer_ranking) {
-        case random_kmer:
+      switch (ranking_method) {
+        case random_kmer: {
           getIxsRandom(ixs, enc_vvec[rix].size(), enc_vvec[rix].size() - b_max);
           break;
-        case large_scount:
-          vecIxsNumber(ixs, scount_vvec[rix], enc_vvec[rix].size() - b_max, true);
+        }
+        case species_count: {
+          vecIxsNumber(ixs, scount_vvec[rix], enc_vvec[rix].size() - b_max, FL);
           break;
-        case information_score:
+        }
+        case information_score: {
           std::unordered_map<encT, std::vector<scT>> values_map =
             mapValuesCountsHTd(childrenHT, rix);
           std::vector<scT> scores_vec;
           vecInformationScores(scores_vec, enc_vvec[rix], values_map);
-          vecIxsNumber(ixs, scores_vec, enc_vvec[rix].size() - b_max, true);
+          vecIxsNumber(ixs, scores_vec, enc_vvec[rix].size() - b_max, FL);
           break;
+        }
+        case taxa_count: {
+          std::unordered_map<encT, std::vector<bool>> values_map =
+            mapValuesBinaryHTd(childrenHT, rix);
+          std::vector<scT> tcount_vec;
+          vecTaxaCounts(tcount_vec, enc_vvec[rix], values_map);
+          vecIxsNumber(ixs, tcount_vec, enc_vvec[rix].size() - b_max, FL);
+          break;
+        }
       }
       vecRemoveIxs(enc_vvec[rix], ixs);
       vecRemoveIxs(scount_vvec[rix], ixs);
@@ -522,11 +535,13 @@ HTd<encT>::unionRows(HTd<encT>& sibling, bool update_size)
 #ifdef DEBUG
   if (!HTd<encT>::areColumnsSorted()) {
     HTd<encT>::sortColumns();
-    std::puts("HTd (main) has unsorted columns before computing the union of rows.\n");
+    std::puts("HTd (main) has unsorted columns before computing the union of "
+              "rows.\n");
   }
   if (!sibling.areColumnsSorted()) {
     sibling.sortColumns();
-    std::puts("HTd (sibling) has unsorted columns before computing the union of rows.\n");
+    std::puts("HTd (sibling) has unsorted columns before computing the union "
+              "of rows.\n");
   }
 #endif
   assert(num_rows == sibling.num_rows);
@@ -567,11 +582,13 @@ HTs<encT>::unionRows(HTs<encT>& sibling, bool update_size)
 #ifdef DEBUG
   if (!HTs<encT>::areColumnsSorted()) {
     HTs<encT>::sortColumns();
-    std::puts("HTs (main) has unsorted columns before computing the union of rows.\n");
+    std::puts("HTs (main) has unsorted columns before computing the union of "
+              "rows.\n");
   }
   if (!sibling.areColumnsSorted()) {
     sibling.sortColumns();
-    std::puts("HTs (sibling) has unsorted columns before computing the union of rows.\n");
+    std::puts("HTs (sibling) has unsorted columns before computing the union "
+              "of rows.\n");
   }
 #endif
   assert(b == sibling.b);
@@ -594,17 +611,17 @@ HTs<encT>::unionRows(HTs<encT>& sibling, bool update_size)
                      std::back_inserter(v));
       if (v.size() > b) {
         std::vector<unsigned int> ixs;
-        switch (kmer_ranking) {
+        switch (ranking_method) {
           case random_kmer: {
             getIxsRandom(ixs, v.size(), v.size() - b);
             break;
           }
-          case large_scount: {
+          case species_count: {
             std::vector<scT> s_v;
             std::transform(v.begin(), v.end(), back_inserter(s_v), [&count_map](encT val) {
               return count_map[val];
             });
-            vecIxsNumber(ixs, s_v, v.size() - b, true);
+            vecIxsNumber(ixs, s_v, v.size() - b, FL);
             break;
           }
           case information_score: {
@@ -612,7 +629,15 @@ HTs<encT>::unionRows(HTs<encT>& sibling, bool update_size)
               mapValuesCountsHTs(childrenHT, rix);
             std::vector<scT> scores_vec;
             vecInformationScores(scores_vec, v, values_map);
-            vecIxsNumber(ixs, scores_vec, v.size() - b, true);
+            vecIxsNumber(ixs, scores_vec, v.size() - b, FL);
+            break;
+          }
+          case taxa_count: {
+            std::unordered_map<encT, std::vector<bool>> values_map =
+              mapValuesBinaryHTs(childrenHT, rix);
+            std::vector<scT> tcount_vec;
+            vecTaxaCounts(tcount_vec, v, values_map);
+            vecIxsNumber(ixs, tcount_vec, v.size() - b, FL);
             break;
           }
         }
@@ -719,17 +744,17 @@ HTs<encT>::mergeRows(HTs<encT>& sibling, bool update_size)
       }
       if (v.size() > b) {
         std::vector<unsigned int> ixs;
-        switch (kmer_ranking) {
+        switch (ranking_method) {
           case random_kmer: {
             getIxsRandom(ixs, v.size(), v.size() - b);
             break;
           }
-          case large_scount: {
+          case species_count: {
             std::vector<scT> s_v;
             std::transform(v.begin(), v.end(), back_inserter(s_v), [&count_map](encT val) {
               return count_map[val];
             });
-            vecIxsNumber(ixs, s_v, v.size() - b, true);
+            vecIxsNumber(ixs, s_v, v.size() - b, FL);
             break;
           }
           case information_score: {
@@ -737,7 +762,15 @@ HTs<encT>::mergeRows(HTs<encT>& sibling, bool update_size)
               mapValuesCountsHTs(childrenHT, rix);
             std::vector<scT> scores_vec;
             vecInformationScores(scores_vec, v, values_map);
-            vecIxsNumber(ixs, scores_vec, v.size() - b, true);
+            vecIxsNumber(ixs, scores_vec, v.size() - b, FL);
+            break;
+          }
+          case taxa_count: {
+            std::unordered_map<encT, std::vector<bool>> values_map =
+              mapValuesBinaryHTs(childrenHT, rix);
+            std::vector<scT> tcount_vec;
+            vecTaxaCounts(tcount_vec, v, values_map);
+            vecIxsNumber(ixs, tcount_vec, v.size() - b, FL);
             break;
           }
         }
@@ -783,7 +816,7 @@ HTd<encT>::shrinkHT(uint64_t num_rm, uint8_t b_max)
     std::vector<unsigned int> row_order;
     vvecSizeOrder(row_order, scount_vvec, true);
     uint8_t n = static_cast<uint64_t>(to_rm) / num_rows + 1;
-    switch (kmer_ranking) {
+    switch (ranking_method) {
       case random_kmer: {
 #pragma omp parallel for num_threads(num_threads) schedule(dynamic)
         for (uint32_t ix = 0; ix < row_order.size(); ++ix) {
@@ -805,7 +838,7 @@ HTd<encT>::shrinkHT(uint64_t num_rm, uint8_t b_max)
         }
         break;
       }
-      case large_scount: {
+      case species_count: {
 #pragma omp parallel for num_threads(num_threads) schedule(dynamic)
         for (uint32_t ix = 0; ix < row_order.size(); ++ix) {
           uint32_t& rix = row_order[ix];
@@ -815,7 +848,7 @@ HTd<encT>::shrinkHT(uint64_t num_rm, uint8_t b_max)
             r_to_rm = to_rm;
             if (r_to_rm > 0) {
               std::vector<unsigned int> ixs;
-              vecIxsNumber(ixs, scount_vvec[rix], n, true);
+              vecIxsNumber(ixs, scount_vvec[rix], n, FL);
               vecRemoveIxs(scount_vvec[rix], ixs);
               vecRemoveIxs(enc_vvec[rix], ixs);
               vecRemoveIxs(tlca_vvec[rix], ixs);
@@ -840,7 +873,32 @@ HTd<encT>::shrinkHT(uint64_t num_rm, uint8_t b_max)
                 mapValuesCountsHTd(childrenHT, rix);
               std::vector<scT> scores_vec;
               vecInformationScores(scores_vec, enc_vvec[rix], values_map);
-              vecIxsNumber(ixs, scores_vec, n, true);
+              vecIxsNumber(ixs, scores_vec, n, FL);
+              vecRemoveIxs(scount_vvec[rix], ixs);
+              vecRemoveIxs(enc_vvec[rix], ixs);
+              vecRemoveIxs(tlca_vvec[rix], ixs);
+#pragma omp atomic update
+              to_rm = to_rm - ixs.size();
+            }
+          }
+        }
+        break;
+      }
+      case taxa_count: {
+#pragma omp parallel for num_threads(num_threads) schedule(dynamic)
+        for (uint32_t ix = 0; ix < row_order.size(); ++ix) {
+          uint32_t& rix = row_order[ix];
+          if (enc_vvec[rix].size() >= n) {
+            int64_t r_to_rm;
+#pragma omp atomic read
+            r_to_rm = to_rm;
+            if (r_to_rm > 0) {
+              std::vector<unsigned int> ixs;
+              std::unordered_map<encT, std::vector<bool>> values_map =
+                mapValuesBinaryHTd(childrenHT, rix);
+              std::vector<scT> tcount_vec;
+              vecTaxaCounts(tcount_vec, enc_vvec[rix], values_map);
+              vecIxsNumber(ixs, tcount_vec, n, FL);
               vecRemoveIxs(scount_vvec[rix], ixs);
               vecRemoveIxs(enc_vvec[rix], ixs);
               vecRemoveIxs(tlca_vvec[rix], ixs);
@@ -879,7 +937,7 @@ HTs<encT>::shrinkHT(uint64_t num_rm)
     std::vector<unsigned int> row_order;
     arrSizeOrder(row_order, ind_arr, num_rows, true);
     uint8_t n = to_rm / num_rows + 1;
-    switch (kmer_ranking) {
+    switch (ranking_method) {
       case random_kmer: {
 #pragma omp parallel for num_threads(num_threads) schedule(dynamic)
         for (uint32_t ix = 0; ix < row_order.size(); ++ix) {
@@ -902,7 +960,7 @@ HTs<encT>::shrinkHT(uint64_t num_rm)
         }
         break;
       }
-      case large_scount: {
+      case species_count: {
 #pragma omp parallel for num_threads(num_threads) schedule(dynamic)
         for (uint32_t ix = 0; ix < row_order.size(); ++ix) {
           uint32_t& rix = row_order[ix];
@@ -938,7 +996,33 @@ HTs<encT>::shrinkHT(uint64_t num_rm)
               std::vector<scT> scores_vec;
               arrInformationScores(scores_vec, enc_arr + rix * b, ind_arr[rix], values_map);
               std::vector<unsigned int> ixs;
-              vecIxsNumber(ixs, scores_vec, n, true);
+              vecIxsNumber(ixs, scores_vec, n, FL);
+              arrRemoveIxs(enc_arr + (rix * b), ind_arr[rix], ixs);
+              arrRemoveIxs(scount_arr + (rix * b), ind_arr[rix], ixs);
+              arrRemoveIxs(tlca_arr + (rix * b), ind_arr[rix], ixs);
+              ind_arr[rix] = ind_arr[rix] - ixs.size();
+#pragma omp atomic update
+              to_rm = to_rm - ixs.size();
+            }
+          }
+        }
+        break;
+      }
+      case taxa_count: {
+#pragma omp parallel for num_threads(num_threads) schedule(dynamic)
+        for (uint32_t ix = 0; ix < row_order.size(); ++ix) {
+          uint32_t& rix = row_order[ix];
+          if (ind_arr[rix] > 0) {
+            int64_t r_to_rm;
+#pragma omp atomic read
+            r_to_rm = to_rm;
+            if (r_to_rm > 0) {
+              std::unordered_map<encT, std::vector<bool>> values_map =
+                mapValuesBinaryHTs(childrenHT, rix);
+              std::vector<scT> tcount_vec;
+              arrTaxaCounts(tcount_vec, enc_arr + rix * b, ind_arr[rix], values_map);
+              std::vector<unsigned int> ixs;
+              vecIxsNumber(ixs, tcount_vec, n, FL);
               arrRemoveIxs(enc_arr + (rix * b), ind_arr[rix], ixs);
               arrRemoveIxs(scount_arr + (rix * b), ind_arr[rix], ixs);
               arrRemoveIxs(tlca_arr + (rix * b), ind_arr[rix], ixs);
@@ -980,16 +1064,17 @@ HTd<encT>::updateLCA()
         } else {
           /* std::unordered_map<encT, std::vector<float>> select_map =
            * mapValuesSelectHTd(childrenHT, rix); */
-          /* std::bernoulli_distribution d(updateLCAtProbabilityAPN(prob_map[enc_vvec[rix][i]],
+          /* std::bernoulli_distribution
+           * d(updateLCAtProbabilityAPN(prob_map[enc_vvec[rix][i]],
            * select_map[enc_vvec[rix][i]])); */
           std::bernoulli_distribution d(updateLCAtProbabilityC2N(prob_map[enc_vvec[rix][i]]));
           if (d(gen)) {
             tlca_vvec[rix][i] = tID;
           } else {
             std::discrete_distribution<> d(prob_map[enc_vvec[rix][i]].begin(),
-                                           prob_map[enc_vvec[rix][i]].end());
-            for (auto v : tlca_map[enc_vvec[rix][i]])
-              tlca_vvec[rix][i] = tlca_map[enc_vvec[rix][i]][d(gen)];
+                                           prob_map[enc_vvec[rix][i]].begin() +
+                                             tlca_map[enc_vvec[rix][i]].size());
+            tlca_vvec[rix][i] = tlca_map[enc_vvec[rix][i]][d(gen)];
           }
         }
       }
@@ -1013,14 +1098,16 @@ HTs<encT>::updateLCA()
         } else {
           /* std::unordered_map<encT, std::vector<float>> select_map =
            * mapValuesSelectHTs(childrenHT, rix); */
-          /* std::bernoulli_distribution d(updateLCAtProbabilityAPN(prob_map[enc_arr[rix * b + i]],
+          /* std::bernoulli_distribution
+           * d(updateLCAtProbabilityAPN(prob_map[enc_arr[rix * b + i]],
            * select_map[enc_arr[rix * b + i]])); */
           std::bernoulli_distribution d(updateLCAtProbabilityC2N(prob_map[enc_arr[rix * b + i]]));
           if (d(gen)) {
             tlca_arr[rix * b + i] = tID;
           } else {
             std::discrete_distribution<> d(prob_map[enc_arr[rix * b + i]].begin(),
-                                           prob_map[enc_arr[rix * b + i]].end());
+                                           prob_map[enc_arr[rix * b + i]].begin() +
+                                             tlca_map[enc_arr[rix * b + i]].size());
             tlca_arr[rix * b + i] = tlca_map[enc_arr[rix * b + i]][d(gen)];
           }
         }

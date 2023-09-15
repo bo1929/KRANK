@@ -162,3 +162,69 @@ arrInformationScores(std::vector<uint32_t>& s,
                      uint32_t* r,
                      uint8_t last,
                      std::unordered_map<uint32_t, std::vector<uint32_t>>& values_map);
+
+template void
+vecTaxaCounts(std::vector<uint64_t>& s,
+              std::vector<uint32_t>& v,
+              std::unordered_map<uint32_t, std::vector<bool>>& values_map);
+
+template void
+arrTaxaCounts(std::vector<uint64_t>& s,
+              uint32_t* r,
+              uint8_t last,
+              std::unordered_map<uint32_t, std::vector<bool>>& values_map);
+
+template void
+vecTaxaCounts(std::vector<uint32_t>& s,
+              std::vector<uint32_t>& v,
+              std::unordered_map<uint32_t, std::vector<bool>>& values_map);
+
+template void
+arrTaxaCounts(std::vector<uint32_t>& s,
+              uint32_t* r,
+              uint8_t last,
+              std::unordered_map<uint32_t, std::vector<bool>>& values_map);
+
+template void
+vecTaxaCounts(std::vector<uint16_t>& s,
+              std::vector<uint32_t>& v,
+              std::unordered_map<uint32_t, std::vector<bool>>& values_map);
+
+template void
+arrTaxaCounts(std::vector<uint16_t>& s,
+              uint32_t* r,
+              uint8_t last,
+              std::unordered_map<uint32_t, std::vector<bool>>& values_map);
+
+template void
+vecTaxaCounts(std::vector<uint64_t>& s,
+              std::vector<uint64_t>& v,
+              std::unordered_map<uint64_t, std::vector<bool>>& values_map);
+
+template void
+arrTaxaCounts(std::vector<uint64_t>& s,
+              uint64_t* r,
+              uint8_t last,
+              std::unordered_map<uint64_t, std::vector<bool>>& values_map);
+
+template void
+vecTaxaCounts(std::vector<uint32_t>& s,
+              std::vector<uint64_t>& v,
+              std::unordered_map<uint64_t, std::vector<bool>>& values_map);
+
+template void
+arrTaxaCounts(std::vector<uint32_t>& s,
+              uint64_t* r,
+              uint8_t last,
+              std::unordered_map<uint64_t, std::vector<bool>>& values_map);
+
+template void
+vecTaxaCounts(std::vector<uint16_t>& s,
+              std::vector<uint64_t>& v,
+              std::unordered_map<uint64_t, std::vector<bool>>& values_map);
+
+template void
+arrTaxaCounts(std::vector<uint16_t>& s,
+              uint64_t* r,
+              uint8_t last,
+              std::unordered_map<uint64_t, std::vector<bool>>& values_map);

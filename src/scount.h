@@ -161,6 +161,22 @@ mapValuesCountsHTd(std::vector<HTd<T>>& td_vec, std::uint32_t rix)
 }
 
 template<typename T>
+inline std::unordered_map<T, std::vector<bool>>
+mapValuesBinaryHTd(std::vector<HTd<T>>& td_vec, std::uint32_t rix)
+{
+  std::unordered_map<T, std::vector<bool>> values_map{};
+  for (auto& td : td_vec) {
+    for (unsigned int i = 0; i < td.enc_vvec[rix].size(); ++i)
+      values_map[td.enc_vvec[rix][i]].push_back(true);
+  }
+  for (auto& kv : values_map) {
+    for (unsigned int i = 0; i < td_vec.size() - kv.second.size(); ++i)
+      kv.second.push_back(false);
+  }
+  return values_map;
+}
+
+template<typename T>
 inline std::unordered_map<T, std::vector<scT>>
 mapValuesCountsHTs(std::vector<HTs<T>>& ts_vec, std::uint32_t rix)
 {
@@ -172,6 +188,22 @@ mapValuesCountsHTs(std::vector<HTs<T>>& ts_vec, std::uint32_t rix)
   for (auto& kv : values_map) {
     for (unsigned int i = 0; i < ts_vec.size() - kv.second.size(); ++i)
       kv.second.push_back(0);
+  }
+  return values_map;
+}
+
+template<typename T>
+inline std::unordered_map<T, std::vector<bool>>
+mapValuesBinaryHTs(std::vector<HTs<T>>& ts_vec, std::uint32_t rix)
+{
+  std::unordered_map<T, std::vector<bool>> values_map{};
+  for (auto& ts : ts_vec) {
+    for (unsigned int i = 0; i < ts.ind_arr[rix]; ++i)
+      values_map[ts.enc_arr[rix * ts.b + i]].push_back(true);
+  }
+  for (auto& kv : values_map) {
+    for (unsigned int i = 0; i < ts_vec.size() - kv.second.size(); ++i)
+      kv.second.push_back(false);
   }
   return values_map;
 }

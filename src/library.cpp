@@ -7,9 +7,10 @@ Library::Library(const char* library_dirpath,
                  uint8_t k,
                  uint8_t h,
                  uint8_t b,
+                 RankingMethod upper_ranking,
+                 RankingMethod lower_ranking,
                  uint64_t capacity_size,
                  uint32_t tbatch_size,
-                 bool swicth_ranking,
                  bool in_library,
                  bool on_disk,
                  uint8_t specified_batch,
@@ -22,9 +23,10 @@ Library::Library(const char* library_dirpath,
   , _k(k)
   , _h(h)
   , _b(b)
+  , _upper_ranking(upper_ranking)
+  , _lower_ranking(lower_ranking)
   , _capacity_size(capacity_size)
   , _tbatch_size(tbatch_size)
-  , _switch_ranking(swicth_ranking)
   , _in_library(in_library)
   , _on_disk(on_disk)
   , _specified_batch(specified_batch)
@@ -159,18 +161,15 @@ Library::Library(const char* library_dirpath,
 }
 
 void
-Library::run(uint8_t sdepth, RankingMethod init_ranking)
+Library::run(uint8_t sdepth)
 {
-  if (_log && _switch_ranking && (init_ranking == random_kmer)) {
-    LOG(NOTICE) << "No counterpart to given k-mer ranking method, no switching." << std::endl;
-  }
   std::cout << "Total number of batches is  " << _total_batches << std::endl;
   unsigned int curr_batch = 0;
   for (unsigned int i = 0; i < _total_batches; ++i) {
     curr_batch++;
     if ((_specified_batch == 0) || (_specified_batch == curr_batch)) {
       std::cout << "Building the library for batch " << curr_batch << "..." << std::endl;
-      HTs<encT> ts_root(1, _k, _h, _b, _tbatch_size, &_lsh_vg, init_ranking);
+      HTs<encT> ts_root(1, _k, _h, _b, _tbatch_size, &_lsh_vg, _upper_ranking);
       Library::getBatchHTs(&ts_root, 0, sdepth);
       Library::saveBatchHTs(ts_root, curr_batch);
     } else {
@@ -246,39 +245,20 @@ Library::getBatchHTs(HTs<encT>* ts, uint8_t curr_depth, uint8_t last_depth)
     LOG(INFO) << "Current depth in the taxonomic tree is " << std::to_string(curr_depth)
               << std::endl;
   if ((curr_depth >= last_depth) || _taxonomy_record.isBasis(ts->tID)) {
-    HTd<encT> td(ts->tID, ts->k, ts->h, ts->num_rows, ts->ptr_lsh_vg, ts->kmer_ranking);
+    HTd<encT> td(ts->tID, ts->k, ts->h, ts->num_rows, ts->ptr_lsh_vg, _lower_ranking);
     getBatchHTd(&td);
     if (_log)
       LOG(INFO) << "Converting from HTd to HTs for the taxon "
                 << _taxonomy_record.changeIDtax(ts->tID) << std::endl;
     td.convertHTs(ts);
   } else {
-    RankingMethod next_ranking;
-    if (_switch_ranking && (curr_depth >= (last_depth - 1))) {
-      if (ts->kmer_ranking == information_score) {
-        if (_log)
-          LOG(INFO) << "Switching from ranking based on information score to "
-                       "large species count."
-                    << std::endl;
-        next_ranking = large_scount;
-      } else if (ts->kmer_ranking == large_scount) {
-        if (_log)
-          LOG(INFO) << "Switching from ranking based on large species count to "
-                       "information score."
-                    << std::endl;
-        next_ranking = information_score;
-      } else {
-        next_ranking = random_kmer;
-      }
-    } else {
-      next_ranking = ts->kmer_ranking;
-    }
     std::set<tT>& children_set = _taxonomy_record.child_map()[ts->tID];
     size_t num_child = children_set.size();
     std::vector<double> children(num_child);
     std::copy(children_set.begin(), children_set.end(), children.begin());
     ts->childrenHT.assign(
-      num_child, HTs<encT>(0, ts->k, ts->h, ts->b, ts->num_rows, ts->ptr_lsh_vg, next_ranking));
+      num_child,
+      HTs<encT>(0, ts->k, ts->h, ts->b, ts->num_rows, ts->ptr_lsh_vg, ts->ranking_method));
     for (unsigned int ti = 0; ti < num_child; ++ti) {
       if (_log)
         LOG(INFO) << "Building for the child " << _taxonomy_record.changeIDtax(children[ti])
@@ -337,7 +317,7 @@ Library::getBatchHTd(HTd<encT>* td)
     std::vector<double> children(num_child);
     std::copy(children_set.begin(), children_set.end(), children.begin());
     td->childrenHT.assign(
-      num_child, HTd<encT>(0, td->k, td->h, td->num_rows, td->ptr_lsh_vg, td->kmer_ranking));
+      num_child, HTd<encT>(0, td->k, td->h, td->num_rows, td->ptr_lsh_vg, td->ranking_method));
     for (unsigned int ti = 0; ti < num_child; ++ti) {
       if (_log)
         LOG(INFO) << "Building for the child " << _taxonomy_record.changeIDtax(children[ti])
