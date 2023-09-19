@@ -1062,12 +1062,11 @@ HTd<encT>::updateLCA()
         if (tlca_map[enc_vvec[rix][i]].size() == 1) {
           tlca_vvec[rix][i] = tlca_map[enc_vvec[rix][i]][0];
         } else {
-          /* std::unordered_map<encT, std::vector<float>> select_map =
-           * mapValuesSelectHTd(childrenHT, rix); */
-          /* std::bernoulli_distribution
-           * d(updateLCAtProbabilityAPN(prob_map[enc_vvec[rix][i]],
-           * select_map[enc_vvec[rix][i]])); */
-          std::bernoulli_distribution d(updateLCAtProbabilityC2N(prob_map[enc_vvec[rix][i]]));
+          std::unordered_map<encT, std::vector<float>> select_map =
+            mapValuesSelectHTd(childrenHT, rix);
+          std::bernoulli_distribution d(
+            updateLCAtProbabilityAPN(prob_map[enc_vvec[rix][i]], select_map[enc_vvec[rix][i]]));
+          /* std::bernoulli_distribution d(updateLCAtProbabilityC2N(prob_map[enc_vvec[rix][i]])); */
           if (d(gen)) {
             tlca_vvec[rix][i] = tID;
           } else {
@@ -1096,12 +1095,12 @@ HTs<encT>::updateLCA()
         if (tlca_map[enc_arr[b * rix + i]].size() == 1) {
           tlca_arr[rix * b + i] = tlca_map[enc_arr[rix * b + i]][0];
         } else {
-          /* std::unordered_map<encT, std::vector<float>> select_map =
-           * mapValuesSelectHTs(childrenHT, rix); */
-          /* std::bernoulli_distribution
-           * d(updateLCAtProbabilityAPN(prob_map[enc_arr[rix * b + i]],
-           * select_map[enc_arr[rix * b + i]])); */
-          std::bernoulli_distribution d(updateLCAtProbabilityC2N(prob_map[enc_arr[rix * b + i]]));
+          std::unordered_map<encT, std::vector<float>> select_map =
+            mapValuesSelectHTs(childrenHT, rix);
+          std::bernoulli_distribution d(updateLCAtProbabilityAPN(prob_map[enc_arr[rix * b + i]],
+                                                                 select_map[enc_arr[rix * b + i]]));
+          /* std::bernoulli_distribution d(updateLCAtProbabilityC2N(prob_map[enc_arr[rix * b +
+           * i]])); */
           if (d(gen)) {
             tlca_arr[rix * b + i] = tID;
           } else {
