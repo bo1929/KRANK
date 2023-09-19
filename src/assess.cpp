@@ -243,9 +243,13 @@ vecIxsNumber(std::vector<unsigned int>& ixs,
 
 template<typename T>
 void
-arrIxsNumber(std::vector<unsigned int>& ixs, const T* s_r, uint8_t number, bool reverse)
+arrIxsNumber(std::vector<unsigned int>& ixs,
+             const T* s_r,
+             uint8_t last,
+             uint8_t number,
+             bool reverse)
 {
-  arrArgsort1D(ixs, s_r, reverse);
+  arrArgsort1D(ixs, s_r, last, reverse);
   ixs.resize(number);
   std::sort(ixs.begin(), ixs.end());
 }

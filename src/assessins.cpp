@@ -86,13 +86,25 @@ vecIxsNumber(std::vector<unsigned int>& ixs,
              bool reverse);
 
 template void
-arrIxsNumber(std::vector<unsigned int>& ixs, const uint16_t* s_arr, uint8_t number, bool reverse);
+arrIxsNumber(std::vector<unsigned int>& ixs,
+             const uint16_t* s_arr,
+             uint8_t last,
+             uint8_t number,
+             bool reverse);
 
 template void
-arrIxsNumber(std::vector<unsigned int>& ixs, const uint32_t* s_arr, uint8_t number, bool reverse);
+arrIxsNumber(std::vector<unsigned int>& ixs,
+             const uint32_t* s_arr,
+             uint8_t last,
+             uint8_t number,
+             bool reverse);
 
 template void
-arrIxsNumber(std::vector<unsigned int>& ixs, const uint64_t* s_arr, uint8_t number, bool reverse);
+arrIxsNumber(std::vector<unsigned int>& ixs,
+             const uint64_t* s_arr,
+             uint8_t last,
+             uint8_t number,
+             bool reverse);
 
 template void
 vvecSizeOrder(std::vector<unsigned int>& ixs, const vvec<uint16_t>& vvec, bool reverse);

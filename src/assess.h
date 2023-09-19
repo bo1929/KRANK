@@ -49,7 +49,11 @@ vecIxsNumber(std::vector<unsigned int>& ixs,
 
 template<typename T>
 void
-arrIxsNumber(std::vector<unsigned int>& ixs, const T* s_arr, uint8_t number, bool reverse = false);
+arrIxsNumber(std::vector<unsigned int>& ixs,
+             const T* s_arr,
+             uint8_t last,
+             uint8_t number,
+             bool reverse = false);
 
 template<typename T>
 void

@@ -970,7 +970,7 @@ HTs<encT>::shrinkHT(uint64_t num_rm)
             r_to_rm = to_rm;
             if (r_to_rm > 0) {
               std::vector<unsigned int> ixs;
-              arrIxsNumber(ixs, scount_arr + (rix * b), n, true);
+              arrIxsNumber(ixs, scount_arr + (rix * b), ind_arr[rix], n, true);
               arrRemoveIxs(enc_arr + (rix * b), ind_arr[rix], ixs);
               arrRemoveIxs(scount_arr + (rix * b), ind_arr[rix], ixs);
               arrRemoveIxs(tlca_arr + (rix * b), ind_arr[rix], ixs);
