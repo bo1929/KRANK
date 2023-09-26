@@ -223,7 +223,7 @@ Library::getRandomPositions()
 }
 
 uint64_t
-Library::getConstrainedSize(std::set<tT> tIDsBasis)
+Library::getConstrainedSizeKC(std::set<tT> tIDsBasis)
 {
   uint64_t constrained_size;
   uint64_t sum_size = 0;
@@ -233,6 +233,15 @@ Library::getConstrainedSize(std::set<tT> tIDsBasis)
   float sq_ratio = sqrt(static_cast<float>(sum_size) / static_cast<float>(_root_size));
   float batch_ratio = static_cast<float>(_tbatch_size) / static_cast<float>(_num_rows);
   constrained_size = static_cast<uint64_t>(_capacity_size * sq_ratio * batch_ratio);
+  return constrained_size;
+}
+
+uint64_t
+Library::getConstrainedSizeSC(uint64_t num_species)
+{
+  float sq_ratio = sqrt(static_cast<float>(num_species) / static_cast<float>(_num_species));
+  float batch_ratio = static_cast<float>(_tbatch_size) / static_cast<float>(_num_rows);
+  uint64_t constrained_size = static_cast<uint64_t>(_capacity_size * sq_ratio * batch_ratio);
   return constrained_size;
 }
 
@@ -274,7 +283,7 @@ Library::getBatchHTs(HTs<encT>* ts, uint8_t curr_depth, uint8_t last_depth)
     }
     if (ts->childrenHT.size() > 1) {
       int64_t num_rm;
-      uint64_t constrained_size = getConstrainedSize(ts->tIDsBasis);
+      uint64_t constrained_size = getConstrainedSizeKC(ts->num_species);
       num_rm = static_cast<int64_t>(ts->num_kmers) - static_cast<int64_t>(constrained_size);
       if (ts->tID != 0 && ts->tID != 1) {
         if (_log)
@@ -333,7 +342,7 @@ Library::getBatchHTd(HTd<encT>* td)
     }
     if (td->childrenHT.size() > 1) {
       int64_t num_rm;
-      uint64_t constrained_size = getConstrainedSize(td->tIDsBasis);
+      uint64_t constrained_size = getConstrainedSizeKC(td->num_species);
       num_rm = static_cast<int64_t>(td->num_kmers) - static_cast<int64_t>(constrained_size);
       if (td->tID != 0 && td->tID != 1) {
         if (_log)

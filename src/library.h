@@ -56,7 +56,8 @@ private:
   const uint16_t _rootID = 1;
 
 public:
-  uint64_t getConstrainedSize(std::set<tT> tIDsBasis);
+  uint64_t getConstrainedSizeKC(std::set<tT> tIDsBasis);
+  uint64_t getConstrainedSizeSC(uint64_t num_species);
   void getBatchHTd(HTd<encT>* td);
   void getBatchHTs(HTs<encT>* ts, uint8_t curr_depth = 0, uint8_t last_depth = 1);
   bool saveBatchHTs(HTs<encT>& ts, uint16_t curr_batch);
