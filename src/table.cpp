@@ -148,7 +148,15 @@ StreamIM<encT>::load(const char* filepath)
 
 template<typename encT>
 void
-StreamIM<encT>::clear()
+StreamIM<encT>::resetStream()
+{
+  l_rix = 0;
+  curr_vix = 0;
+}
+
+template<typename encT>
+void
+StreamIM<encT>::clearStream()
 {
   StreamIM<encT>::lsh_enc_vec.clear();
   l_rix = 0;
@@ -181,9 +189,17 @@ void
 StreamOD<encT>::openStream()
 {
   is_open = true;
-  StreamOD<encT>::vec_ifs = IO::open_ifstream(StreamOD::filepath, is_open);
+  vec_ifs = IO::open_ifstream(StreamOD::filepath, is_open);
   if (is_open)
     curr_pos = vec_ifs.tellg();
+}
+
+template<typename encT>
+void
+StreamOD<encT>::closeStream()
+{
+  is_open = false;
+  vec_ifs.close();
 }
 
 template<typename encT>
@@ -397,12 +413,12 @@ void
 HTd<encT>::updateSize()
 {
   uint64_t num_kmers_sum = 0;
-#pragma omp parallel for num_threads(num_threads), schedule(dynamic)
+  /* #pragma omp parallel for num_threads(num_threads), schedule(dynamic) */
   for (uint32_t rix = 0; rix < num_rows; ++rix) {
-    if (!enc_vvec[rix].empty()) {
-#pragma omp atomic update
-      num_kmers_sum += enc_vvec[rix].size();
-    }
+    /* if (!enc_vvec[rix].empty()) { */
+    /* #pragma omp atomic update */
+    num_kmers_sum += enc_vvec[rix].size();
+    /* } */
   }
   num_kmers = num_kmers_sum;
   table_size = num_kmers * sizeof(encT) + num_rows * sizeof(std::vector<encT>);
@@ -415,9 +431,9 @@ void
 HTs<encT>::updateSize()
 {
   uint64_t num_kmers_sum = 0;
-#pragma omp parallel for num_threads(num_threads), schedule(dynamic)
+  /* #pragma omp parallel for num_threads(num_threads), schedule(dynamic) */
   for (uint32_t rix = 0; rix < num_rows; ++rix) {
-#pragma omp atomic update
+    /* #pragma omp atomic update */
     num_kmers_sum += ind_arr[rix];
   }
   num_kmers = num_kmers_sum;
@@ -465,8 +481,8 @@ HTd<encT>::trimColumns(uint8_t b_max)
       tlca_vvec[rix].resize(b_max);
     }
   }
-  HTd<encT>::updateSize();
 #ifdef DEBUG
+  HTd<encT>::updateSize();
   LOG(INFO) << "The current size of the table is " << num_kmers << std::endl;
 #endif
 }
@@ -518,8 +534,8 @@ HTd<encT>::pruneColumns(uint8_t b_max)
       vecRemoveIxs(tlca_vvec[rix], ixs);
     }
   }
-  HTd<encT>::updateSize();
 #ifdef DEBUG
+  HTd<encT>::updateSize();
   if (!HTd<encT>::areColumnsSorted()) {
     HTd<encT>::sortColumns();
     std::puts("HTd has unsorted columns after pruning.\n");
@@ -804,6 +820,7 @@ HTd<encT>::shrinkHT(uint64_t num_rm, uint8_t b_max)
   assert(num_rm < num_kmers);
   uint64_t init_num_kmers = num_kmers;
   HTd<encT>::pruneColumns(b_max);
+  HTd<encT>::updateSize();
   volatile int64_t to_rm = num_rm;
   to_rm = to_rm - (init_num_kmers - num_kmers);
   volatile int64_t pto_rm = to_rm;

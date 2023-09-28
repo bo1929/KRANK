@@ -40,10 +40,12 @@ struct StreamIM
     , h(h)
     , ptr_lsh_vg(ptr_lsh_vg)
     , ptr_npositions(ptr_npositions)
-  {}
+  {
+  }
   bool save(const char* filepath);
   bool load(const char* filepath);
-  void clear();
+  void clearStream();
+  void resetStream();
   uint64_t processInput(uint64_t rbatch_size);
   uint64_t getBatch(vvec<encT>& batch_table, uint32_t tbatch_size);
   std::unordered_map<uint8_t, uint64_t> histRowSizes();
@@ -63,8 +65,10 @@ struct StreamOD
     : filepath(filepath)
     , curr_rix(0)
     , f_rix(0)
-  {}
+  {
+  }
   void openStream();
+  void closeStream();
   uint64_t getBatch(vvec<encT>& batch_table, uint32_t tbatch_size, bool contd = false);
 };
 

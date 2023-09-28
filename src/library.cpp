@@ -1,5 +1,6 @@
 #include "common.h"
 #include "library.h"
+#include <unistd.h>
 
 Library::Library(const char* library_dirpath,
                  const char* nodes_filepath,
@@ -80,7 +81,7 @@ Library::Library(const char* library_dirpath,
       }
     }
     uint64_t size_basis = 0;
-    StreamIM<encT> sIM(filepath.c_str(), _k, h, &_lsh_vg, &_npositions);
+    StreamIM<encT> sIM(filepath.c_str(), _k, _h, &_lsh_vg, &_npositions);
     if (!in_library) {
       size_basis = sIM.processInput(static_cast<uint64_t>(DEFAULT_BATCH_SIZE));
     } else {
@@ -118,7 +119,7 @@ Library::Library(const char* library_dirpath,
         _streamOD_map.emplace(std::make_pair(tID_key, StreamOD<encT>(disk_path.c_str())));
         _streamOD_map.at(tID_key).openStream();
       }
-      sIM.clear();
+      sIM.clearStream();
     } else {
 #pragma omp critical
       {
@@ -157,6 +158,76 @@ Library::Library(const char* library_dirpath,
   } else {
     if (_log)
       LOG(INFO) << "Metadata has been read from the library, won't be saved again." << std::endl;
+  }
+}
+
+void
+Library::computeTrueScount(HTs<encT>& ts)
+{
+#pragma omp parallel for schedule(dynamic), num_threads(num_threads)
+  for (unsigned int i = 0; i < _tID_vec.size(); ++i) {
+    tT tID_key = _tID_vec[i];
+    std::string filepath = _taxonomy_record.tID_to_input()[tID_key];
+    std::string disk_path(_library_dirpath);
+    disk_path = disk_path + "/lsh_enc_vec-" + std::to_string(tID_key);
+    std::vector<std::pair<uint32_t, encT>> lsh_enc_vec;
+    IO::read_encinput(disk_path, lsh_enc_vec);
+    std::vector<bool> nseen(ts.num_rows * _b, true);
+    for (unsigned int i = 0; i < lsh_enc_vec.size(); ++i) {
+      for (unsigned int j = 0; j < ts.ind_arr[i]; ++j) {
+        if (ts.enc_arr[lsh_enc_vec[i].first * _b + j] == lsh_enc_vec[i].second) {
+          if (nseen[lsh_enc_vec[i].first * _b + j]) {
+            ts.scount_arr[lsh_enc_vec[i].first * _b + j]++;
+            nseen[lsh_enc_vec[i].first * _b + j] = false;
+          }
+        }
+      }
+    }
+  }
+}
+
+void
+Library::resetAuxInfo(HTs<encT>& ts, bool reset_scount, bool reset_tlca)
+{
+#pragma omp parallel for schedule(dynamic), num_threads(num_threads)
+  for (uint32_t rix = 0; rix < ts.num_rows; ++rix) {
+    for (unsigned int j = 0; j < ts.ind_arr[rix]; ++j) {
+      if (reset_scount)
+        ts.scount_arr[rix * _b + j] = 0;
+      if (reset_tlca)
+        ts.tlca_arr[rix * _b + j] = 0;
+    }
+  }
+}
+
+void
+Library::computeSoftLCA(HTs<encT>& ts)
+{
+  double s = 5.0;
+  double w = 4.0;
+  double sx = pow(1.0 / s, 2);
+#pragma omp parallel for schedule(dynamic), num_threads(num_threads)
+  for (unsigned int i = 0; i < _tID_vec.size(); ++i) {
+    tT tID_key = _tID_vec[i];
+    std::string filepath = _taxonomy_record.tID_to_input()[tID_key];
+    std::string disk_path(_library_dirpath);
+    disk_path = disk_path + "/lsh_enc_vec-" + std::to_string(tID_key);
+    std::vector<std::pair<uint32_t, encT>> lsh_enc_vec;
+    IO::read_encinput(disk_path, lsh_enc_vec);
+    double p_update;
+    for (unsigned int i = 0; i < lsh_enc_vec.size(); ++i) {
+      for (unsigned int j = 0; j < ts.ind_arr[i]; ++j) {
+        if (ts.enc_arr[lsh_enc_vec[i].first * _b + j] == lsh_enc_vec[i].second) {
+          p_update = std::min(
+            1.0, sx + (w / std::max(w, w + ts.scount_arr[lsh_enc_vec[i].first * _b + j] - s)));
+          std::bernoulli_distribution bt(p_update);
+          if (bt(gen)) {
+            ts.tlca_arr[lsh_enc_vec[i].first * _b + j] = _taxonomy_record.getLowestCommonAncestor(
+              ts.tlca_arr[lsh_enc_vec[i].first * _b + j], tID_key);
+          }
+        }
+      }
+    }
   }
 }
 
@@ -204,8 +275,9 @@ Library::getRandomPositions()
   uint8_t n;
   assert(_h <= 16);
   assert(_h < _k);
+  std::uniform_int_distribution<uint8_t> distrib(0, _k - 1);
   for (uint8_t m = 0; m < _h; m++) {
-    n = rand() % _k;
+    n = distrib(gen);
     if (count(_positions.begin(), _positions.end(), n)) {
       m -= 1;
     } else {
@@ -279,18 +351,19 @@ Library::getBatchHTs(HTs<encT>* ts, uint8_t curr_depth, uint8_t last_depth)
       LOG(INFO) << "Taking the union of tables of children of "
                 << _taxonomy_record.changeIDtax(ts->tID) << std::endl;
     for (auto& ts_c : ts->childrenHT) {
-      ts->unionRows(ts_c);
+      ts->unionRows(ts_c, false);
     }
+    ts->updateSize();
     if (ts->childrenHT.size() > 1) {
       int64_t num_rm;
-      uint64_t constrained_size = getConstrainedSizeKC(ts->num_species);
+      uint64_t constrained_size = getConstrainedSizeKC(ts->tIDsBasis);
       num_rm = static_cast<int64_t>(ts->num_kmers) - static_cast<int64_t>(constrained_size);
-      if (ts->tID != 0 && ts->tID != 1) {
-        if (_log)
-          LOG(INFO) << _taxonomy_record.changeIDtax(ts->tID)
-                    << " has more than one child, updating LCA labels" << std::endl;
-        ts->updateLCA();
-      }
+      /* if (ts->tID != 0 && ts->tID != 1) { */
+      /*   if (_log) */
+      /*     LOG(INFO) << _taxonomy_record.changeIDtax(ts->tID) */
+      /*               << " has more than one child, updating LCA labels" << std::endl; */
+      /*   ts->updateLCA(); */
+      /* } */
       if (num_rm > 0) {
         if (_log)
           LOG(INFO) << _taxonomy_record.changeIDtax(ts->tID) << " has more than one child, and "
@@ -338,18 +411,19 @@ Library::getBatchHTd(HTd<encT>* td)
       LOG(INFO) << "Taking the union of tables of children of "
                 << _taxonomy_record.changeIDtax(td->tID) << std::endl;
     for (auto& td_c : td->childrenHT) {
-      td->unionRows(td_c);
+      td->unionRows(td_c, false);
     }
+    td->updateSize();
     if (td->childrenHT.size() > 1) {
       int64_t num_rm;
-      uint64_t constrained_size = getConstrainedSizeKC(td->num_species);
+      uint64_t constrained_size = getConstrainedSizeKC(td->tIDsBasis);
       num_rm = static_cast<int64_t>(td->num_kmers) - static_cast<int64_t>(constrained_size);
-      if (td->tID != 0 && td->tID != 1) {
-        if (_log)
-          LOG(INFO) << _taxonomy_record.changeIDtax(td->tID)
-                    << " has more than one child, updating LCA labels" << std::endl;
-        td->updateLCA();
-      }
+      /* if (td->tID != 0 && td->tID != 1) { */
+      /*   if (_log) */
+      /*     LOG(INFO) << _taxonomy_record.changeIDtax(td->tID) */
+      /*               << " has more than one child, updating LCA labels" << std::endl; */
+      /*   td->updateLCA(); */
+      /* } */
       if (num_rm > 0) {
         if (_log)
           LOG(INFO) << _taxonomy_record.changeIDtax(td->tID) << " has more than one child, and "

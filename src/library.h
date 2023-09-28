@@ -66,6 +66,9 @@ public:
   void getRandomPositions();
   void skipBatch();
   void run(uint8_t sdepth = 3);
+  void resetAuxInfo(HTs<encT>& ts, bool reset_scount, bool reset_tlca);
+  void computeSoftLCA(HTs<encT>& ts);
+  void computeTrueScount(HTs<encT>& ts);
   decltype(_npositions)& npositions() { return _npositions; }
   decltype(_positions)& positions() { return _positions; }
   decltype(_lsh_vg)& lsh_vg() { return _lsh_vg; }

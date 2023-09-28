@@ -20,16 +20,28 @@ template bool
 StreamIM<uint32_t>::load(const char* filepath);
 
 template void
-StreamIM<uint32_t>::clear();
+StreamIM<uint32_t>::clearStream();
 
 template void
-StreamIM<uint64_t>::clear();
+StreamIM<uint64_t>::clearStream();
+
+template void
+StreamIM<uint32_t>::resetStream();
+
+template void
+StreamIM<uint64_t>::resetStream();
 
 template uint64_t
 StreamIM<uint64_t>::getBatch(vvec<uint64_t>& batch_table, uint32_t tbatch_size);
 
 template uint64_t
 StreamIM<uint32_t>::getBatch(vvec<uint32_t>& batch_table, uint32_t tbatch_size);
+
+template void
+StreamOD<uint64_t>::closeStream();
+
+template void
+StreamOD<uint32_t>::closeStream();
 
 template void
 StreamOD<uint64_t>::openStream();

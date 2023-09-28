@@ -87,3 +87,22 @@ IO::open_ifstream(const char* filepath, bool is_ok)
   }
   return ifs;
 }
+
+void
+IO::read_encinput(std::string disk_path, std::vector<std::pair<uint32_t, encT>>& lsh_enc_vec)
+{
+  bool is_ok = false;
+  std::ifstream vec_ifs = open_ifstream(disk_path.c_str(), is_ok);
+  while (!vec_ifs.eof() && vec_ifs.good()) {
+    std::pair<uint32_t, encT> lsh_enc;
+    vec_ifs.read((char*)&lsh_enc, sizeof(std::pair<uint32_t, encT>));
+    if (!vec_ifs.eof())
+      lsh_enc_vec.push_back(lsh_enc);
+  }
+  if (vec_ifs.fail() && !vec_ifs.eof()) {
+    std::puts("I/O rror when reading LSH-value and encoding pairs.\n");
+  } else if (vec_ifs.eof()) {
+    is_ok = true;
+  }
+  vec_ifs.close();
+}
