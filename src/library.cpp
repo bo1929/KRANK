@@ -177,9 +177,10 @@ Library::computeTrueScount(HTs<encT>& ts)
     IO::read_encinput(disk_path, lsh_enc_vec);
     std::vector<bool> nseen(ts.num_rows * _b, true);
     for (unsigned int i = 0; i < lsh_enc_vec.size(); ++i) {
-      for (unsigned int j = 0; j < ts.ind_arr[i]; ++j) {
+      for (unsigned int j = 0; j < ts.ind_arr[lsh_enc_vec[i].first]; ++j) {
         if (ts.enc_arr[lsh_enc_vec[i].first * _b + j] == lsh_enc_vec[i].second) {
           if (nseen[lsh_enc_vec[i].first * _b + j]) {
+#pragma omp atomic update
             ts.scount_arr[lsh_enc_vec[i].first * _b + j]++;
             nseen[lsh_enc_vec[i].first * _b + j] = false;
           }
@@ -206,9 +207,7 @@ Library::resetAuxInfo(HTs<encT>& ts, bool reset_scount, bool reset_tlca)
 void
 Library::computeSoftLCA(HTs<encT>& ts)
 {
-  double s = 5.0;
-  double w = 4.0;
-  double sx = pow(1.0 / s, 2);
+  double s = 6.0;
 #pragma omp parallel for schedule(dynamic), num_threads(num_threads)
   for (unsigned int i = 0; i < _tID_vec.size(); ++i) {
     tT tID_key = _tID_vec[i];
@@ -218,12 +217,12 @@ Library::computeSoftLCA(HTs<encT>& ts)
     IO::read_encinput(disk_path, lsh_enc_vec);
     double p_update;
     for (unsigned int i = 0; i < lsh_enc_vec.size(); ++i) {
-      for (unsigned int j = 0; j < ts.ind_arr[i]; ++j) {
+      for (unsigned int j = 0; j < ts.ind_arr[lsh_enc_vec[i].first]; ++j) {
         if (ts.enc_arr[lsh_enc_vec[i].first * _b + j] == lsh_enc_vec[i].second) {
-          p_update = std::min(
-            1.0, sx + (w / std::max(w, w + ts.scount_arr[lsh_enc_vec[i].first * _b + j] - s)));
+          p_update = 1 / log2(pow((ts.scount_arr[lsh_enc_vec[i].first * _b + j] - 1) / s, 2) + 2);
           std::bernoulli_distribution bt(p_update);
           if (bt(gen)) {
+#pragma omp atomic write
             ts.tlca_arr[lsh_enc_vec[i].first * _b + j] = _taxonomy_record.getLowestCommonAncestor(
               ts.tlca_arr[lsh_enc_vec[i].first * _b + j], tID_key);
           }
@@ -245,6 +244,9 @@ Library::run(uint8_t sdepth)
       HTs<encT> ts_root(1, _k, _h, _b, _tbatch_size, &_lsh_vg, _upper_ranking);
       Library::getBatchHTs(&ts_root, 0, sdepth);
       Library::saveBatchHTs(ts_root, curr_batch);
+      Library::resetAuxInfo(ts_root, true, true);
+      Library::computeTrueScount(ts_root);
+      Library::computeSoftLCA(ts_root);
     } else {
       Library::skipBatch();
       std::cout << "Skipping the library building for batch  " << curr_batch << std::endl;
@@ -360,6 +362,7 @@ Library::getBatchHTs(HTs<encT>* ts, uint8_t curr_depth, uint8_t last_depth)
       int64_t num_rm;
       uint64_t constrained_size = getConstrainedSizeKC(ts->tIDsBasis);
       num_rm = static_cast<int64_t>(ts->num_kmers) - static_cast<int64_t>(constrained_size);
+      // TODO: Consider removing.
       /* if (ts->tID != 0 && ts->tID != 1) { */
       /*   if (_log) */
       /*     LOG(INFO) << _taxonomy_record.changeIDtax(ts->tID) */
@@ -420,6 +423,7 @@ Library::getBatchHTd(HTd<encT>* td)
       int64_t num_rm;
       uint64_t constrained_size = getConstrainedSizeKC(td->tIDsBasis);
       num_rm = static_cast<int64_t>(td->num_kmers) - static_cast<int64_t>(constrained_size);
+      // TODO: Consider removing.
       /* if (td->tID != 0 && td->tID != 1) { */
       /*   if (_log) */
       /*     LOG(INFO) << _taxonomy_record.changeIDtax(td->tID) */
