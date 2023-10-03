@@ -28,7 +28,7 @@ private:
   std::unordered_map<T, uint64_t> _tID_to_taxID;
   std::unordered_map<uint64_t, T> _taxID_to_tID;
   std::unordered_map<std::string, T> _input_to_tID;
-  std::unordered_map<T, std::string> _tID_to_input;
+  std::unordered_map<T, std::vector<std::string>> _tID_to_input;
   std::vector<T> _parent_vec;
   std::vector<uint8_t> _depth_vec;
   std::unordered_map<T, std::set<T>> _child_map;

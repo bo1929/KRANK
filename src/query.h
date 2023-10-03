@@ -3,8 +3,10 @@
 
 #include "common.h"
 #include "encode.h"
+#include "io.h"
 #include "library.h"
 #include "lsh.h"
+#include "table.h"
 #include "taxonomy.h"
 
 class Query

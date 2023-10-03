@@ -80,12 +80,12 @@ TaxonomyRecord<T>::TaxonomyRecord(const char* input_filepath, TaxonomyNCBI taxon
 
   while (std::getline(input_file, line)) {
     std::istringstream iss(line);
-    std::string genome, taxID;
-    if (!(std::getline(iss, taxID, '\t') && std::getline(iss, genome, '\t'))) {
-      std::cerr << "Failed to read file for taxon ID to genome input map." << std::endl;
+    std::string inputn, taxID;
+    if (!(std::getline(iss, taxID, '\t') && std::getline(iss, inputn, '\t'))) {
+      std::cerr << "Failed to read file for taxon ID to input map." << std::endl;
       exit(EXIT_FAILURE);
     }
-    input_to_taxID[genome] = (uint64_t)stoul(taxID);
+    input_to_taxID[inputn] = (uint64_t)stoul(taxID);
   }
   input_file.close();
   _num_input = input_to_taxID.size();
@@ -98,22 +98,25 @@ TaxonomyRecord<T>::TaxonomyRecord(const char* input_filepath, TaxonomyNCBI taxon
   uint64_t parent_taxID = 1;
 
   for (auto& kv : input_to_taxID) {
-    _input_to_tID[kv.first] = curr_tID;
-    _tID_to_input[curr_tID] = kv.first;
-    _tID_to_taxID[curr_tID] = kv.second;
-    _tID_to_rank[curr_tID] = taxonomy.getRank(kv.second);
-    _taxID_to_tID[kv.second] = curr_tID;
-    parent_taxID = taxonomy.getParent(kv.second);
-
-    while ((_taxID_to_tID.find(parent_taxID) == _taxID_to_tID.end()) && parent_taxID != 1) {
+    if (_taxID_to_tID.find(kv.second) == _taxID_to_tID.end()) {
+      _input_to_tID[kv.first] = curr_tID;
+      _tID_to_input[curr_tID].push_back(kv.first);
+      _tID_to_taxID[curr_tID] = kv.second;
+      _tID_to_rank[curr_tID] = taxonomy.getRank(kv.second);
+      _taxID_to_tID[kv.second] = curr_tID;
+      parent_taxID = taxonomy.getParent(kv.second);
+      while ((_taxID_to_tID.find(parent_taxID) == _taxID_to_tID.end()) && parent_taxID != 1) {
+        curr_tID++;
+        _tID_to_taxID[curr_tID] = parent_taxID;
+        _tID_to_rank[curr_tID] = taxonomy.getRank(parent_taxID);
+        _taxID_to_tID[parent_taxID] = curr_tID;
+        parent_taxID = taxonomy.getParent(parent_taxID);
+      }
       curr_tID++;
-      _tID_to_taxID[curr_tID] = parent_taxID;
-      _tID_to_rank[curr_tID] = taxonomy.getRank(parent_taxID);
-      _taxID_to_tID[parent_taxID] = curr_tID;
-      parent_taxID = taxonomy.getParent(parent_taxID);
+    } else {
+      _input_to_tID[kv.first] = _taxID_to_tID[kv.second];
+      _tID_to_input[_taxID_to_tID[kv.second]].push_back(kv.first);
     }
-
-    curr_tID++;
   }
 
   _num_nodes = curr_tID - 1;

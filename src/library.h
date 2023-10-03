@@ -14,6 +14,7 @@ public:
           const char* nodes_filepath,
           const char* input_filepath,
           uint8_t k,
+          uint8_t w,
           uint8_t h,
           uint8_t b,
           RankingMethod upper_ranking,
@@ -22,6 +23,7 @@ public:
           uint32_t num_batch_rows,
           bool in_library = false,
           bool on_disk = true,
+          bool from_kmers = false,
           uint8_t specified_batch = 0,
           bool log = true);
 
@@ -32,6 +34,7 @@ private:
   const char* _nodes_filepath;
   const char* _input_filepath;
   uint8_t _k;
+  uint8_t _w;
   uint8_t _h;
   uint8_t _b;
   RankingMethod _upper_ranking;
@@ -51,6 +54,7 @@ private:
   uint64_t _num_species;
   bool _on_disk;
   bool _in_library;
+  bool _from_kmers;
   uint8_t _specified_batch;
   bool _log;
   const uint16_t _rootID = 1;

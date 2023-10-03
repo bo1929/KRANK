@@ -28,10 +28,29 @@ main(int argc, char** argv)
                  "Path to the file containing paths and taxon IDs of "
                  "reference k-mer sets.")
     ->required();
+  bool in_library = false;
+  sub_build->add_flag("--in-library,!--raw-input",
+                      in_library,
+                      "Are k-mers already processed and in the library? "
+                      "Default is --raw-input, "
+                      "and it reads k-mers sets or sequences from given input paths..");
+  bool on_disk = true;
+  sub_build->add_flag("--on-disk,!--in-memory",
+                      on_disk,
+                      "Are stream of k-mers will be on the disk? If so, k-mers will be read in "
+                      "batches from the disk. Default is --on-disk, --in-memory is memory hungry.");
+  bool from_kmers = false;
+  sub_build->add_flag("--from-kmers,!--from-sequences",
+                      from_kmers,
+                      "Are given input files k-mers sets or sequences? If sequences, k-mers sets "
+                      "will be computed internally."
+                      "Default is --from-sequences.");
   uint8_t k = 32;
   sub_build->add_option("-k,--kmer-length", k, "Length of k-mers. Default is 32.");
-  uint8_t h = 11;
-  sub_build->add_option("-h,--num-positions", h, "Number of positions for the LSH. Default is 14.");
+  uint8_t w = k;
+  sub_build->add_option("-w,--window-length", w, "Length of minimizer window. Default is k.");
+  uint8_t h = 13;
+  sub_build->add_option("-h,--num-positions", h, "Number of positions for the LSH. Default is 13.");
   uint8_t b = 8;
   sub_build->add_option("-b,--num-columns", b, "Number of columns of the table. Default is 8.");
   uint8_t switch_depth = 4;
@@ -49,17 +68,6 @@ main(int argc, char** argv)
                         specify_batch,
                         "The specific library batch to be built. Default is 0, "
                         "i.e., all batches will be processed.");
-  bool in_library = false;
-  sub_build->add_flag("--in-library,!--raw-input",
-                      in_library,
-                      "Are k-mers already processed and in the library? "
-                      "Default is --raw-input, "
-                      "reads FASTA k-mer sets.");
-  bool on_disk = true;
-  sub_build->add_flag("--on-disk,!--in-memory",
-                      on_disk,
-                      "Are stream of k-mers will be on the disk? If so, k-mers will be read in "
-                      "batches from the disk. Default is true, --in-memory is memory hungry.");
   std::map<std::string, RankingMethod> map_ranking{ { "random_kmer", random_kmer },
                                                     { "species_count", species_count },
                                                     { "information_score", information_score },
@@ -120,10 +128,14 @@ main(int argc, char** argv)
   CLI11_PARSE(app, argc, argv);
 
   if (sub_build->parsed()) {
+    if (!(sub_build->count("-w") + sub_build->count("--window-length"))) {
+      w = k;
+    }
     Library lib(library_dir.c_str(),
                 taxonomy_dmp.c_str(),
                 input_file.c_str(),
                 k,
+                w,
                 h,
                 b,
                 ranking_methods.first,
@@ -132,6 +144,7 @@ main(int argc, char** argv)
                 pow(2, 2 * h - batch_size), // tbatch_size
                 in_library,
                 on_disk,
+                from_kmers,
                 specify_batch,
                 log);
     if (run_build)

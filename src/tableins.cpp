@@ -1,66 +1,6 @@
 #ifndef _TABLED_H
 #define _TABLED_H
 
-template uint64_t
-StreamIM<uint32_t>::processInput(uint64_t rbatch_size);
-
-template uint64_t
-StreamIM<uint64_t>::processInput(uint64_t rbatch_size);
-
-template bool
-StreamIM<uint64_t>::save(const char* filepath);
-
-template bool
-StreamIM<uint32_t>::save(const char* filepath);
-
-template bool
-StreamIM<uint64_t>::load(const char* filepath);
-
-template bool
-StreamIM<uint32_t>::load(const char* filepath);
-
-template void
-StreamIM<uint32_t>::clearStream();
-
-template void
-StreamIM<uint64_t>::clearStream();
-
-template void
-StreamIM<uint32_t>::resetStream();
-
-template void
-StreamIM<uint64_t>::resetStream();
-
-template uint64_t
-StreamIM<uint64_t>::getBatch(vvec<uint64_t>& batch_table, uint32_t tbatch_size);
-
-template uint64_t
-StreamIM<uint32_t>::getBatch(vvec<uint32_t>& batch_table, uint32_t tbatch_size);
-
-template void
-StreamOD<uint64_t>::closeStream();
-
-template void
-StreamOD<uint32_t>::closeStream();
-
-template void
-StreamOD<uint64_t>::openStream();
-
-template void
-StreamOD<uint32_t>::openStream();
-
-template uint64_t
-StreamOD<uint64_t>::getBatch(vvec<uint64_t>& batch_table, uint32_t tbatch_size, bool cont);
-
-template uint64_t
-StreamOD<uint32_t>::getBatch(vvec<uint32_t>& batch_table, uint32_t tbatch_size, bool cont);
-
-template std::unordered_map<uint8_t, uint64_t>
-StreamIM<uint64_t>::histRowSizes();
-
-template std::unordered_map<uint8_t, uint64_t>
-StreamIM<uint32_t>::histRowSizes();
-
 template void
 HTd<uint32_t>::makeUnique(bool update_size);
 

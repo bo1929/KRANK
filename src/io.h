@@ -2,7 +2,8 @@
 #define _IO_H
 
 #include "common.h"
-#include <zlib.h>
+#include "encode.h"
+#include "lsh.h"
 
 extern "C"
 {
@@ -13,6 +14,7 @@ struct sseq_t
 {
   std::string nseq;
   std::string name;
+  unsigned int len;
 };
 
 KSEQ_INIT(gzFile, gzread)
@@ -39,6 +41,64 @@ open_ifstream(const char* filepath, bool is_ok);
 void
 read_encinput(std::string disk_path, std::vector<std::pair<uint32_t, encT>>& lsh_enc_vec);
 }
+
+template<typename encT>
+struct StreamIM
+{
+  uint8_t k, w, h;
+  uint32_t l_rix;
+  uint64_t tnum_kmers;
+  uint32_t curr_vix;
+  std::vector<std::string> filepath_v;
+  maskLSH* ptr_lsh_vg;
+  std::vector<uint8_t>* ptr_npositions;
+  std::vector<std::pair<uint32_t, encT>> lsh_enc_vec;
+
+  StreamIM(std::vector<std::string> filepath_v,
+           uint8_t k,
+           uint8_t w,
+           uint8_t h,
+           maskLSH* ptr_lsh_vg,
+           std::vector<uint8_t>* ptr_npositions)
+    : l_rix(0)
+    , curr_vix(0)
+    , tnum_kmers(0)
+    , filepath_v(filepath_v)
+    , k(k)
+    , h(h)
+    , w(w)
+    , ptr_lsh_vg(ptr_lsh_vg)
+    , ptr_npositions(ptr_npositions)
+  {}
+  bool save(const char* filepath);
+  bool load(const char* filepath);
+  void clearStream();
+  void resetStream();
+  uint64_t processInput(uint64_t rbatch_size);
+  uint64_t extractInput(uint64_t rbatch_size);
+  uint64_t getBatch(vvec<encT>& batch_table, uint32_t tbatch_size);
+  std::unordered_map<uint8_t, uint64_t> histRowSizes();
+};
+
+template<typename encT>
+struct StreamOD
+{
+  uint32_t f_rix;
+  uint32_t curr_rix;
+  const char* filepath;
+  std::ifstream vec_ifs;
+  std::streampos curr_pos;
+  bool is_open;
+
+  StreamOD(const char* filepath)
+    : filepath(filepath)
+    , curr_rix(0)
+    , f_rix(0)
+  {}
+  void openStream();
+  void closeStream();
+  uint64_t getBatch(vvec<encT>& batch_table, uint32_t tbatch_size, bool contd = false);
+};
 
 #define DEFAULT_BATCH_SIZE 1048576
 

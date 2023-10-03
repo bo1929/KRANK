@@ -1,11 +1,10 @@
-#include "common.h"
 #include "library.h"
-#include <unistd.h>
 
 Library::Library(const char* library_dirpath,
                  const char* nodes_filepath,
                  const char* input_filepath,
                  uint8_t k,
+                 uint8_t w,
                  uint8_t h,
                  uint8_t b,
                  RankingMethod upper_ranking,
@@ -14,6 +13,7 @@ Library::Library(const char* library_dirpath,
                  uint32_t tbatch_size,
                  bool in_library,
                  bool on_disk,
+                 bool from_kmers,
                  uint8_t specified_batch,
                  bool log)
   : _library_dirpath(library_dirpath)
@@ -22,6 +22,7 @@ Library::Library(const char* library_dirpath,
   , _nodes_filepath(nodes_filepath)
   , _input_filepath(input_filepath)
   , _k(k)
+  , _w(w)
   , _h(h)
   , _b(b)
   , _upper_ranking(upper_ranking)
@@ -30,6 +31,7 @@ Library::Library(const char* library_dirpath,
   , _tbatch_size(tbatch_size)
   , _in_library(in_library)
   , _on_disk(on_disk)
+  , _from_kmers(from_kmers)
   , _specified_batch(specified_batch)
   , _log(log)
 {
@@ -72,7 +74,9 @@ Library::Library(const char* library_dirpath,
 #pragma omp parallel for schedule(dynamic), num_threads(num_threads)
   for (unsigned int i = 0; i < _tID_vec.size(); ++i) {
     tT tID_key = _tID_vec[i];
-    std::string filepath = _taxonomy_record.tID_to_input()[tID_key];
+    std::string disk_path(_library_dirpath);
+    disk_path = disk_path + "/lsh_enc_vec-" + std::to_string(tID_key);
+    std::vector<std::string>& filepath_v = _taxonomy_record.tID_to_input()[tID_key];
     if (_log) {
 #pragma omp critical
       {
@@ -81,15 +85,15 @@ Library::Library(const char* library_dirpath,
       }
     }
     uint64_t size_basis = 0;
-    StreamIM<encT> sIM(filepath.c_str(), _k, _h, &_lsh_vg, &_npositions);
+    StreamIM<encT> sIM(filepath_v, _k, _w, _h, &_lsh_vg, &_npositions);
     if (!in_library) {
-      size_basis = sIM.processInput(static_cast<uint64_t>(DEFAULT_BATCH_SIZE));
+      if (_from_kmers)
+        size_basis = sIM.processInput(static_cast<uint64_t>(DEFAULT_BATCH_SIZE));
+      else
+        size_basis = sIM.extractInput(1);
     } else {
-      std::ifstream input(filepath);
-      std::string tmp;
-      while (std::getline(input, tmp))
-        ++size_basis;
-      size_basis /= 2;
+      bool loadIM = sIM.load(disk_path.c_str());
+      size_basis = sIM.lsh_enc_vec.size();
     }
 #pragma omp critical
     {
@@ -98,8 +102,6 @@ Library::Library(const char* library_dirpath,
     }
     assert(on_disk || !in_library);
     if (_on_disk) {
-      std::string disk_path(_library_dirpath);
-      disk_path = disk_path + "/lsh_enc_vec-" + std::to_string(tID_key);
       if (!in_library) {
         bool is_ok = sIM.save(disk_path.c_str());
         if (!is_ok) {
@@ -138,7 +140,9 @@ Library::Library(const char* library_dirpath,
     std::cout << "Stream will be in memory." << std::endl;
 
   std::cout << "Details:" << std::endl;
+  std::cout << "\tSequences as input directly: " << std::noboolalpha << !_from_kmers << std::endl;
   std::cout << "\tLength of the k-mer, k: " << std::to_string(_k) << std::endl;
+  std::cout << "\tLength of the minimizer window, w: " << std::to_string(_w) << std::endl;
   std::cout << "\tNumber of positions of LSH, h: " << std::to_string(_h) << std::endl;
   std::cout << "\tNumber of columns in the table, b: " << std::to_string(_b) << std::endl;
   std::cout << "\tMaximum capacity size: " << _capacity_size << std::endl;
@@ -149,7 +153,7 @@ Library::Library(const char* library_dirpath,
   std::cout << std::endl;
 
   if (_log)
-    LOG(INFO) << "Specified batch is " << _specified_batch << std::endl;
+    LOG(INFO) << "Specified batch is " << static_cast<uint16_t>(_specified_batch) << std::endl;
 
   if (_specified_batch == 0) {
     Library::saveMetadata();
@@ -167,7 +171,6 @@ Library::computeTrueScount(HTs<encT>& ts)
 #pragma omp parallel for schedule(dynamic), num_threads(num_threads)
   for (unsigned int i = 0; i < _tID_vec.size(); ++i) {
     tT tID_key = _tID_vec[i];
-    std::string filepath = _taxonomy_record.tID_to_input()[tID_key];
     std::string disk_path(_library_dirpath);
     disk_path = disk_path + "/lsh_enc_vec-" + std::to_string(tID_key);
     std::vector<std::pair<uint32_t, encT>> lsh_enc_vec;
@@ -209,7 +212,6 @@ Library::computeSoftLCA(HTs<encT>& ts)
 #pragma omp parallel for schedule(dynamic), num_threads(num_threads)
   for (unsigned int i = 0; i < _tID_vec.size(); ++i) {
     tT tID_key = _tID_vec[i];
-    std::string filepath = _taxonomy_record.tID_to_input()[tID_key];
     std::string disk_path(_library_dirpath);
     disk_path = disk_path + "/lsh_enc_vec-" + std::to_string(tID_key);
     std::vector<std::pair<uint32_t, encT>> lsh_enc_vec;

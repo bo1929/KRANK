@@ -38,6 +38,7 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
+#include <zlib.h>
 
 /* #define UINT32_MAX ((uint32_t)-1) */
 
@@ -52,6 +53,7 @@ extern unsigned int num_threads;
 extern std::random_device rd;
 extern std::mt19937 gen;
 extern std::bernoulli_distribution ct;
+extern const unsigned char seq_nt4_table[128];
 
 template<typename T>
 using vvec = std::vector<std::vector<T>>;

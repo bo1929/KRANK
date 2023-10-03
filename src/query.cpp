@@ -69,6 +69,9 @@ Query::run(uint64_t rbatch_size)
   for (auto& kv : _queryID_to_path) {
     keys.push_back(kv.first);
   }
+  uint64_t u64m = std::numeric_limits<uint64_t>::max();
+  uint64_t mask_bp = u64m >> (32 - _k) * 2;
+  uint64_t mask_lr = ((u64m >> (64 - _k)) << 32) + ((u64m << 32) >> (64 - _k));
   for (unsigned int i = 0; i < _queryID_to_path.size(); ++i) {
     std::string queryID = keys[i];
     if (_log)
@@ -113,7 +116,7 @@ Query::run(uint64_t rbatch_size)
             iss_read.str(or_read);
           std::string curr_cont_read;
           while (getline(iss_read, curr_cont_read, 'N')) {
-            std::string kmer_str;
+            std::string kmer_seq;
             uint64_t enc64_bp;
             uint64_t enc64_lr;
             uint32_t enc32_lr;
@@ -124,19 +127,21 @@ Query::run(uint64_t rbatch_size)
             if (curr_cont_read.length() >= _k) {
               for (unsigned int kix = 0; kix < curr_cont_read.length(); kix++) {
                 if (kix == 0) {
-                  kmer_str = curr_cont_read.substr(kix, _k);
+                  kmer_seq = curr_cont_read.substr(kix, _k);
                   if (r)
-                    kmerEncodingComputeC(kmer_str.c_str(), enc64_lr, enc64_bp);
+                    kmerEncodingComputeC(kmer_seq.c_str(), enc64_lr, enc64_bp);
                   else
-                    kmerEncodingCompute(kmer_str.c_str(), enc64_lr, enc64_bp);
+                    kmerEncodingCompute(kmer_seq.c_str(), enc64_lr, enc64_bp);
                   kix = _k - 1;
                 } else {
-                  kmer_str = curr_cont_read.substr(kix, 1);
+                  kmer_seq = curr_cont_read.substr(kix, 1);
                   if (r)
-                    kmerEncodingUpdateC(kmer_str.c_str(), enc64_lr, enc64_bp);
+                    kmerEncodingUpdateC(kmer_seq.c_str(), enc64_lr, enc64_bp);
                   else
-                    kmerEncodingUpdate(kmer_str.c_str(), enc64_lr, enc64_bp);
+                    kmerEncodingUpdate(kmer_seq.c_str(), enc64_lr, enc64_bp);
                 }
+                enc64_bp = enc64_bp & mask_bp;
+                enc64_lr = enc64_lr & mask_lr;
                 bool pm = false;
                 for (unsigned int lix = 0; lix < _num_libraries; ++lix) {
                   min_dist = _k;

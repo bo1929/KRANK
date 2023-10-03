@@ -16,63 +16,6 @@ enum RankingMethod
 };
 
 template<typename encT>
-struct StreamIM
-{
-  uint8_t k, h;
-  uint32_t l_rix;
-  uint64_t tnum_kmers;
-  uint32_t curr_vix;
-  const char* filepath;
-  maskLSH* ptr_lsh_vg;
-  std::vector<uint8_t>* ptr_npositions;
-  std::vector<std::pair<uint32_t, encT>> lsh_enc_vec;
-
-  StreamIM(const char* filepath,
-           uint8_t k,
-           uint8_t h,
-           maskLSH* ptr_lsh_vg,
-           std::vector<uint8_t>* ptr_npositions)
-    : l_rix(0)
-    , curr_vix(0)
-    , tnum_kmers(0)
-    , filepath(filepath)
-    , k(k)
-    , h(h)
-    , ptr_lsh_vg(ptr_lsh_vg)
-    , ptr_npositions(ptr_npositions)
-  {
-  }
-  bool save(const char* filepath);
-  bool load(const char* filepath);
-  void clearStream();
-  void resetStream();
-  uint64_t processInput(uint64_t rbatch_size);
-  uint64_t getBatch(vvec<encT>& batch_table, uint32_t tbatch_size);
-  std::unordered_map<uint8_t, uint64_t> histRowSizes();
-};
-
-template<typename encT>
-struct StreamOD
-{
-  uint32_t f_rix;
-  uint32_t curr_rix;
-  const char* filepath;
-  std::ifstream vec_ifs;
-  std::streampos curr_pos;
-  bool is_open;
-
-  StreamOD(const char* filepath)
-    : filepath(filepath)
-    , curr_rix(0)
-    , f_rix(0)
-  {
-  }
-  void openStream();
-  void closeStream();
-  uint64_t getBatch(vvec<encT>& batch_table, uint32_t tbatch_size, bool contd = false);
-};
-
-template<typename encT>
 struct HTs
 {
   tT tID;
