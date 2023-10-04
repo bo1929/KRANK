@@ -88,7 +88,8 @@ Query::run(uint64_t rbatch_size)
     }
     kseq_t* reader = IO::getReader(_queryID_to_path[queryID].c_str());
     rbatch_size = IO::adjustBatchSize(rbatch_size, num_threads);
-    std::vector<sseq_t> seqBatch = IO::readBatch(reader, rbatch_size);
+    std::vector<sseq_t> seqBatch;
+    IO::readBatch(seqBatch, reader, rbatch_size);
     uint64_t tnum_reads = 0;
     if (_log)
       LOG(INFO) << "Batch size for the query reads in the current query file is " << seqBatch.size()
@@ -239,11 +240,10 @@ Query::run(uint64_t rbatch_size)
         }
       }
       tnum_reads += seqBatch.size();
-      if (seqBatch.size() == rbatch_size)
-        seqBatch = IO::readBatch(reader, rbatch_size);
-      else
-        seqBatch.clear();
+      IO::readBatch(seqBatch, reader, rbatch_size);
     }
+    kseq_destroy(reader);
+    gzclose(reader->f->f);
     if (_save_match_info) {
       if (_log)
         LOG(INFO) << "Closing match information output file" << std::endl;

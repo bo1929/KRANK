@@ -29,8 +29,8 @@ getReader(const char* path);
 uint64_t
 adjustBatchSize(uint64_t batch_size, uint8_t num_threads);
 
-std::vector<sseq_t>
-readBatch(kseq_t* kseq, uint64_t batch_size);
+void
+readBatch(std::vector<sseq_t>& seqRead, kseq_t* kseq, uint64_t batch_size);
 
 FILE*
 open_file(const char* filepath, bool& is_ok, const char* mode);

@@ -168,7 +168,8 @@ StreamIM<encT>::extractInput(uint64_t rbatch_size)
   unsigned int i, l, c;
   for (std::string& filepath : filepath_v) {
     kseq_t* reader = IO::getReader(filepath.c_str());
-    std::vector<sseq_t> seqBatch = IO::readBatch(reader, rbatch_size);
+    std::vector<sseq_t> seqBatch;
+    IO::readBatch(seqBatch, reader, rbatch_size);
     while (!(seqBatch.empty())) {
       for (uint32_t ix = 0; ix < seqBatch.size(); ++ix) {
         uint64_t enc64_bp;
@@ -244,11 +245,10 @@ StreamIM<encT>::extractInput(uint64_t rbatch_size)
         }
         lsh_enc_vec.resize(wix);
       }
-      if (seqBatch.size() == rbatch_size)
-        seqBatch = IO::readBatch(reader, rbatch_size);
-      else
-        seqBatch.clear();
+      IO::readBatch(seqBatch, reader, rbatch_size);
     }
+    kseq_destroy(reader);
+    gzclose(reader->f->f);
   }
   lsh_enc_vec.shrink_to_fit();
   std::sort(lsh_enc_vec.begin(),
@@ -277,7 +277,8 @@ StreamIM<encT>::processInput(uint64_t rbatch_size)
   rbatch_size = IO::adjustBatchSize(rbatch_size, num_threads);
   for (std::string& filepath : filepath_v) {
     kseq_t* reader = IO::getReader(filepath.c_str());
-    std::vector<sseq_t> seqBatch = IO::readBatch(reader, rbatch_size);
+    std::vector<sseq_t> seqBatch;
+    IO::readBatch(seqBatch, reader, rbatch_size);
     while (!(seqBatch.empty())) {
       uint8_t ldiff = w - k + 1;
       uint8_t kix = 0;
@@ -338,11 +339,10 @@ StreamIM<encT>::processInput(uint64_t rbatch_size)
                               });
       }
       tnum_kmers_sum += seqBatch.size();
-      if (seqBatch.size() == rbatch_size)
-        seqBatch = IO::readBatch(reader, rbatch_size);
-      else
-        seqBatch.clear();
+      IO::readBatch(seqBatch, reader, rbatch_size);
     }
+    kseq_destroy(reader);
+    gzclose(reader->f->f);
   }
   lsh_enc_vec.shrink_to_fit();
   std::sort(lsh_enc_vec.begin(),
@@ -414,26 +414,22 @@ IO::adjustBatchSize(uint64_t batch_size, uint8_t num_threads)
   return (batch_size / num_threads) * num_threads;
 }
 
-std::vector<sseq_t>
-IO::readBatch(kseq_t* kseq, uint64_t batch_size)
+void
+IO::readBatch(std::vector<sseq_t>& seqRead, kseq_t* kseq, uint64_t batch_size)
 {
   int l;
   unsigned int i = 0;
-  std::vector<sseq_t> seqRead;
-  seqRead.reserve(batch_size);
+  seqRead.clear();
+  seqRead.resize(batch_size);
   while ((i < batch_size) && (l = kseq_read(kseq)) >= 0) {
     sseq_t tmp_seq;
     tmp_seq.nseq.assign(kseq->seq.s);
     tmp_seq.name.assign(kseq->name.s);
     tmp_seq.len = (kseq->seq.l);
-    seqRead.push_back(tmp_seq);
+    seqRead[i] = tmp_seq;
     i++;
   }
-  if ((i < batch_size) && (!seqRead.empty())) {
-    kseq_destroy(kseq);
-    gzclose(kseq->f->f);
-  }
-  return seqRead;
+  seqRead.resize(i);
 }
 
 FILE*

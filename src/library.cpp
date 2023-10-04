@@ -105,7 +105,9 @@ Library::Library(const char* library_dirpath,
       if (!in_library) {
         bool is_ok = sIM.save(disk_path.c_str());
         if (!is_ok) {
-          std::cerr << "Error saving to " << disk_path << std::endl;
+
+          std::cerr << "Error saving to " << disk_path << " for "
+                    << _taxonomy_record.changeIDtax(tID_key) << std::endl;
           exit(EXIT_FAILURE);
         }
         if (_log) {
