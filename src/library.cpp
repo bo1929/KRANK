@@ -379,14 +379,14 @@ Library::getBatchHTs(HTs<encT>* ts, uint8_t curr_depth, uint8_t last_depth)
                     << " has more than one child, updating LCA labels" << std::endl;
         ts->updateLCA();
       }
-      /* if (num_rm > 0) { */
-      /*   if (_log) */
-      /*     LOG(INFO) << _taxonomy_record.changeIDtax(ts->tID) << " has more than one child, and "
-       */
-      /*               << num_rm << " many k-mers above the constraint, shrinking the table" */
-      /*               << std::endl; */
-      /*   ts->shrinkHT(static_cast<uint64_t>(num_rm)); */
-      /* } */
+      if (num_rm > 0) {
+        if (_log)
+          LOG(INFO) << _taxonomy_record.changeIDtax(ts->tID) << " has more than one child, and "
+
+                    << num_rm << " many k-mers above the constraint, shrinking the table"
+                    << std::endl;
+        ts->shrinkHT(static_cast<uint64_t>(num_rm));
+      }
     }
     ts->childrenHT.clear();
     std::cout << "HTs has been constructed for " << _taxonomy_record.changeIDtax(ts->tID)
@@ -441,14 +441,13 @@ Library::getBatchHTd(HTd<encT>* td)
                     << " has more than one child, updating LCA labels" << std::endl;
         td->updateLCA();
       }
-      /* if (num_rm > 0) { */
-      /*   if (_log) */
-      /*     LOG(INFO) << _taxonomy_record.changeIDtax(td->tID) << " has more than one child, and "
-       */
-      /*               << num_rm << " many k-mers above the constraint, shrinking the table" */
-      /*               << std::endl; */
-      /*   td->shrinkHT(static_cast<uint64_t>(num_rm), _b); */
-      /* } */
+      if (num_rm > 0) {
+        if (_log)
+          LOG(INFO) << _taxonomy_record.changeIDtax(td->tID) << " has more than one child, and "
+                    << num_rm << " many k-mers above the constraint, shrinking the table"
+                    << std::endl;
+        td->shrinkHT(static_cast<uint64_t>(num_rm), _b);
+      }
     }
     td->childrenHT.clear();
     std::cout << "HTd has been constructed for " << _taxonomy_record.changeIDtax(td->tID)
