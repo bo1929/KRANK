@@ -65,14 +65,15 @@ public:
   void getBatchHTd(HTd<encT>* td);
   void getBatchHTs(HTs<encT>* ts, uint8_t curr_depth = 0, uint8_t last_depth = 1);
   bool saveBatchHTs(HTs<encT>& ts, uint16_t curr_batch);
+  bool loadBatchHTs(HTs<encT>& ts, uint16_t curr_batch);
   bool saveMetadata();
   bool loadMetadata();
   void getRandomPositions();
   void skipBatch();
   void run(uint8_t sdepth = 3);
   void resetAuxInfo(HTs<encT>& ts, bool reset_scount, bool reset_tlca);
-  void computeSoftLCA(HTs<encT>& ts);
-  void computeTrueScount(HTs<encT>& ts);
+  void computeSoftLCA(HTs<encT>& ts, uint8_t curr_batch);
+  void computeTrueScount(HTs<encT>& ts, uint8_t curr_batch);
   decltype(_npositions)& npositions() { return _npositions; }
   decltype(_positions)& positions() { return _positions; }
   decltype(_lsh_vg)& lsh_vg() { return _lsh_vg; }

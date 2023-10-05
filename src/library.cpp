@@ -168,7 +168,7 @@ Library::Library(const char* library_dirpath,
 }
 
 void
-Library::computeTrueScount(HTs<encT>& ts)
+Library::computeTrueScount(HTs<encT>& ts, uint8_t curr_batch)
 {
 #pragma omp parallel for schedule(dynamic), num_threads(num_threads)
   for (unsigned int i = 0; i < _tID_vec.size(); ++i) {
@@ -179,12 +179,16 @@ Library::computeTrueScount(HTs<encT>& ts)
     IO::read_encinput(disk_path, lsh_enc_vec);
     std::vector<bool> nseen(ts.num_rows * _b, true);
     for (unsigned int i = 0; i < lsh_enc_vec.size(); ++i) {
-      for (unsigned int j = 0; j < ts.ind_arr[lsh_enc_vec[i].first]; ++j) {
-        if (ts.enc_arr[lsh_enc_vec[i].first * _b + j] == lsh_enc_vec[i].second) {
-          if (nseen[lsh_enc_vec[i].first * _b + j]) {
+      if ((lsh_enc_vec[i].first >= (curr_batch - 1) * _tbatch_size) &&
+          (lsh_enc_vec[i].first < curr_batch * _tbatch_size)) {
+        uint32_t rix = lsh_enc_vec[i].first - (curr_batch - 1) * _tbatch_size;
+        for (unsigned int j = 0; j < ts.ind_arr[rix]; ++j) {
+          if (ts.enc_arr[rix * _b + j] == lsh_enc_vec[i].second) {
+            if (nseen[rix * _b + j]) {
 #pragma omp atomic update
-            ts.scount_arr[lsh_enc_vec[i].first * _b + j]++;
-            nseen[lsh_enc_vec[i].first * _b + j] = false;
+              ts.scount_arr[rix * _b + j]++;
+              nseen[rix * _b + j] = false;
+            }
           }
         }
       }
@@ -207,7 +211,7 @@ Library::resetAuxInfo(HTs<encT>& ts, bool reset_scount, bool reset_tlca)
 }
 
 void
-Library::computeSoftLCA(HTs<encT>& ts)
+Library::computeSoftLCA(HTs<encT>& ts, uint8_t curr_batch)
 {
   double s = 6.0;
 #pragma omp parallel for schedule(dynamic), num_threads(num_threads)
@@ -219,14 +223,18 @@ Library::computeSoftLCA(HTs<encT>& ts)
     IO::read_encinput(disk_path, lsh_enc_vec);
     double p_update;
     for (unsigned int i = 0; i < lsh_enc_vec.size(); ++i) {
-      for (unsigned int j = 0; j < ts.ind_arr[lsh_enc_vec[i].first]; ++j) {
-        if (ts.enc_arr[lsh_enc_vec[i].first * _b + j] == lsh_enc_vec[i].second) {
-          p_update = 1 / log2(pow((ts.scount_arr[lsh_enc_vec[i].first * _b + j] - 1) / s, 2) + 2);
-          std::bernoulli_distribution bt(p_update);
-          if (bt(gen)) {
-#pragma omp atomic write
-            ts.tlca_arr[lsh_enc_vec[i].first * _b + j] = _taxonomy_record.getLowestCommonAncestor(
-              ts.tlca_arr[lsh_enc_vec[i].first * _b + j], tID_key);
+      if ((lsh_enc_vec[i].first >= (curr_batch - 1) * _tbatch_size) &&
+          (lsh_enc_vec[i].first < curr_batch * _tbatch_size)) {
+        uint32_t rix = lsh_enc_vec[i].first - (curr_batch - 1) * _tbatch_size;
+        for (unsigned int j = 0; j < ts.ind_arr[rix]; ++j) {
+          if (ts.enc_arr[rix * _b + j] == lsh_enc_vec[i].second) {
+            p_update = 1 / log2(pow((ts.scount_arr[rix * _b + j] - 1) / s, 2) + 2);
+            std::bernoulli_distribution bt(p_update);
+            if (bt(gen)) {
+#pragma omp critical
+              ts.tlca_arr[rix * _b + j] =
+                _taxonomy_record.getLowestCommonAncestor(ts.tlca_arr[rix * _b + j], tID_key);
+            }
           }
         }
       }
@@ -245,10 +253,10 @@ Library::run(uint8_t sdepth)
       std::cout << "Building the library for batch " << curr_batch << "..." << std::endl;
       HTs<encT> ts_root(1, _k, _h, _b, _tbatch_size, &_lsh_vg, _upper_ranking);
       Library::getBatchHTs(&ts_root, 0, sdepth);
-      Library::saveBatchHTs(ts_root, curr_batch);
       Library::resetAuxInfo(ts_root, true, true);
-      Library::computeTrueScount(ts_root);
-      Library::computeSoftLCA(ts_root);
+      Library::computeTrueScount(ts_root, curr_batch);
+      Library::computeSoftLCA(ts_root, curr_batch);
+      Library::saveBatchHTs(ts_root, curr_batch);
     } else {
       Library::skipBatch();
       std::cout << "Skipping the library building for batch  " << curr_batch << std::endl;
@@ -371,13 +379,14 @@ Library::getBatchHTs(HTs<encT>* ts, uint8_t curr_depth, uint8_t last_depth)
                     << " has more than one child, updating LCA labels" << std::endl;
         ts->updateLCA();
       }
-      if (num_rm > 0) {
-        if (_log)
-          LOG(INFO) << _taxonomy_record.changeIDtax(ts->tID) << " has more than one child, and "
-                    << num_rm << " many k-mers above the constraint, shrinking the table"
-                    << std::endl;
-        ts->shrinkHT(static_cast<uint64_t>(num_rm));
-      }
+      /* if (num_rm > 0) { */
+      /*   if (_log) */
+      /*     LOG(INFO) << _taxonomy_record.changeIDtax(ts->tID) << " has more than one child, and "
+       */
+      /*               << num_rm << " many k-mers above the constraint, shrinking the table" */
+      /*               << std::endl; */
+      /*   ts->shrinkHT(static_cast<uint64_t>(num_rm)); */
+      /* } */
     }
     ts->childrenHT.clear();
     std::cout << "HTs has been constructed for " << _taxonomy_record.changeIDtax(ts->tID)
@@ -432,18 +441,77 @@ Library::getBatchHTd(HTd<encT>* td)
                     << " has more than one child, updating LCA labels" << std::endl;
         td->updateLCA();
       }
-      if (num_rm > 0) {
-        if (_log)
-          LOG(INFO) << _taxonomy_record.changeIDtax(td->tID) << " has more than one child, and "
-                    << num_rm << " many k-mers above the constraint, shrinking the table"
-                    << std::endl;
-        td->shrinkHT(static_cast<uint64_t>(num_rm), _b);
-      }
+      /* if (num_rm > 0) { */
+      /*   if (_log) */
+      /*     LOG(INFO) << _taxonomy_record.changeIDtax(td->tID) << " has more than one child, and "
+       */
+      /*               << num_rm << " many k-mers above the constraint, shrinking the table" */
+      /*               << std::endl; */
+      /*   td->shrinkHT(static_cast<uint64_t>(num_rm), _b); */
+      /* } */
     }
     td->childrenHT.clear();
     std::cout << "HTd has been constructed for " << _taxonomy_record.changeIDtax(td->tID)
               << std::endl;
   }
+}
+
+bool
+Library::loadBatchHTs(HTs<encT>& ts, uint16_t curr_batch)
+{
+  bool is_ok = true;
+  std::string load_dirpath(_library_dirpath);
+
+  if (_log)
+    LOG(INFO) << "Loading the library batch for " << _taxonomy_record.changeIDtax(ts.tID)
+              << std::endl;
+
+  FILE* encf =
+    IO::open_file((load_dirpath + "/enc_arr-" + std::to_string(curr_batch)).c_str(), is_ok, "r");
+  if (std::ferror(encf)) {
+    std::puts("I/O error when reading encoding array from the library\n");
+    is_ok = false;
+  } else
+    std::fread(ts.enc_arr, sizeof(encT), _tbatch_size * _b, encf);
+  std::fclose(encf);
+
+  FILE* indf =
+    IO::open_file((load_dirpath + "/ind_arr-" + std::to_string(curr_batch)).c_str(), is_ok, "r");
+  if (std::ferror(indf)) {
+    std::puts("I/O error when reading indicator array from the library\n");
+    is_ok = false;
+  } else
+    std::fread(ts.ind_arr, sizeof(uint8_t), _tbatch_size, indf);
+  std::fclose(indf);
+
+  FILE* tlcaf =
+    IO::open_file((load_dirpath + "/tlca_arr-" + std::to_string(curr_batch)).c_str(), is_ok, "r");
+  if (std::ferror(tlcaf)) {
+    std::puts("I/O error when reading taxon-LCA array from the library\n");
+    is_ok = false;
+  } else
+    std::fread(ts.tlca_arr, sizeof(tT), _tbatch_size * _b, tlcaf);
+  std::fclose(tlcaf);
+
+  FILE* scountf =
+    IO::open_file((load_dirpath + "/scount_arr-" + std::to_string(curr_batch)).c_str(), is_ok, "r");
+  if (std::ferror(scountf)) {
+    std::puts("I/O error when reading species-count array from the library\n");
+    is_ok = false;
+  } else
+    std::fread(ts.scount_arr, sizeof(tT), _tbatch_size * _b, scountf);
+  std::fclose(scountf);
+
+  if (_log) {
+    if (is_ok)
+      LOG(NOTICE) << "Successfully loaded the batch library for "
+                  << _taxonomy_record.changeIDtax(ts.tID) << std::endl;
+    else
+      LOG(ERROR) << "Failed loading the batch library for " << _taxonomy_record.changeIDtax(ts.tID)
+                 << std::endl;
+  }
+
+  return is_ok;
 }
 
 bool
