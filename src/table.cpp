@@ -295,9 +295,9 @@ HTd<encT>::pruneColumns(uint8_t b_max)
           break;
         }
         case information_score: {
-          std::unordered_map<encT, std::vector<scT>> values_map =
+          std::unordered_map<encT, std::vector<float>> values_map =
             mapValuesCountsHTd(childrenHT, rix);
-          std::vector<scT> scores_vec;
+          std::vector<float> scores_vec;
           vecInformationScores(scores_vec, enc_vvec[rix], values_map);
           vecIxsNumber(ixs, scores_vec, enc_vvec[rix].size() - b_max, FL);
           break;
@@ -597,6 +597,29 @@ HTs<encT>::mergeRows(HTs<encT>& sibling, bool update_size)
 
 template<typename encT>
 void
+HTd<encT>::rmCommon(std::vector<uint8_t>& depth_vec)
+{
+#pragma omp parallel for num_threads(num_threads) schedule(dynamic)
+  for (uint32_t rix = 0; rix < num_rows; ++rix) {
+    if (tlca_vvec[rix].size() >= 1) {
+      std::vector<unsigned int> ixs;
+      for (unsigned int j = 0; j < tlca_vvec[rix].size(); ++j) {
+        if (depth_vec[tlca_vvec[rix][j]] < 4)
+          ixs.push_back(j);
+      }
+      vecRemoveIxs(scount_vvec[rix], ixs);
+      vecRemoveIxs(enc_vvec[rix], ixs);
+      vecRemoveIxs(tlca_vvec[rix], ixs);
+    }
+  }
+  HTd<encT>::updateSize();
+#ifdef DEBUG
+  LOG(INFO) << "The current size of the table is " << num_kmers << std::endl;
+#endif
+}
+
+template<typename encT>
+void
 HTd<encT>::shrinkHT(uint64_t num_rm, uint8_t b_max)
 {
   assert(num_rm < num_kmers);
@@ -668,9 +691,9 @@ HTd<encT>::shrinkHT(uint64_t num_rm, uint8_t b_max)
             r_to_rm = to_rm;
             if (r_to_rm > 0) {
               std::vector<unsigned int> ixs;
-              std::unordered_map<encT, std::vector<scT>> values_map =
+              std::unordered_map<encT, std::vector<float>> values_map =
                 mapValuesCountsHTd(childrenHT, rix);
-              std::vector<scT> scores_vec;
+              std::vector<float> scores_vec;
               vecInformationScores(scores_vec, enc_vvec[rix], values_map);
               vecIxsNumber(ixs, scores_vec, n, FL);
               vecRemoveIxs(scount_vvec[rix], ixs);
@@ -854,34 +877,14 @@ HTd<encT>::updateLCA()
 #pragma omp parallel for num_threads(num_threads) schedule(dynamic) private(gen)
     for (uint32_t rix = 0; rix < num_rows; ++rix) {
       tlca_vvec[rix].resize(enc_vvec[rix].size());
-      /* std::unordered_map<encT, std::vector<float>> prob_map = */
-      /*   mapValuesProbabilityHTd(childrenHT, rix); */
-      /* std::unordered_map<encT, std::vector<tT>> tlca_map =
-       * mapValuesLCAtHTd(childrenHT, rix); */
-      /* for (unsigned int i = 0; i < enc_vvec[rix].size(); ++i) { */
-      /*   if (tlca_map[enc_vvec[rix][i]].size() == 1) { */
-      /*     tlca_vvec[rix][i] = tlca_map[enc_vvec[rix][i]][0]; */
-      /*   } else { */
-      /*     std::unordered_map<encT, std::vector<float>> select_map = */
-      /*       mapValuesSelectHTd(childrenHT, rix); */
-      /*     std::bernoulli_distribution d( */
-      /*       updateLCAtProbabilityAPN(prob_map[enc_vvec[rix][i]],
-       * select_map[enc_vvec[rix][i]])); */
-      /*     /1* std::bernoulli_distribution
-       * d(updateLCAtProbabilityC2N(prob_map[enc_vvec[rix][i]])); *1/ */
-      /*     if (d(gen)) { */
-      /*       tlca_vvec[rix][i] = tID; */
-      /*     } else { */
-      /*       std::discrete_distribution<>
-       * d(prob_map[enc_vvec[rix][i]].begin(), */
-      /*                                      prob_map[enc_vvec[rix][i]].begin()
-       * + */
-      /*                                        tlca_map[enc_vvec[rix][i]].size());
-       */
-      /*       tlca_vvec[rix][i] = tlca_map[enc_vvec[rix][i]][d(gen)]; */
-      /*     } */
-      /*   } */
-      /* } */
+      std::unordered_map<encT, std::vector<tT>> tlca_map = mapValuesLCAtHTd(childrenHT, rix);
+      for (unsigned int i = 0; i < enc_vvec[rix].size(); ++i) {
+        if (tlca_map[enc_vvec[rix][i]].size() == 1) {
+          tlca_vvec[rix][i] = tlca_map[enc_vvec[rix][i]][0];
+        } else {
+          tlca_vvec[rix][i] = tID;
+        }
+      }
     }
   }
 }
@@ -890,43 +893,19 @@ template<typename encT>
 void
 HTs<encT>::updateLCA()
 {
-  /* if (childrenHT.size() > 1) { */
-  /* #pragma omp parallel for num_threads(num_threads) schedule(dynamic)
-   * private(gen) */
-  /*   for (uint32_t rix = 0; rix < num_rows; ++rix) { */
-  /*     std::unordered_map<encT, std::vector<float>> prob_map = */
-  /*       mapValuesProbabilityHTs(childrenHT, rix); */
-  /*     std::unordered_map<encT, std::vector<tT>> tlca_map =
-   * mapValuesLCAtHTs(childrenHT, rix); */
-  /*     for (unsigned int i = 0; i < ind_arr[rix]; ++i) { */
-  /*       if (tlca_map[enc_arr[b * rix + i]].size() == 1) { */
-  /*         tlca_arr[rix * b + i] = tlca_map[enc_arr[rix * b + i]][0]; */
-  /*       } else { */
-  /*         std::unordered_map<encT, std::vector<float>> select_map = */
-  /*           mapValuesSelectHTs(childrenHT, rix); */
-  /*         std::bernoulli_distribution
-   * d(updateLCAtProbabilityAPN(prob_map[enc_arr[rix * b + i]], */
-  /*                                                                select_map[enc_arr[rix
-   * * b + i]])); */
-  /*         /1* std::bernoulli_distribution
-   * d(updateLCAtProbabilityC2N(prob_map[enc_arr[rix * b + */
-  /*          * i]])); *1/ */
-  /*         if (d(gen)) { */
-  /*           tlca_arr[rix * b + i] = tID; */
-  /*         } else { */
-  /*           std::discrete_distribution<> d(prob_map[enc_arr[rix * b +
-   * i]].begin(), */
-  /*                                          prob_map[enc_arr[rix * b +
-   * i]].begin() + */
-  /*                                            tlca_map[enc_arr[rix * b +
-   * i]].size()); */
-  /*           tlca_arr[rix * b + i] = tlca_map[enc_arr[rix * b + i]][d(gen)];
-   */
-  /*         } */
-  /*       } */
-  /*     } */
-  /*   } */
-  /* } */
+  if (childrenHT.size() > 1) {
+#pragma omp parallel for num_threads(num_threads) schedule(dynamic) private(gen)
+    for (uint32_t rix = 0; rix < num_rows; ++rix) {
+      std::unordered_map<encT, std::vector<tT>> tlca_map = mapValuesLCAtHTs(childrenHT, rix);
+      for (unsigned int i = 0; i < ind_arr[rix]; ++i) {
+        if (tlca_map[enc_arr[b * rix + i]].size() == 1) {
+          tlca_arr[rix * b + i] = tlca_map[enc_arr[rix * b + i]][0];
+        } else {
+          tlca_arr[rix * b + i] = tID;
+        }
+      }
+    }
+  }
 }
 
 template<typename encT>
@@ -940,6 +919,7 @@ HTd<encT>::convertHTs(HTs<encT>* new_table)
   uint8_t b = new_table->b;
   uint32_t num_rows = new_table->num_rows;
   new_table->clearRows();
+  HTd<encT>::pruneColumns(b);
 #pragma omp parallel for num_threads(num_threads), schedule(dynamic)
   for (uint32_t rix = 0; rix < num_rows; ++rix) {
     if (enc_vvec[rix].size() < b) {

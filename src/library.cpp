@@ -369,24 +369,28 @@ Library::getBatchHTs(HTs<encT>* ts, uint8_t curr_depth, uint8_t last_depth)
     }
     ts->updateSize();
     if (ts->childrenHT.size() > 1) {
-      int64_t num_rm;
-      uint64_t constrained_size = getConstrainedSizeKC(ts->tIDsBasis);
-      num_rm = static_cast<int64_t>(ts->num_kmers) - static_cast<int64_t>(constrained_size);
-      // TODO: Consider removing.
       if (ts->tID != 0 && ts->tID != 1) {
         if (_log)
           LOG(INFO) << _taxonomy_record.changeIDtax(ts->tID)
                     << " has more than one child, updating LCA labels" << std::endl;
         ts->updateLCA();
       }
-      if (num_rm > 0) {
-        if (_log)
-          LOG(INFO) << _taxonomy_record.changeIDtax(ts->tID) << " has more than one child, and "
+      /* int64_t num_rm; */
+      /* uint64_t constrained_size = getConstrainedSizeKC(ts->tIDsBasis); */
+      /* uint64_t constrained_size = getConstrainedSizeSC(ts->num_species); */
+      /* num_rm = static_cast<int64_t>(ts->num_kmers) - */
+      /*          static_cast<int64_t>(constrained_size); */
+      /* if (num_rm > 0) { */
+      /*   if (_log) */
+      /*     LOG(INFO) << _taxonomy_record.changeIDtax(ts->tID) */
+      /*               << " has more than one child, and " */
 
-                    << num_rm << " many k-mers above the constraint, shrinking the table"
-                    << std::endl;
-        ts->shrinkHT(static_cast<uint64_t>(num_rm));
-      }
+      /*               << num_rm */
+      /*               << " many k-mers above the constraint, shrinking the
+       * table" */
+      /*               << std::endl; */
+      /*   ts->shrinkHT(static_cast<uint64_t>(num_rm)); */
+      /* } */
     }
     ts->childrenHT.clear();
     std::cout << "HTs has been constructed for " << _taxonomy_record.changeIDtax(ts->tID)
@@ -431,23 +435,29 @@ Library::getBatchHTd(HTd<encT>* td)
     }
     td->updateSize();
     if (td->childrenHT.size() > 1) {
-      int64_t num_rm;
-      uint64_t constrained_size = getConstrainedSizeKC(td->tIDsBasis);
-      num_rm = static_cast<int64_t>(td->num_kmers) - static_cast<int64_t>(constrained_size);
-      // TODO: Consider removing.
       if (td->tID != 0 && td->tID != 1) {
         if (_log)
           LOG(INFO) << _taxonomy_record.changeIDtax(td->tID)
                     << " has more than one child, updating LCA labels" << std::endl;
         td->updateLCA();
       }
-      if (num_rm > 0) {
-        if (_log)
-          LOG(INFO) << _taxonomy_record.changeIDtax(td->tID) << " has more than one child, and "
-                    << num_rm << " many k-mers above the constraint, shrinking the table"
-                    << std::endl;
-        td->shrinkHT(static_cast<uint64_t>(num_rm), _b);
-      }
+      /* if (_taxonomy_record.depth_vec()[td->tID] < 4) { */
+      /*   td->rmCommon(_taxonomy_record.depth_vec()); */
+      /* } */
+      /* int64_t num_rm; */
+      /* uint64_t constrained_size = getConstrainedSizeKC(td->tIDsBasis); */
+      /* uint64_t constrained_size = getConstrainedSizeSC(td->num_species); */
+      /* num_rm = static_cast<int64_t>(td->num_kmers) - */
+      /*          static_cast<int64_t>(constrained_size); */
+      /* if (num_rm > 0) { */
+      /*   if (_log) */
+      /*     LOG(INFO) << _taxonomy_record.changeIDtax(td->tID) */
+      /*               << " has more than one child, and " << num_rm */
+      /*               << " many k-mers above the constraint, shrinking the
+       * table" */
+      /*               << std::endl; */
+      /*   td->shrinkHT(static_cast<uint64_t>(num_rm), _b); */
+      /* } */
     }
     td->childrenHT.clear();
     std::cout << "HTd has been constructed for " << _taxonomy_record.changeIDtax(td->tID)

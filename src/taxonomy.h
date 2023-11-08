@@ -42,6 +42,7 @@ public:
   bool isBasis(T tID);
   decltype(_tID_to_input)& tID_to_input() { return _tID_to_input; }
   decltype(_child_map)& child_map() { return _child_map; }
+  decltype(_depth_vec)& depth_vec() { return _depth_vec; }
   bool saveTaxonomyRecord(const char* library_dirpath);
 };
 

@@ -86,6 +86,12 @@ vecIxsNumber(std::vector<unsigned int>& ixs,
              bool reverse);
 
 template void
+vecIxsNumber(std::vector<unsigned int>& ixs,
+             const std::vector<float>& s_vec,
+             uint8_t number,
+             bool reverse);
+
+template void
 arrIxsNumber(std::vector<unsigned int>& ixs,
              const uint16_t* s_arr,
              uint8_t last,
@@ -144,6 +150,15 @@ template void
 vecInformationScores(std::vector<uint16_t>& scores_vec,
                      std::vector<uint64_t>& enc_vec,
                      std::unordered_map<uint64_t, std::vector<uint16_t>>& values_map);
+template void
+vecInformationScores(std::vector<float>& scores_vec,
+                     std::vector<uint32_t>& enc_vec,
+                     std::unordered_map<uint32_t, std::vector<float>>& values_map);
+
+template void
+vecInformationScores(std::vector<float>& scores_vec,
+                     std::vector<uint64_t>& enc_vec,
+                     std::unordered_map<uint64_t, std::vector<float>>& values_map);
 
 template void
 arrInformationScores(std::vector<uint16_t>& s,

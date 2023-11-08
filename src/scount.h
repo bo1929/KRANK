@@ -145,17 +145,20 @@ mapValuesLCAtHTs(std::vector<HTs<T>>& ts_vec, std::uint32_t rix)
 }
 
 template<typename T>
-inline std::unordered_map<T, std::vector<scT>>
+inline std::unordered_map<T, std::vector<float>>
 mapValuesCountsHTd(std::vector<HTd<T>>& td_vec, std::uint32_t rix)
 {
-  std::unordered_map<T, std::vector<scT>> values_map{};
+  std::unordered_map<T, std::vector<float>> values_map{};
+  std::unordered_map<scT, scT> app_mapp{};
   for (auto& td : td_vec) {
     for (unsigned int i = 0; i < td.enc_vvec[rix].size(); ++i)
-      values_map[td.enc_vvec[rix][i]].push_back(td.scount_vvec[rix][i]);
+      app_mapp[td.tID]++;
   }
-  for (auto& kv : values_map) {
-    for (unsigned int i = 0; i < td_vec.size() - kv.second.size(); ++i)
-      kv.second.push_back(0);
+  for (auto& td : td_vec) {
+    for (unsigned int i = 0; i < td.enc_vvec[rix].size(); ++i) {
+      values_map[td.enc_vvec[rix][i]].push_back(static_cast<float>(td.scount_vvec[rix][i]) /
+                                                static_cast<float>(app_mapp[td.tID]));
+    }
   }
   return values_map;
 }

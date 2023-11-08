@@ -9,12 +9,7 @@ vecInformationScores(std::vector<T1>& s,
 {
   s.resize(v.size());
   for (unsigned int i = 0; i < v.size(); ++i) {
-    std::sort(values_map[v[i]].begin(), values_map[v[i]].end());
-    if (values_map[v[i]].size() > 1)
-      s[i] = 1 + (3 * values_map[v[i]].back()) - (2 * values_map[v[i]].end()[-2]) -
-             (values_map[v[i]][0]);
-    else
-      s[i] = 1;
+    s[i] = std::accumulate(values_map[v[i]].begin(), values_map[v[i]].end(), 0);
   }
 }
 

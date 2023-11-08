@@ -177,6 +177,7 @@ struct HTd
   void shrinkHT(uint64_t num_rm, uint8_t b_max);
   void initBasis(tT tID);
   void updateLCA();
+  void rmCommon(std::vector<uint8_t>& depth_vec);
   std::unordered_map<uint8_t, uint64_t> histRowSizes();
 };
 

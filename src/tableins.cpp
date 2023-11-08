@@ -145,4 +145,9 @@ HTs<uint64_t>::updateLCA();
 template void
 HTs<uint32_t>::updateLCA();
 
+template void
+HTd<uint64_t>::rmCommon(std::vector<uint8_t>& depth_vec);
+
+template void
+HTd<uint32_t>::rmCommon(std::vector<uint8_t>& depth_vec);
 #endif
