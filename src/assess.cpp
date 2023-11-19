@@ -2,10 +2,7 @@
 #include <ostream>
 
 template<typename T1, typename T2>
-void
-vecInformationScores(std::vector<T1>& s,
-                     std::vector<T2>& v,
-                     std::unordered_map<T2, std::vector<T1>>& values_map)
+void vecInformationScores(std::vector<T1> &s, std::vector<T2> &v, std::unordered_map<T2, std::vector<T1>> &values_map)
 {
   s.resize(v.size());
   for (unsigned int i = 0; i < v.size(); ++i) {
@@ -14,28 +11,20 @@ vecInformationScores(std::vector<T1>& s,
 }
 
 template<typename T1, typename T2>
-void
-arrInformationScores(std::vector<T1>& s,
-                     T2* r,
-                     uint8_t last,
-                     std::unordered_map<T2, std::vector<T1>>& values_map)
+void arrInformationScores(std::vector<T1> &s, T2 *r, uint8_t last, std::unordered_map<T2, std::vector<T1>> &values_map)
 {
   s.resize(last);
   for (unsigned int i = 0; i < last; ++i) {
     std::sort(values_map[r[i]].begin(), values_map[r[i]].end());
     if (values_map[r[i]].size() > 1)
-      s[i] = 1 + (3 * values_map[r[i]].back()) - (2 * values_map[r[i]].end()[-2]) -
-             (values_map[r[i]][0]);
+      s[i] = 1 + (3 * values_map[r[i]].back()) - (2 * values_map[r[i]].end()[-2]) - (values_map[r[i]][0]);
     else
       s[i] = 1;
   }
 }
 
 template<typename T1, typename T2>
-void
-vecTaxaCounts(std::vector<T1>& s,
-              std::vector<T2>& v,
-              std::unordered_map<T2, std::vector<bool>>& values_map)
+void vecTaxaCounts(std::vector<T1> &s, std::vector<T2> &v, std::unordered_map<T2, std::vector<bool>> &values_map)
 {
   s.resize(v.size());
   for (unsigned int i = 0; i < v.size(); ++i) {
@@ -46,11 +35,7 @@ vecTaxaCounts(std::vector<T1>& s,
 }
 
 template<typename T1, typename T2>
-void
-arrTaxaCounts(std::vector<T1>& s,
-              T2* r,
-              uint8_t last,
-              std::unordered_map<T2, std::vector<bool>>& values_map)
+void arrTaxaCounts(std::vector<T1> &s, T2 *r, uint8_t last, std::unordered_map<T2, std::vector<bool>> &values_map)
 {
   s.resize(last);
   for (unsigned int i = 0; i < last; ++i) {
@@ -61,8 +46,7 @@ arrTaxaCounts(std::vector<T1>& s,
 }
 
 template<typename T>
-void
-vecRemoveIxs(std::vector<T>& v, std::vector<unsigned int>& ixs)
+void vecRemoveIxs(std::vector<T> &v, std::vector<size_t> &ixs)
 {
   if (!v.empty() && (ixs.size() <= v.size())) {
     if (ixs.size() > 0) {
@@ -89,8 +73,7 @@ vecRemoveIxs(std::vector<T>& v, std::vector<unsigned int>& ixs)
 }
 
 template<typename T>
-void
-arrRemoveIxs(T* r, uint8_t last, std::vector<unsigned int>& ixs)
+void arrRemoveIxs(T *r, uint8_t last, std::vector<size_t> &ixs)
 {
   if ((last > 0) && (last >= ixs.size())) {
     if (!ixs.empty()) {
@@ -117,41 +100,34 @@ arrRemoveIxs(T* r, uint8_t last, std::vector<unsigned int>& ixs)
 }
 
 template<typename T>
-void
-vecArgsort1D(std::vector<unsigned int>& ixs, const std::vector<T>& v, bool reverse)
+void vecArgsort1D(std::vector<size_t> &ixs, const std::vector<T> &v, bool reverse)
 {
   ixs.resize(v.size());
   std::iota(ixs.begin(), ixs.end(), 0);
   std::random_shuffle(ixs.begin(), ixs.end());
   if (reverse)
-    std::sort(
-      ixs.begin(), ixs.end(), [&v](unsigned int i1, unsigned int i2) { return v[i1] > v[i2]; });
+    std::sort(ixs.begin(), ixs.end(), [&v](unsigned int i1, unsigned int i2) { return v[i1] > v[i2]; });
   else
-    std::sort(
-      ixs.begin(), ixs.end(), [&v](unsigned int i1, unsigned int i2) { return v[i1] < v[i2]; });
+    std::sort(ixs.begin(), ixs.end(), [&v](unsigned int i1, unsigned int i2) { return v[i1] < v[i2]; });
 }
 
 template<typename T>
-void
-arrArgsort1D(std::vector<unsigned int>& ixs, const T* r, uint8_t last, bool reverse)
+void arrArgsort1D(std::vector<size_t> &ixs, const T *r, uint8_t last, bool reverse)
 {
   ixs.resize(last);
   std::iota(ixs.begin(), ixs.end(), 0);
   std::random_shuffle(ixs.begin(), ixs.end());
   if (reverse)
-    std::sort(
-      ixs.begin(), ixs.end(), [&r](unsigned int i1, unsigned int i2) { return r[i1] > r[i2]; });
+    std::sort(ixs.begin(), ixs.end(), [&r](unsigned int i1, unsigned int i2) { return r[i1] > r[i2]; });
   else
-    std::sort(
-      ixs.begin(), ixs.end(), [&r](unsigned int i1, unsigned int i2) { return r[i1] < r[i2]; });
+    std::sort(ixs.begin(), ixs.end(), [&r](unsigned int i1, unsigned int i2) { return r[i1] < r[i2]; });
 }
 
 template<typename T>
-T
-vvecArgmax2D(const vvec<T>& vv, uint64_t n, bool reverse)
+T vvecArgmax2D(const vvec<T> &vv, uint64_t n, bool reverse)
 {
   std::map<T, uint64_t> val_counts;
-  for (auto& v : vv) {
+  for (auto &v : vv) {
     for (auto val : v)
       val_counts[val]++;
   }
@@ -176,13 +152,7 @@ vvecArgmax2D(const vvec<T>& vv, uint64_t n, bool reverse)
 }
 
 template<typename T>
-T
-arrArgmax2D(const T* r,
-            const uint8_t* ind_r,
-            uint32_t num_rows,
-            uint8_t b,
-            uint64_t n,
-            bool reverse)
+T arrArgmax2D(const T *r, const uint8_t *ind_r, uint32_t num_rows, uint8_t b, uint64_t n, bool reverse)
 {
   std::map<T, uint64_t> val_counts;
   for (uint32_t rix = 0; rix < num_rows; ++rix) {
@@ -209,11 +179,8 @@ arrArgmax2D(const T* r,
   return val_prev;
 }
 
-void
-getIxsRandom(std::vector<unsigned int>& ixs, uint8_t b, uint8_t number)
+void getIxsRandom(std::vector<size_t> &ixs, size_t b, size_t number)
 {
-  if (number > b)
-    std::cout << std::endl << (int)number << "," << (int)b << std::endl;
   assert(b > 0);
   assert(number <= b);
   if (ixs.size() != b)
@@ -225,24 +192,21 @@ getIxsRandom(std::vector<unsigned int>& ixs, uint8_t b, uint8_t number)
 }
 
 template<typename T>
-void
-vecIxsNumber(std::vector<unsigned int>& ixs,
-             const std::vector<T>& s_v,
-             uint8_t number,
-             bool reverse)
+void getIxsArgsort(std::vector<size_t> &ixs, const std::vector<T> &v, size_t number, bool reverse)
 {
-  vecArgsort1D(ixs, s_v, reverse);
+  ixs.resize(v.size());
+  std::iota(ixs.begin(), ixs.end(), 0);
+  std::random_shuffle(ixs.begin(), ixs.end());
+  if (reverse)
+    std::sort(ixs.begin(), ixs.end(), [&v](size_t i1, size_t i2) { return v[i1] > v[i2]; });
+  else
+    std::sort(ixs.begin(), ixs.end(), [&v](size_t i1, size_t i2) { return v[i1] < v[i2]; });
   ixs.resize(number);
   std::sort(ixs.begin(), ixs.end());
 }
 
 template<typename T>
-void
-arrIxsNumber(std::vector<unsigned int>& ixs,
-             const T* s_r,
-             uint8_t last,
-             uint8_t number,
-             bool reverse)
+void arrIxsNumber(std::vector<size_t> &ixs, const T *s_r, uint8_t last, uint8_t number, bool reverse)
 {
   arrArgsort1D(ixs, s_r, last, reverse);
   ixs.resize(number);
@@ -250,34 +214,24 @@ arrIxsNumber(std::vector<unsigned int>& ixs,
 }
 
 template<typename T>
-void
-vvecSizeOrder(std::vector<unsigned int>& ixs, const vvec<T>& vv, bool reverse)
+void vvecSizeOrder(std::vector<size_t> &ixs, const vvec<T> &vv, bool reverse)
 {
   ixs.resize(vv.size());
   std::iota(ixs.begin(), ixs.end(), 0);
   if (reverse)
-    std::sort(ixs.begin(), ixs.end(), [&vv](unsigned int i1, unsigned int i2) {
-      return vv[i1].size() > vv[i2].size();
-    });
+    std::sort(ixs.begin(), ixs.end(), [&vv](unsigned int i1, unsigned int i2) { return vv[i1].size() > vv[i2].size(); });
   else
-    std::sort(ixs.begin(), ixs.end(), [&vv](unsigned int i1, unsigned int i2) {
-      return vv[i1].size() < vv[i2].size();
-    });
+    std::sort(ixs.begin(), ixs.end(), [&vv](unsigned int i1, unsigned int i2) { return vv[i1].size() < vv[i2].size(); });
 }
 
-void
-arrSizeOrder(std::vector<unsigned int>& ixs, const uint8_t* ind_r, uint32_t num_rows, bool reverse)
+void arrSizeOrder(std::vector<size_t> &ixs, const uint8_t *ind_r, uint32_t num_rows, bool reverse)
 {
   ixs.resize(num_rows);
   std::iota(ixs.begin(), ixs.end(), 0);
   if (reverse)
-    std::sort(ixs.begin(), ixs.end(), [&ind_r](unsigned int i1, unsigned int i2) {
-      return ind_r[i1] > ind_r[i2];
-    });
+    std::sort(ixs.begin(), ixs.end(), [&ind_r](unsigned int i1, unsigned int i2) { return ind_r[i1] > ind_r[i2]; });
   else
-    std::sort(ixs.begin(), ixs.end(), [&ind_r](unsigned int i1, unsigned int i2) {
-      return ind_r[i1] < ind_r[i2];
-    });
+    std::sort(ixs.begin(), ixs.end(), [&ind_r](unsigned int i1, unsigned int i2) { return ind_r[i1] < ind_r[i2]; });
 }
 
 #include "assessins.cpp"

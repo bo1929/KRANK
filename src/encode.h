@@ -4,39 +4,27 @@
 #include "common.h"
 #include "io.h"
 
-void
-kmerEncodingBPCompute(const char* seq, uint64_t& enc_bp);
+void kmerEncodingBPCompute(const char *seq, uint64_t &enc_bp);
 
-void
-kmerEncodingCompute(const char* seq, uint64_t& enc_lr, uint64_t& enc_bp);
+void kmerEncodingCompute(const char *seq, uint64_t &enc_lr, uint64_t &enc_bp);
 
-void
-kmerEncodingComputeC(const char* seq, uint64_t& enc_lr, uint64_t& enc_bp);
+void kmerEncodingComputeC(const char *seq, uint64_t &enc_lr, uint64_t &enc_bp);
 
-void
-kmerEncodingUpdate(const char* seq, uint64_t& enc_lr, uint64_t& enc_bp);
+void kmerEncodingUpdate(const char *seq, uint64_t &enc_lr, uint64_t &enc_bp);
 
-void
-kmerEncodingUpdateC(const char* seq, uint64_t& enc_lr, uint64_t& enc_bp);
+void kmerEncodingUpdateC(const char *seq, uint64_t &enc_lr, uint64_t &enc_bp);
 
-void
-retrieveEncodings(const char* fpath,
-                  uint64_t*& enc_arr,
-                  uint32_t num_kmers,
-                  unsigned int batch_size);
+void retrieveEncodings(const char *fpath, uint64_t *&enc_arr, uint32_t num_kmers, unsigned int batch_size);
 
-uint8_t
-computeHammingDistance64(uint64_t x, uint64_t y);
+uint8_t computeHammingDistance64(uint64_t x, uint64_t y);
 
-uint8_t
-computeHammingDistance32(uint32_t x, uint32_t y);
+uint8_t computeHammingDistance32(uint32_t x, uint32_t y);
 
-inline void
-drop64Encoding32(std::vector<uint8_t>& npositions,
-                 uint64_t enc64_bp,
-                 uint64_t enc64_lr,
-                 uint32_t& enc32_bp,
-                 uint32_t& enc32_lr)
+inline void drop64Encoding32(std::vector<uint8_t> &npositions,
+                             uint64_t enc64_bp,
+                             uint64_t enc64_lr,
+                             uint32_t &enc32_bp,
+                             uint32_t &enc32_lr)
 {
   assert(npositions.size() <= 16);
   enc32_bp = 0;
@@ -53,8 +41,7 @@ drop64Encoding32(std::vector<uint8_t>& npositions,
   enc32_bp += static_cast<uint32_t>((enc64_bp >> (npositions.front() * 2)) & 3);
 }
 
-inline uint8_t
-computeHammingDistance64(const uint64_t x, const uint64_t y)
+inline uint8_t computeHammingDistance64(const uint64_t x, const uint64_t y)
 {
   uint64_t z1 = x ^ y;
   uint32_t z2 = z1 >> 32;
@@ -62,8 +49,7 @@ computeHammingDistance64(const uint64_t x, const uint64_t y)
   return static_cast<uint8_t>(__builtin_popcount(zc));
 }
 
-inline uint8_t
-computeHammingDistance32(const uint32_t x, const uint32_t y)
+inline uint8_t computeHammingDistance32(const uint32_t x, const uint32_t y)
 {
   uint32_t z1 = x ^ y;
   uint16_t z2 = z1 >> 16;
@@ -71,8 +57,7 @@ computeHammingDistance32(const uint32_t x, const uint32_t y)
   return static_cast<uint8_t>(__builtin_popcount(zc));
 }
 
-inline u_int64_t
-revcomp64bp(const u_int64_t& x, size_t sizeKmer)
+inline u_int64_t revcomp64bp(const u_int64_t &x, size_t sizeKmer)
 {
   uint64_t res = ~x;
   res = ((res >> 2 & 0x3333333333333333) | (res & 0x3333333333333333) << 2);
@@ -83,8 +68,7 @@ revcomp64bp(const u_int64_t& x, size_t sizeKmer)
   return (res >> (2 * (32 - sizeKmer)));
 }
 
-inline uint64_t
-rmoddp64(uint64_t x)
+inline uint64_t rmoddp64(uint64_t x)
 {
   x = x & 0x5555555555555555;
   x = (x | (x >> 1)) & 0x3333333333333333;
@@ -95,14 +79,9 @@ rmoddp64(uint64_t x)
   return x;
 }
 
-inline u_int64_t
-conv64bp2lr(const u_int64_t& x, size_t sizeKmer)
-{
-  return (rmoddp64(x >> 1) << 32) | rmoddp64(x);
-}
+inline u_int64_t conv64bp2lr(const u_int64_t &x, size_t sizeKmer) { return (rmoddp64(x >> 1) << 32) | rmoddp64(x); }
 
-static inline uint64_t
-murmur64(uint64_t h)
+static inline uint64_t murmur64(uint64_t h)
 {
   h ^= (h >> 33);
   h *= 0xff51afd7ed558ccdL;

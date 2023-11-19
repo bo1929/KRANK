@@ -8,7 +8,7 @@
 class TaxonomyNCBI
 {
 public:
-  TaxonomyNCBI(const char* nodes_filepath);
+  TaxonomyNCBI(const char *nodes_filepath);
   uint64_t getParent(uint64_t taxID);
   std::string getRank(uint64_t taxID);
   void printTaxonomyNCBI();
@@ -34,16 +34,16 @@ private:
   std::unordered_map<T, std::set<T>> _child_map;
 
 public:
-  TaxonomyRecord(const char* input_filepath, TaxonomyNCBI taxonomy);
+  TaxonomyRecord(const char *input_filepath, TaxonomyNCBI taxonomy);
   void printTaxonomyRecord();
   T getLowestCommonAncestor(T a, T b);
   uint64_t changeIDtax(T tID);
   T changeIDt(uint64_t taxID);
   bool isBasis(T tID);
-  decltype(_tID_to_input)& tID_to_input() { return _tID_to_input; }
-  decltype(_child_map)& child_map() { return _child_map; }
-  decltype(_depth_vec)& depth_vec() { return _depth_vec; }
-  bool saveTaxonomyRecord(const char* library_dirpath);
+  decltype(_tID_to_input) &tID_to_input() { return _tID_to_input; }
+  decltype(_child_map) &child_map() { return _child_map; }
+  decltype(_depth_vec) &depth_vec() { return _depth_vec; }
+  bool saveTaxonomyRecord(const char *library_dirpath);
 };
 
 #endif

@@ -1,7 +1,6 @@
 #include "encode.h"
 
-void
-kmerEncodingBPCompute(const char* seq, uint64_t& enc_bp)
+void kmerEncodingBPCompute(const char *seq, uint64_t &enc_bp)
 {
   enc_bp = 0;
   for (unsigned int i = 0; i < static_cast<unsigned int>(strlen(seq)); i++) {
@@ -18,8 +17,7 @@ kmerEncodingBPCompute(const char* seq, uint64_t& enc_bp)
   }
 }
 
-void
-kmerEncodingCompute(const char* seq, uint64_t& enc_lr, uint64_t& enc_bp)
+void kmerEncodingCompute(const char *seq, uint64_t &enc_lr, uint64_t &enc_bp)
 {
   enc_lr = 0;
   enc_bp = 0;
@@ -42,8 +40,7 @@ kmerEncodingCompute(const char* seq, uint64_t& enc_lr, uint64_t& enc_bp)
   }
 }
 
-void
-kmerEncodingComputeC(const char* seq, uint64_t& enc_lr, uint64_t& enc_bp)
+void kmerEncodingComputeC(const char *seq, uint64_t &enc_lr, uint64_t &enc_bp)
 {
   enc_lr = 0;
   enc_bp = 0;
@@ -66,8 +63,7 @@ kmerEncodingComputeC(const char* seq, uint64_t& enc_lr, uint64_t& enc_bp)
   }
 }
 
-void
-kmerEncodingUpdate(const char* seq, uint64_t& enc_lr, uint64_t& enc_bp)
+void kmerEncodingUpdate(const char *seq, uint64_t &enc_lr, uint64_t &enc_bp)
 {
   enc_lr = enc_lr << 1;
   enc_bp = enc_bp << 2;
@@ -88,8 +84,7 @@ kmerEncodingUpdate(const char* seq, uint64_t& enc_lr, uint64_t& enc_bp)
   }
 }
 
-void
-kmerEncodingUpdateC(const char* seq, uint64_t& enc_lr, uint64_t& enc_bp)
+void kmerEncodingUpdateC(const char *seq, uint64_t &enc_lr, uint64_t &enc_bp)
 {
   enc_lr = enc_lr << 1;
   enc_bp = enc_bp << 2;

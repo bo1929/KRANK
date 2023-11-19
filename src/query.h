@@ -13,8 +13,8 @@ class Query
 {
 public:
   Query(std::vector<std::string> library_dirpaths,
-        const char* output_dirpath,
-        const char* query_filepath,
+        const char *output_dirpath,
+        const char *query_filepath,
         uint8_t max_match_hdist = 5,
         bool save_match_info = true,
         bool log = false);
@@ -25,9 +25,9 @@ public:
 private:
   struct SearchL
   {
-    SearchL(const char* library_dirpath, bool log = false);
+    SearchL(const char *library_dirpath, bool log = false);
     bool _log;
-    const char* _library_dirpath;
+    const char *_library_dirpath;
     uint8_t _k;
     uint8_t _h;
     uint8_t _b;
@@ -47,21 +47,21 @@ private:
     std::vector<uint8_t> _tax_depth_vec;
     const uint16_t _rootID = 1;
     std::vector<std::pair<tT, uint16_t>> _bases_sizes;
-    encT* _enc_arr;
-    tT* _tlca_arr;
+    encT *_enc_arr;
+    tT *_tlca_arr;
     // scT* _scount_ar;
-    uint8_t* _ind_arr;
+    uint8_t *_ind_arr;
     bool loadMetadata();
     bool loadTaxonomy();
     void run(uint64_t rbatch_size = DEFAULT_BATCH_SIZE);
-    decltype(_npositions)& npositions() { return _npositions; }
-    decltype(_positions)& positions() { return _positions; }
-    decltype(_lsh_vg)& lsh_vg() { return _lsh_vg; }
+    decltype(_npositions) &npositions() { return _npositions; }
+    decltype(_positions) &positions() { return _positions; }
+    decltype(_lsh_vg) &lsh_vg() { return _lsh_vg; }
   };
   bool _log;
   std::vector<std::string> _library_dirpaths;
-  const char* _query_filepath;
-  const char* _output_dirpath;
+  const char *_query_filepath;
+  const char *_output_dirpath;
   uint8_t _k;
   uint8_t _num_libraries;
   uint8_t _max_match_hdist;

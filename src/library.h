@@ -10,35 +10,35 @@
 class Library
 {
 public:
-  Library(const char* library_dirpath,
-          const char* nodes_filepath,
-          const char* input_filepath,
+  Library(const char *library_dirpath,
+          const char *nodes_filepath,
+          const char *input_filepath,
           uint8_t k,
           uint8_t w,
           uint8_t h,
           uint8_t b,
-          RankingMethod upper_ranking,
-          RankingMethod lower_ranking,
+          RankingMethod ranking_method,
+          bool adaptive_size,
           uint64_t capacitiy_size,
           uint32_t num_batch_rows,
-          bool in_library = false,
+          bool from_library = false,
           bool on_disk = true,
           bool from_kmers = false,
-          uint8_t specified_batch = 0,
+          uint8_t target_batch = 0,
           bool log = true);
 
 private:
   TaxonomyNCBI _taxonomy_ncbi;
   TaxonomyRecord<tT> _taxonomy_record;
-  const char* _library_dirpath;
-  const char* _nodes_filepath;
-  const char* _input_filepath;
+  const char *_library_dirpath;
+  const char *_nodes_filepath;
+  const char *_input_filepath;
   uint8_t _k;
   uint8_t _w;
   uint8_t _h;
   uint8_t _b;
-  RankingMethod _upper_ranking;
-  RankingMethod _lower_ranking;
+  RankingMethod _ranking_method;
+  bool _adaptive_size;
   uint64_t _num_rows; // Total number of rows: pow(2, 2h).
   uint64_t _capacity_size;
   uint32_t _tbatch_size;
@@ -53,30 +53,30 @@ private:
   std::vector<tT> _tID_vec;
   uint64_t _num_species;
   bool _on_disk;
-  bool _in_library;
+  bool _from_library;
   bool _from_kmers;
-  uint8_t _specified_batch;
+  uint8_t _target_batch;
   bool _log;
   const uint16_t _rootID = 1;
 
 public:
   uint64_t getConstrainedSizeKC(std::set<tT> tIDsBasis);
-  uint64_t getConstrainedSizeSC(uint64_t num_species);
-  void getBatchHTd(HTd<encT>* td);
-  void getBatchHTs(HTs<encT>* ts, uint8_t curr_depth = 0, uint8_t last_depth = 1);
-  bool saveBatchHTs(HTs<encT>& ts, uint16_t curr_batch);
-  bool loadBatchHTs(HTs<encT>& ts, uint16_t curr_batch);
+  uint64_t getConstrainedSizeSC(uint64_t num_basis);
+  void getBatchHTd(HTd<encT> *td);
+  void getBatchHTs(HTs<encT> *ts);
+  bool saveBatchHTs(HTs<encT> &ts, uint16_t curr_batch);
+  bool loadBatchHTs(HTs<encT> &ts, uint16_t curr_batch);
   bool saveMetadata();
   bool loadMetadata();
   void getRandomPositions();
   void skipBatch();
-  void run(uint8_t sdepth = 3);
-  void resetAuxInfo(HTs<encT>& ts, bool reset_scount, bool reset_tlca);
-  void computeSoftLCA(HTs<encT>& ts, uint8_t curr_batch);
-  void computeTrueScount(HTs<encT>& ts, uint8_t curr_batch);
-  decltype(_npositions)& npositions() { return _npositions; }
-  decltype(_positions)& positions() { return _positions; }
-  decltype(_lsh_vg)& lsh_vg() { return _lsh_vg; }
+  void build();
+  void resetInfo(HTs<encT> &ts, bool reset_scount, bool reset_tlca);
+  void softLCA(HTs<encT> &ts, uint8_t curr_batch);
+  void countBasis(HTs<encT> &ts, uint8_t curr_batch);
+  decltype(_npositions) &npositions() { return _npositions; }
+  decltype(_positions) &positions() { return _positions; }
+  decltype(_lsh_vg) &lsh_vg() { return _lsh_vg; }
 };
 
 #endif

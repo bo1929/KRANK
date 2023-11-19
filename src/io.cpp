@@ -3,8 +3,7 @@
 /* #define CANONICAL */
 
 template<typename T>
-inline void
-sortColumns(vvec<T>& table)
+inline void sortColumns(vvec<T> &table)
 {
   uint32_t num_rows = table.size();
 #pragma omp parallel for num_threads(num_threads), schedule(dynamic)
@@ -15,8 +14,7 @@ sortColumns(vvec<T>& table)
 }
 
 template<typename encT>
-bool
-StreamIM<encT>::save(const char* filepath)
+bool StreamIM<encT>::save(const char *filepath)
 {
   bool is_ok = true;
   if (StreamIM<encT>::lsh_enc_vec.empty()) {
@@ -24,11 +22,9 @@ StreamIM<encT>::save(const char* filepath)
     is_ok = false;
     return is_ok;
   }
-  FILE* vec_f = IO::open_file(filepath, is_ok, "wb");
-  std::fwrite(StreamIM<encT>::lsh_enc_vec.data(),
-              sizeof(std::pair<uint32_t, encT>),
-              StreamIM<encT>::lsh_enc_vec.size(),
-              vec_f);
+  FILE *vec_f = IO::open_file(filepath, is_ok, "wb");
+  std::fwrite(
+    StreamIM<encT>::lsh_enc_vec.data(), sizeof(std::pair<uint32_t, encT>), StreamIM<encT>::lsh_enc_vec.size(), vec_f);
   if (std::ferror(vec_f)) {
     std::puts("I/O error when writing LSH-value and encoding pairs.\n");
     is_ok = false;
@@ -38,15 +34,14 @@ StreamIM<encT>::save(const char* filepath)
 }
 
 template<typename encT>
-bool
-StreamIM<encT>::load(const char* filepath)
+bool StreamIM<encT>::load(const char *filepath)
 {
   bool is_ok = false;
   StreamIM<encT>::lsh_enc_vec.clear();
   std::ifstream vec_ifs = IO::open_ifstream(filepath, is_ok);
   while (!vec_ifs.eof() && vec_ifs.good()) {
     std::pair<uint32_t, encT> lsh_enc;
-    vec_ifs.read((char*)&lsh_enc, sizeof(std::pair<uint32_t, encT>));
+    vec_ifs.read((char *)&lsh_enc, sizeof(std::pair<uint32_t, encT>));
     if (!vec_ifs.eof())
       StreamIM<encT>::lsh_enc_vec.push_back(lsh_enc);
   }
@@ -60,16 +55,14 @@ StreamIM<encT>::load(const char* filepath)
 }
 
 template<typename encT>
-void
-StreamIM<encT>::resetStream()
+void StreamIM<encT>::resetStream()
 {
   l_rix = 0;
   curr_vix = 0;
 }
 
 template<typename encT>
-void
-StreamIM<encT>::clearStream()
+void StreamIM<encT>::clearStream()
 {
   StreamIM<encT>::lsh_enc_vec.clear();
   l_rix = 0;
@@ -77,8 +70,7 @@ StreamIM<encT>::clearStream()
 }
 
 template<typename encT>
-uint64_t
-StreamIM<encT>::getBatch(vvec<encT>& batch_table, uint32_t tbatch_size)
+uint64_t StreamIM<encT>::getBatch(vvec<encT> &batch_table, uint32_t tbatch_size)
 {
   assert(batch_table.size() >= tbatch_size);
   uint64_t num_kmers = 0;
@@ -98,26 +90,23 @@ StreamIM<encT>::getBatch(vvec<encT>& batch_table, uint32_t tbatch_size)
 }
 
 template<typename encT>
-void
-StreamOD<encT>::openStream()
+void StreamOD<encT>::openStream()
 {
   is_open = true;
-  vec_ifs = IO::open_ifstream(StreamOD::filepath, is_open);
+  vec_ifs = IO::open_ifstream(StreamOD<encT>::filepath, is_open);
   if (is_open)
     curr_pos = vec_ifs.tellg();
 }
 
 template<typename encT>
-void
-StreamOD<encT>::closeStream()
+void StreamOD<encT>::closeStream()
 {
   is_open = false;
   vec_ifs.close();
 }
 
 template<typename encT>
-uint64_t
-StreamOD<encT>::getBatch(vvec<encT>& batch_table, uint32_t tbatch_size, bool contd)
+uint64_t StreamOD<encT>::getBatch(vvec<encT> &batch_table, uint32_t tbatch_size, bool contd)
 {
   if (!contd)
     assert(batch_table.size() >= tbatch_size);
@@ -130,7 +119,7 @@ StreamOD<encT>::getBatch(vvec<encT>& batch_table, uint32_t tbatch_size, bool con
   vec_ifs.rdbuf()->pubsetbuf(buf, bufsize);
   while ((row_ix < tbatch_size) && (!StreamOD::vec_ifs.eof() && StreamOD::vec_ifs.good())) {
     std::pair<uint32_t, encT> lsh_enc;
-    StreamOD::vec_ifs.read((char*)&lsh_enc, sizeof(std::pair<uint32_t, encT>));
+    StreamOD::vec_ifs.read((char *)&lsh_enc, sizeof(std::pair<uint32_t, encT>));
     curr_rix = lsh_enc.first;
     row_ix = curr_rix - f_rix;
     if (!StreamOD::vec_ifs.eof() && (row_ix < tbatch_size)) {
@@ -157,17 +146,36 @@ StreamOD<encT>::getBatch(vvec<encT>& batch_table, uint32_t tbatch_size, bool con
 }
 
 template<typename encT>
-uint64_t
-StreamIM<encT>::extractInput(uint64_t rbatch_size)
+void StreamOD<encT>::load(std::vector<std::pair<uint32_t, encT>> &lsh_enc_vec)
 {
+  bool is_ok = false;
+  std::ifstream vec_ifs = IO::open_ifstream(StreamOD<encT>::filepath, is_ok);
+  while (!vec_ifs.eof() && vec_ifs.good()) {
+    std::pair<uint32_t, encT> lsh_enc;
+    vec_ifs.read((char *)&lsh_enc, sizeof(std::pair<uint32_t, encT>));
+    if (!vec_ifs.eof())
+      lsh_enc_vec.push_back(lsh_enc);
+  }
+  if (vec_ifs.fail() && !vec_ifs.eof()) {
+    std::puts("I/O rror when reading LSH-value and encoding pairs.\n");
+  } else if (vec_ifs.eof()) {
+    is_ok = true;
+  }
+  vec_ifs.close();
+}
+
+template<typename encT>
+uint64_t StreamIM<encT>::extractInput(uint64_t rbatch_size)
+{
+  // TODO: Make this more efficient, maybe use sets.
   uint32_t max_rix = std::numeric_limits<uint32_t>::max();
   max_rix = max_rix >> (32 - 2 * h);
   uint64_t u64m = std::numeric_limits<uint64_t>::max();
   uint64_t mask_bp = u64m >> (32 - k) * 2;
   uint64_t mask_lr = ((u64m >> (64 - k)) << 32) + ((u64m << 32) >> (64 - k));
   unsigned int i, l, c;
-  for (std::string& filepath : filepath_v) {
-    kseq_t* reader = IO::getReader(filepath.c_str());
+  for (std::string &filepath : filepath_v) {
+    kseq_t *reader = IO::getReader(filepath.c_str());
     std::vector<sseq_t> seqBatch;
     IO::readBatch(seqBatch, reader, rbatch_size);
     while (!(seqBatch.empty())) {
@@ -231,13 +239,11 @@ StreamIM<encT>::extractInput(uint64_t rbatch_size)
               }
             }
             if (l >= w && ldiff > 1) {
-              lsh_enc_vec[wix] =
-                *std::min_element(lsh_enc_win.begin(),
-                                  lsh_enc_win.end(),
-                                  [](std::pair<uint32_t, encT> lhs, std::pair<uint32_t, encT> rhs) {
-                                    return murmur64(lhs.second) < murmur64(rhs.second);
-                                    /* return lhs.second < rhs.second; */
-                                  });
+              lsh_enc_vec[wix] = *std::min_element(
+                lsh_enc_win.begin(), lsh_enc_win.end(), [](std::pair<uint32_t, encT> lhs, std::pair<uint32_t, encT> rhs) {
+                  return murmur64(lhs.second) < murmur64(rhs.second);
+                  /* return lhs.second < rhs.second; */
+                });
               wix++;
             }
           } else
@@ -251,22 +257,20 @@ StreamIM<encT>::extractInput(uint64_t rbatch_size)
     gzclose(reader->f->f);
   }
   lsh_enc_vec.shrink_to_fit();
-  std::sort(lsh_enc_vec.begin(),
-            lsh_enc_vec.end(),
-            [](const std::pair<uint32_t, encT>& l, const std::pair<uint32_t, encT>& r) {
-              if (l.first == r.first)
-                return l.second < r.second;
-              else
-                return l.first < r.first;
-            });
+  std::sort(
+    lsh_enc_vec.begin(), lsh_enc_vec.end(), [](const std::pair<uint32_t, encT> &l, const std::pair<uint32_t, encT> &r) {
+      if (l.first == r.first)
+        return l.second < r.second;
+      else
+        return l.first < r.first;
+    });
   lsh_enc_vec.erase(std::unique(lsh_enc_vec.begin(), lsh_enc_vec.end()), lsh_enc_vec.end());
   tnum_kmers = lsh_enc_vec.size();
   return tnum_kmers;
 }
 
 template<typename encT>
-uint64_t
-StreamIM<encT>::processInput(uint64_t rbatch_size)
+uint64_t StreamIM<encT>::readInput(uint64_t rbatch_size)
 {
   uint64_t tnum_kmers_sum = 0;
   uint32_t max_rix = std::numeric_limits<uint32_t>::max();
@@ -275,8 +279,8 @@ StreamIM<encT>::processInput(uint64_t rbatch_size)
   uint64_t mask_bp = u64m >> (32 - k) * 2;
   uint64_t mask_lr = ((u64m >> (64 - k)) << 32) + ((u64m << 32) >> (64 - k));
   rbatch_size = IO::adjustBatchSize(rbatch_size, num_threads);
-  for (std::string& filepath : filepath_v) {
-    kseq_t* reader = IO::getReader(filepath.c_str());
+  for (std::string &filepath : filepath_v) {
+    kseq_t *reader = IO::getReader(filepath.c_str());
     std::vector<sseq_t> seqBatch;
     IO::readBatch(seqBatch, reader, rbatch_size);
     while (!(seqBatch.empty())) {
@@ -301,8 +305,7 @@ StreamIM<encT>::processInput(uint64_t rbatch_size)
           if (kix == 0)
             kmerEncodingCompute(seqBatch[ix].nseq.substr(kix, k).c_str(), enc64_lr, enc64_bp);
           else
-            kmerEncodingUpdate(
-              seqBatch[ix].nseq.substr(kix + k - 1, 1).c_str(), enc64_lr, enc64_bp);
+            kmerEncodingUpdate(seqBatch[ix].nseq.substr(kix + k - 1, 1).c_str(), enc64_lr, enc64_bp);
           cenc64_bp = enc64_bp & mask_bp;
           cenc64_lr = enc64_lr & mask_lr;
 #ifdef CANONICAL
@@ -330,13 +333,11 @@ StreamIM<encT>::processInput(uint64_t rbatch_size)
           }
         }
         if (ldiff > 1)
-          lsh_enc_vec[wix + ix] =
-            *std::min_element(lsh_enc_win.begin(),
-                              lsh_enc_win.end(),
-                              [](std::pair<uint32_t, encT> lhs, std::pair<uint32_t, encT> rhs) {
-                                return murmur64(lhs.second) < murmur64(rhs.second);
-                                /* return lhs.second < rhs.second; */
-                              });
+          lsh_enc_vec[wix + ix] = *std::min_element(
+            lsh_enc_win.begin(), lsh_enc_win.end(), [](std::pair<uint32_t, encT> lhs, std::pair<uint32_t, encT> rhs) {
+              return murmur64(lhs.second) < murmur64(rhs.second);
+              /* return lhs.second < rhs.second; */
+            });
       }
       tnum_kmers_sum += seqBatch.size();
       IO::readBatch(seqBatch, reader, rbatch_size);
@@ -347,7 +348,7 @@ StreamIM<encT>::processInput(uint64_t rbatch_size)
   lsh_enc_vec.shrink_to_fit();
   std::sort(lsh_enc_vec.begin(),
             lsh_enc_vec.end(),
-            [](const std::pair<uint32_t, uint64_t>& l, const std::pair<uint32_t, uint64_t>& r) {
+            [](const std::pair<uint32_t, uint64_t> &l, const std::pair<uint32_t, uint64_t> &r) {
               if (l.first == r.first)
                 return l.second < r.second;
               else
@@ -361,8 +362,7 @@ StreamIM<encT>::processInput(uint64_t rbatch_size)
 }
 
 template<typename encT>
-std::unordered_map<uint8_t, uint64_t>
-StreamIM<encT>::histRowSizes()
+std::unordered_map<uint8_t, uint64_t> StreamIM<encT>::histRowSizes()
 {
   std::unordered_map<uint32_t, uint8_t> row_sizes;
   for (auto kv : StreamIM<encT>::lsh_enc_vec) {
@@ -375,8 +375,7 @@ StreamIM<encT>::histRowSizes()
   return hist_map;
 }
 
-bool
-IO::ensureDirectory(const char* dirpath)
+bool IO::ensureDirectory(const char *dirpath)
 {
   bool is_ok;
   struct stat info;
@@ -392,8 +391,7 @@ IO::ensureDirectory(const char* dirpath)
   return is_ok;
 }
 
-kseq_t*
-IO::getReader(const char* fpath)
+kseq_t *IO::getReader(const char *fpath)
 {
   gzFile fp;
   fp = gzopen(fpath, "r");
@@ -402,20 +400,15 @@ IO::getReader(const char* fpath)
     exit(1);
   }
 
-  kseq_t* kseq;
+  kseq_t *kseq;
   kseq = kseq_init(fp);
 
   return kseq;
 }
 
-uint64_t
-IO::adjustBatchSize(uint64_t batch_size, uint8_t num_threads)
-{
-  return (batch_size / num_threads) * num_threads;
-}
+uint64_t IO::adjustBatchSize(uint64_t batch_size, uint8_t num_threads) { return (batch_size / num_threads) * num_threads; }
 
-void
-IO::readBatch(std::vector<sseq_t>& seqRead, kseq_t* kseq, uint64_t batch_size)
+void IO::readBatch(std::vector<sseq_t> &seqRead, kseq_t *kseq, uint64_t batch_size)
 {
   int l;
   unsigned int i = 0;
@@ -432,10 +425,9 @@ IO::readBatch(std::vector<sseq_t>& seqRead, kseq_t* kseq, uint64_t batch_size)
   seqRead.resize(i);
 }
 
-FILE*
-IO::open_file(const char* filepath, bool& is_ok, const char* mode)
+FILE *IO::open_file(const char *filepath, bool &is_ok, const char *mode)
 {
-  FILE* f;
+  FILE *f;
   f = std::fopen(filepath, mode);
   if (!f) {
     std::cerr << "File opening failed!" << filepath << std::endl;
@@ -444,8 +436,7 @@ IO::open_file(const char* filepath, bool& is_ok, const char* mode)
   return f;
 }
 
-std::ifstream
-IO::open_ifstream(const char* filepath, bool is_ok)
+std::ifstream IO::open_ifstream(const char *filepath, bool is_ok)
 {
   std::ifstream ifs;
   ifs.open(filepath, std::ios::binary | std::ios::in);
@@ -456,87 +447,50 @@ IO::open_ifstream(const char* filepath, bool is_ok)
   return ifs;
 }
 
-void
-IO::read_encinput(std::string disk_path, std::vector<std::pair<uint32_t, encT>>& lsh_enc_vec)
-{
-  bool is_ok = false;
-  std::ifstream vec_ifs = open_ifstream(disk_path.c_str(), is_ok);
-  while (!vec_ifs.eof() && vec_ifs.good()) {
-    std::pair<uint32_t, encT> lsh_enc;
-    vec_ifs.read((char*)&lsh_enc, sizeof(std::pair<uint32_t, encT>));
-    if (!vec_ifs.eof())
-      lsh_enc_vec.push_back(lsh_enc);
-  }
-  if (vec_ifs.fail() && !vec_ifs.eof()) {
-    std::puts("I/O rror when reading LSH-value and encoding pairs.\n");
-  } else if (vec_ifs.eof()) {
-    is_ok = true;
-  }
-  vec_ifs.close();
-}
+template uint64_t StreamIM<uint32_t>::readInput(uint64_t rbatch_size);
 
-template uint64_t
-StreamIM<uint32_t>::processInput(uint64_t rbatch_size);
+template uint64_t StreamIM<uint64_t>::readInput(uint64_t rbatch_size);
 
-template uint64_t
-StreamIM<uint64_t>::processInput(uint64_t rbatch_size);
+template uint64_t StreamIM<uint32_t>::extractInput(uint64_t rbatch_size);
 
-template uint64_t
-StreamIM<uint32_t>::extractInput(uint64_t rbatch_size);
+template uint64_t StreamIM<uint64_t>::extractInput(uint64_t rbatch_size);
 
-template uint64_t
-StreamIM<uint64_t>::extractInput(uint64_t rbatch_size);
+template bool StreamIM<uint64_t>::save(const char *filepath);
 
-template bool
-StreamIM<uint64_t>::save(const char* filepath);
+template bool StreamIM<uint32_t>::save(const char *filepath);
 
-template bool
-StreamIM<uint32_t>::save(const char* filepath);
+template bool StreamIM<uint64_t>::load(const char *filepath);
 
-template bool
-StreamIM<uint64_t>::load(const char* filepath);
+template bool StreamIM<uint32_t>::load(const char *filepath);
 
-template bool
-StreamIM<uint32_t>::load(const char* filepath);
+template void StreamIM<uint32_t>::clearStream();
 
-template void
-StreamIM<uint32_t>::clearStream();
+template void StreamIM<uint64_t>::clearStream();
 
-template void
-StreamIM<uint64_t>::clearStream();
+template void StreamIM<uint32_t>::resetStream();
 
-template void
-StreamIM<uint32_t>::resetStream();
+template void StreamIM<uint64_t>::resetStream();
 
-template void
-StreamIM<uint64_t>::resetStream();
+template uint64_t StreamIM<uint64_t>::getBatch(vvec<uint64_t> &batch_table, uint32_t tbatch_size);
 
-template uint64_t
-StreamIM<uint64_t>::getBatch(vvec<uint64_t>& batch_table, uint32_t tbatch_size);
+template uint64_t StreamIM<uint32_t>::getBatch(vvec<uint32_t> &batch_table, uint32_t tbatch_size);
 
-template uint64_t
-StreamIM<uint32_t>::getBatch(vvec<uint32_t>& batch_table, uint32_t tbatch_size);
+template void StreamOD<uint64_t>::closeStream();
 
-template void
-StreamOD<uint64_t>::closeStream();
+template void StreamOD<uint32_t>::closeStream();
 
-template void
-StreamOD<uint32_t>::closeStream();
+template void StreamOD<uint64_t>::openStream();
 
-template void
-StreamOD<uint64_t>::openStream();
+template void StreamOD<uint32_t>::openStream();
 
-template void
-StreamOD<uint32_t>::openStream();
+template uint64_t StreamOD<uint64_t>::getBatch(vvec<uint64_t> &batch_table, uint32_t tbatch_size, bool cont);
 
-template uint64_t
-StreamOD<uint64_t>::getBatch(vvec<uint64_t>& batch_table, uint32_t tbatch_size, bool cont);
+template uint64_t StreamOD<uint32_t>::getBatch(vvec<uint32_t> &batch_table, uint32_t tbatch_size, bool cont);
 
-template uint64_t
-StreamOD<uint32_t>::getBatch(vvec<uint32_t>& batch_table, uint32_t tbatch_size, bool cont);
+template void StreamOD<uint32_t>::load(std::vector<std::pair<uint32_t, uint32_t>> &lsh_enc_vec);
 
-template std::unordered_map<uint8_t, uint64_t>
-StreamIM<uint64_t>::histRowSizes();
+template void StreamOD<uint64_t>::load(std::vector<std::pair<uint32_t, uint64_t>> &lsh_enc_vec);
 
-template std::unordered_map<uint8_t, uint64_t>
-StreamIM<uint32_t>::histRowSizes();
+template std::unordered_map<uint8_t, uint64_t> StreamIM<uint64_t>::histRowSizes();
+
+template std::unordered_map<uint8_t, uint64_t> StreamIM<uint32_t>::histRowSizes();

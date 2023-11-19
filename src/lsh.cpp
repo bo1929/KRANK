@@ -1,7 +1,6 @@
 #include "lsh.h"
 
-maskLSH
-generateMaskLSH(std::vector<uint8_t>& positions)
+maskLSH generateMaskLSH(std::vector<uint8_t> &positions)
 {
   sort(positions.begin(), positions.end(), std::greater<uint8_t>());
   std::vector<int8_t> v;
@@ -35,8 +34,7 @@ generateMaskLSH(std::vector<uint8_t>& positions)
   return lsh_vg;
 }
 
-uint32_t
-computeValueLSH(uint64_t enc_bp, maskLSH lsh_vg)
+uint32_t computeValueLSH(uint64_t enc_bp, maskLSH lsh_vg)
 {
   uint64_t res = 0;
   unsigned int i = 0;

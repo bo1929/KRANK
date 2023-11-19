@@ -1,20 +1,22 @@
 #include "library.h"
 
-Library::Library(const char* library_dirpath,
-                 const char* nodes_filepath,
-                 const char* input_filepath,
+#define LSR 3
+
+Library::Library(const char *library_dirpath,
+                 const char *nodes_filepath,
+                 const char *input_filepath,
                  uint8_t k,
                  uint8_t w,
                  uint8_t h,
                  uint8_t b,
-                 RankingMethod upper_ranking,
-                 RankingMethod lower_ranking,
+                 RankingMethod ranking_method,
+                 bool adaptive_size,
                  uint64_t capacity_size,
                  uint32_t tbatch_size,
-                 bool in_library,
+                 bool from_library,
                  bool on_disk,
                  bool from_kmers,
-                 uint8_t specified_batch,
+                 uint8_t target_batch,
                  bool log)
   : _library_dirpath(library_dirpath)
   , _taxonomy_ncbi(nodes_filepath)
@@ -25,42 +27,37 @@ Library::Library(const char* library_dirpath,
   , _w(w)
   , _h(h)
   , _b(b)
-  , _upper_ranking(upper_ranking)
-  , _lower_ranking(lower_ranking)
+  , _ranking_method(ranking_method)
+  , _adaptive_size(adaptive_size)
   , _capacity_size(capacity_size)
   , _tbatch_size(tbatch_size)
-  , _in_library(in_library)
+  , _from_library(from_library)
   , _on_disk(on_disk)
   , _from_kmers(from_kmers)
-  , _specified_batch(specified_batch)
+  , _target_batch(target_batch)
   , _log(log)
 {
   bool isDir = IO::ensureDirectory(_library_dirpath);
-  if (!in_library) {
+  if (!_from_library) {
     if (isDir) {
       std::cout << "Library will be created at " << _library_dirpath << std::endl;
     } else {
       std::cerr << "Library can not be created at " << _library_dirpath << std::endl;
       exit(EXIT_FAILURE);
     }
-  } else {
-    std::cout << "Library is at " << _library_dirpath << std::endl;
-    std::cout << "Sets of k-mers are already on disk." << std::endl;
-  }
-
-  if (!_in_library) {
     getRandomPositions();
-    if (_specified_batch != 0) {
-      std::cerr << "A specific batch can not be built before saving processed "
-                   "k-mer sets into library."
-                << std::endl;
+    if (_target_batch != 0) {
+      std::cerr << "A specific batch can not be built seperately before saving k-mer sets into the library." << std::endl;
       exit(EXIT_FAILURE);
     }
   } else {
+    std::cout << "Library is at " << _library_dirpath << std::endl;
+    std::cout << "Sets of k-mers and corresponding hash keys are already on the disk." << std::endl;
     Library::loadMetadata();
-    std::puts("Given parameters will be ignored. Metadata of the given library "
-              "in the disk is loaded.\n");
+    std::puts("Given parameters will be ignored.\n");
+    std::cout << "The metadata of the given library is loaded from the disk" << std::endl;
   }
+
   _lsh_vg = generateMaskLSH(_positions);
   _num_rows = pow(2, 2 * _h);
   _total_batches = _num_rows / _tbatch_size;
@@ -68,7 +65,7 @@ Library::Library(const char* library_dirpath,
   uint64_t root_size = 0;
   _num_species = _taxonomy_record.tID_to_input().size();
   _tID_vec.reserve(_num_species);
-  for (auto const& kv : _taxonomy_record.tID_to_input())
+  for (auto const &kv : _taxonomy_record.tID_to_input())
     _tID_vec.push_back(kv.first);
 
 #pragma omp parallel for schedule(dynamic), num_threads(num_threads)
@@ -76,19 +73,18 @@ Library::Library(const char* library_dirpath,
     tT tID_key = _tID_vec[i];
     std::string disk_path(_library_dirpath);
     disk_path = disk_path + "/lsh_enc_vec-" + std::to_string(tID_key);
-    std::vector<std::string>& filepath_v = _taxonomy_record.tID_to_input()[tID_key];
+    std::vector<std::string> &filepath_v = _taxonomy_record.tID_to_input()[tID_key];
     if (_log) {
 #pragma omp critical
       {
-        LOG(INFO) << "Processing k-mer set for taxon " << _taxonomy_record.changeIDtax(tID_key)
-                  << std::endl;
+        LOG(INFO) << "Processing k-mer set for taxon " << _taxonomy_record.changeIDtax(tID_key) << std::endl;
       }
     }
     uint64_t size_basis = 0;
     StreamIM<encT> sIM(filepath_v, _k, _w, _h, &_lsh_vg, &_npositions);
-    if (!in_library) {
+    if (!_from_library) {
       if (_from_kmers)
-        size_basis = sIM.processInput(static_cast<uint64_t>(DEFAULT_BATCH_SIZE));
+        size_basis = sIM.readInput(static_cast<uint64_t>(DEFAULT_BATCH_SIZE));
       else
         size_basis = sIM.extractInput(1);
     } else {
@@ -100,24 +96,23 @@ Library::Library(const char* library_dirpath,
       _basis_to_size[tID_key] = size_basis;
       root_size += size_basis;
     }
-    assert(on_disk || !in_library);
-    if (_on_disk) {
-      if (!in_library) {
-        bool is_ok = sIM.save(disk_path.c_str());
-        if (!is_ok) {
 
-          std::cerr << "Error saving to " << disk_path << " for "
-                    << _taxonomy_record.changeIDtax(tID_key) << std::endl;
-          exit(EXIT_FAILURE);
-        }
-        if (_log) {
+    if ((!_from_library) && _on_disk) {
+      bool is_ok = sIM.save(disk_path.c_str());
+      if (!is_ok) {
+        std::cerr << "Error saving to " << disk_path << " for " << _taxonomy_record.changeIDtax(tID_key) << std::endl;
+        exit(EXIT_FAILURE);
+      }
+      if (_log) {
 #pragma omp critical
-          {
-            LOG(INFO) << "LSH-value and encoding pairs has been saved for "
-                      << _taxonomy_record.changeIDtax(tID_key) << std::endl;
-          }
+        {
+          LOG(INFO) << "LSH-value and encoding pairs has been saved for " << _taxonomy_record.changeIDtax(tID_key)
+                    << std::endl;
         }
       }
+    }
+
+    if (_on_disk) {
 #pragma omp critical
       {
         _streamOD_map.emplace(std::make_pair(tID_key, StreamOD<encT>(disk_path.c_str())));
@@ -131,9 +126,9 @@ Library::Library(const char* library_dirpath,
       }
     }
   }
+
   _root_size = root_size;
-  std::cout << "Total number of (non-unique) k-mers under the root: " << _root_size << std::endl;
-  bool taxonomy_saved = _taxonomy_record.saveTaxonomyRecord(_library_dirpath);
+  std::cout << "Total number of (non-distinct) k-mers under the root: " << _root_size << std::endl;
 
   std::cout << "Library is initialized and k-mers sets are ready to be streamed." << std::endl;
   if (on_disk)
@@ -155,39 +150,40 @@ Library::Library(const char* library_dirpath,
   std::cout << std::endl;
 
   if (_log)
-    LOG(INFO) << "Specified batch is " << static_cast<uint16_t>(_specified_batch) << std::endl;
+    LOG(INFO) << "Specified batch is " << static_cast<uint16_t>(_target_batch) << std::endl;
 
-  if (_specified_batch == 0) {
+  if (_target_batch == 0 || !_from_library) {
     Library::saveMetadata();
+    bool taxonomy_saved = _taxonomy_record.saveTaxonomyRecord(_library_dirpath);
     if (_log)
       LOG(INFO) << "Metadata has been saved to the library." << std::endl;
   } else {
     if (_log)
       LOG(INFO) << "Metadata has been read from the library, won't be saved again." << std::endl;
   }
+
+  if (_from_library || (_target_batch == 0))
+    Library::build();
 }
 
-void
-Library::computeTrueScount(HTs<encT>& ts, uint8_t curr_batch)
+void Library::countBasis(HTs<encT> &ts, uint8_t curr_batch)
 {
 #pragma omp parallel for schedule(dynamic), num_threads(num_threads)
   for (unsigned int i = 0; i < _tID_vec.size(); ++i) {
     tT tID_key = _tID_vec[i];
-    std::string disk_path(_library_dirpath);
-    disk_path = disk_path + "/lsh_enc_vec-" + std::to_string(tID_key);
     std::vector<std::pair<uint32_t, encT>> lsh_enc_vec;
-    IO::read_encinput(disk_path, lsh_enc_vec);
+    _streamOD_map.at(tID_key).load(lsh_enc_vec);
     std::vector<bool> nseen(ts.num_rows * _b, true);
     for (unsigned int i = 0; i < lsh_enc_vec.size(); ++i) {
-      if ((lsh_enc_vec[i].first >= (curr_batch - 1) * _tbatch_size) &&
-          (lsh_enc_vec[i].first < curr_batch * _tbatch_size)) {
+      if ((lsh_enc_vec[i].first >= (curr_batch - 1) * _tbatch_size) && (lsh_enc_vec[i].first < curr_batch * _tbatch_size)) {
         uint32_t rix = lsh_enc_vec[i].first - (curr_batch - 1) * _tbatch_size;
         for (unsigned int j = 0; j < ts.ind_arr[rix]; ++j) {
           if (ts.enc_arr[rix * _b + j] == lsh_enc_vec[i].second) {
             if (nseen[rix * _b + j]) {
+#pragma omp critical
+              nseen[rix * _b + j] = false;
 #pragma omp atomic update
               ts.scount_arr[rix * _b + j]++;
-              nseen[rix * _b + j] = false;
             }
           }
         }
@@ -196,8 +192,7 @@ Library::computeTrueScount(HTs<encT>& ts, uint8_t curr_batch)
   }
 }
 
-void
-Library::resetAuxInfo(HTs<encT>& ts, bool reset_scount, bool reset_tlca)
+void Library::resetInfo(HTs<encT> &ts, bool reset_scount, bool reset_tlca)
 {
 #pragma omp parallel for schedule(dynamic), num_threads(num_threads)
   for (uint32_t rix = 0; rix < ts.num_rows; ++rix) {
@@ -210,30 +205,31 @@ Library::resetAuxInfo(HTs<encT>& ts, bool reset_scount, bool reset_tlca)
   }
 }
 
-void
-Library::computeSoftLCA(HTs<encT>& ts, uint8_t curr_batch)
+void Library::softLCA(HTs<encT> &ts, uint8_t curr_batch)
 {
-  double s = 6.0;
+  double s = 4.0;
 #pragma omp parallel for schedule(dynamic), num_threads(num_threads)
   for (unsigned int i = 0; i < _tID_vec.size(); ++i) {
     tT tID_key = _tID_vec[i];
-    std::string disk_path(_library_dirpath);
-    disk_path = disk_path + "/lsh_enc_vec-" + std::to_string(tID_key);
     std::vector<std::pair<uint32_t, encT>> lsh_enc_vec;
-    IO::read_encinput(disk_path, lsh_enc_vec);
+    _streamOD_map.at(tID_key).load(lsh_enc_vec);
+    std::vector<bool> nseen(ts.num_rows * _b, true);
     double p_update;
     for (unsigned int i = 0; i < lsh_enc_vec.size(); ++i) {
-      if ((lsh_enc_vec[i].first >= (curr_batch - 1) * _tbatch_size) &&
-          (lsh_enc_vec[i].first < curr_batch * _tbatch_size)) {
+      if ((lsh_enc_vec[i].first >= (curr_batch - 1) * _tbatch_size) && (lsh_enc_vec[i].first < curr_batch * _tbatch_size)) {
         uint32_t rix = lsh_enc_vec[i].first - (curr_batch - 1) * _tbatch_size;
         for (unsigned int j = 0; j < ts.ind_arr[rix]; ++j) {
-          if (ts.enc_arr[rix * _b + j] == lsh_enc_vec[i].second) {
-            p_update = 1 / log2(pow((ts.scount_arr[rix * _b + j] - 1) / s, 2) + 2);
+          if ((ts.enc_arr[rix * _b + j] == lsh_enc_vec[i].second) && nseen[rix * _b + j]) {
+#pragma omp critical
+            nseen[rix * _b + j] = false;
+            if (ts.scount_arr[rix * _b + j] <= 2)
+              p_update = 1;
+            else
+              p_update = 1 / log2(pow((ts.scount_arr[rix * _b + j] - 1) / s, 2) + 2);
             std::bernoulli_distribution bt(p_update);
             if (bt(gen)) {
 #pragma omp critical
-              ts.tlca_arr[rix * _b + j] =
-                _taxonomy_record.getLowestCommonAncestor(ts.tlca_arr[rix * _b + j], tID_key);
+              ts.tlca_arr[rix * _b + j] = _taxonomy_record.getLowestCommonAncestor(ts.tlca_arr[rix * _b + j], tID_key);
             }
           }
         }
@@ -242,20 +238,19 @@ Library::computeSoftLCA(HTs<encT>& ts, uint8_t curr_batch)
   }
 }
 
-void
-Library::run(uint8_t sdepth)
+void Library::build()
 {
   std::cout << "Total number of batches is  " << _total_batches << std::endl;
   unsigned int curr_batch = 0;
   for (unsigned int i = 0; i < _total_batches; ++i) {
     curr_batch++;
-    if ((_specified_batch == 0) || (_specified_batch == curr_batch)) {
+    if ((_target_batch == 0) || (_target_batch == curr_batch)) {
       std::cout << "Building the library for batch " << curr_batch << "..." << std::endl;
-      HTs<encT> ts_root(1, _k, _h, _b, _tbatch_size, &_lsh_vg, _upper_ranking);
-      Library::getBatchHTs(&ts_root, 0, sdepth);
-      Library::resetAuxInfo(ts_root, true, true);
-      Library::computeTrueScount(ts_root, curr_batch);
-      Library::computeSoftLCA(ts_root, curr_batch);
+      HTs<encT> ts_root(1, _k, _h, _b, _tbatch_size, &_lsh_vg, _ranking_method);
+      Library::getBatchHTs(&ts_root);
+      Library::resetInfo(ts_root, true, true);
+      Library::countBasis(ts_root, curr_batch);
+      Library::softLCA(ts_root, curr_batch);
       Library::saveBatchHTs(ts_root, curr_batch);
     } else {
       Library::skipBatch();
@@ -264,8 +259,7 @@ Library::run(uint8_t sdepth)
   }
 }
 
-void
-Library::skipBatch()
+void Library::skipBatch()
 {
   vvec<encT> tmp;
   if (_on_disk) {
@@ -283,8 +277,7 @@ Library::skipBatch()
   }
 }
 
-void
-Library::getRandomPositions()
+void Library::getRandomPositions()
 {
   uint8_t n;
   assert(_h <= 16);
@@ -308,8 +301,7 @@ Library::getRandomPositions()
   }
 }
 
-uint64_t
-Library::getConstrainedSizeKC(std::set<tT> tIDsBasis)
+uint64_t Library::getConstrainedSizeKC(std::set<tT> tIDsBasis)
 {
   uint64_t constrained_size;
   uint64_t sum_size = 0;
@@ -322,87 +314,32 @@ Library::getConstrainedSizeKC(std::set<tT> tIDsBasis)
   return constrained_size;
 }
 
-uint64_t
-Library::getConstrainedSizeSC(uint64_t num_species)
+uint64_t Library::getConstrainedSizeSC(uint64_t num_basis)
 {
-  float sq_ratio = sqrt(static_cast<float>(num_species) / static_cast<float>(_num_species));
+  float sq_ratio = sqrt(static_cast<float>(num_basis) / static_cast<float>(_num_species));
   float batch_ratio = static_cast<float>(_tbatch_size) / static_cast<float>(_num_rows);
   uint64_t constrained_size = static_cast<uint64_t>(_capacity_size * sq_ratio * batch_ratio);
   return constrained_size;
 }
 
-void
-Library::getBatchHTs(HTs<encT>* ts, uint8_t curr_depth, uint8_t last_depth)
+void Library::getBatchHTs(HTs<encT> *ts)
 {
   if (_log)
     LOG(INFO) << "Constructing the HTd for " << _taxonomy_record.changeIDtax(ts->tID) << std::endl;
+  HTd<encT> td(ts->tID, ts->k, ts->h, ts->num_rows, ts->ptr_lsh_vg, _ranking_method);
+  getBatchHTd(&td);
   if (_log)
-    LOG(INFO) << "Current depth in the taxonomic tree is " << std::to_string(curr_depth)
-              << std::endl;
-  if ((curr_depth >= last_depth) || _taxonomy_record.isBasis(ts->tID)) {
-    HTd<encT> td(ts->tID, ts->k, ts->h, ts->num_rows, ts->ptr_lsh_vg, _lower_ranking);
-    getBatchHTd(&td);
-    if (_log)
-      LOG(INFO) << "Converting from HTd to HTs for the taxon "
-                << _taxonomy_record.changeIDtax(ts->tID) << std::endl;
-    td.convertHTs(ts);
-  } else {
-    std::set<tT>& children_set = _taxonomy_record.child_map()[ts->tID];
-    size_t num_child = children_set.size();
-    std::vector<double> children(num_child);
-    std::copy(children_set.begin(), children_set.end(), children.begin());
-    ts->childrenHT.assign(
-      num_child,
-      HTs<encT>(0, ts->k, ts->h, ts->b, ts->num_rows, ts->ptr_lsh_vg, ts->ranking_method));
-    for (unsigned int ti = 0; ti < num_child; ++ti) {
-      if (_log)
-        LOG(INFO) << "Building for the child " << _taxonomy_record.changeIDtax(children[ti])
-                  << " of " << _taxonomy_record.changeIDtax(ts->tID) << std::endl;
-      ts->childrenHT[ti].tID = children[ti];
-      getBatchHTs(&(ts->childrenHT[ti]), curr_depth + 1, last_depth);
-    }
-    if (_log)
-      LOG(INFO) << "Taking the union of tables of children of "
-                << _taxonomy_record.changeIDtax(ts->tID) << std::endl;
-    for (auto& ts_c : ts->childrenHT) {
-      ts->unionRows(ts_c, false);
-    }
-    ts->updateSize();
-    if (ts->childrenHT.size() > 1) {
-      if (ts->tID != 0 && ts->tID != 1) {
-        if (_log)
-          LOG(INFO) << _taxonomy_record.changeIDtax(ts->tID)
-                    << " has more than one child, updating LCA labels" << std::endl;
-        ts->updateLCA();
-      }
-      /* int64_t num_rm; */
-      /* uint64_t constrained_size = getConstrainedSizeKC(ts->tIDsBasis); */
-      /* uint64_t constrained_size = getConstrainedSizeSC(ts->num_species); */
-      /* num_rm = static_cast<int64_t>(ts->num_kmers) - */
-      /*          static_cast<int64_t>(constrained_size); */
-      /* if (num_rm > 0) { */
-      /*   if (_log) */
-      /*     LOG(INFO) << _taxonomy_record.changeIDtax(ts->tID) */
-      /*               << " has more than one child, and " */
-
-      /*               << num_rm */
-      /*               << " many k-mers above the constraint, shrinking the
-       * table" */
-      /*               << std::endl; */
-      /*   ts->shrinkHT(static_cast<uint64_t>(num_rm)); */
-      /* } */
-    }
-    ts->childrenHT.clear();
-    std::cout << "HTs has been constructed for " << _taxonomy_record.changeIDtax(ts->tID)
-              << std::endl;
-  }
+    LOG(INFO) << "Converting from HTd to HTs for the taxon " << _taxonomy_record.changeIDtax(ts->tID) << std::endl;
+  td.convertHTs(ts);
+  if (_log)
+    std::cout << "HTs has been constructed for " << _taxonomy_record.changeIDtax(ts->tID) << std::endl;
 }
 
-void
-Library::getBatchHTd(HTd<encT>* td)
+void Library::getBatchHTd(HTd<encT> *td)
 {
+  uint64_t curr_taxID = _taxonomy_record.changeIDtax(td->tID);
   if (_log)
-    LOG(INFO) << "Constructing the HTd for " << _taxonomy_record.changeIDtax(td->tID) << std::endl;
+    LOG(INFO) << "Constructing the HTd for " << curr_taxID << std::endl;
   if (_taxonomy_record.isBasis(td->tID)) {
     if (_on_disk) {
       _streamOD_map.at(td->tID).getBatch(td->enc_vvec, _tbatch_size);
@@ -411,72 +348,60 @@ Library::getBatchHTd(HTd<encT>* td)
     }
     td->initBasis(td->tID);
     td->makeUnique();
-    std::cout << "Basis HTd has been constructed for " << _taxonomy_record.changeIDtax(td->tID)
-              << std::endl;
+    std::cout << "Basis HTd has been constructed for " << curr_taxID << std::endl;
   } else {
-    std::set<tT>& children_set = _taxonomy_record.child_map()[td->tID];
+    std::set<tT> &children_set = _taxonomy_record.child_map()[td->tID];
     size_t num_child = children_set.size();
     std::vector<double> children(num_child);
     std::copy(children_set.begin(), children_set.end(), children.begin());
-    td->childrenHT.assign(
-      num_child, HTd<encT>(0, td->k, td->h, td->num_rows, td->ptr_lsh_vg, td->ranking_method));
+    td->childrenHT.assign(num_child, HTd<encT>(0, td->k, td->h, td->num_rows, td->ptr_lsh_vg, td->ranking_method));
     for (unsigned int ti = 0; ti < num_child; ++ti) {
       if (_log)
-        LOG(INFO) << "Building for the child " << _taxonomy_record.changeIDtax(children[ti])
-                  << " of " << _taxonomy_record.changeIDtax(td->tID) << std::endl;
+        LOG(INFO) << "Building for the child " << _taxonomy_record.changeIDtax(children[ti]) << " of " << curr_taxID
+                  << std::endl;
       td->childrenHT[ti].tID = children[ti];
       getBatchHTd(&(td->childrenHT[ti]));
     }
     if (_log)
-      LOG(INFO) << "Taking the union of tables of children of "
-                << _taxonomy_record.changeIDtax(td->tID) << std::endl;
-    for (auto& td_c : td->childrenHT) {
+      LOG(INFO) << "Taking the union of tables of children of " << curr_taxID << std::endl;
+    for (auto &td_c : td->childrenHT) {
       td->unionRows(td_c, false);
     }
     td->updateSize();
+
     if (td->childrenHT.size() > 1) {
       if (td->tID != 0 && td->tID != 1) {
         if (_log)
-          LOG(INFO) << _taxonomy_record.changeIDtax(td->tID)
-                    << " has more than one child, updating LCA labels" << std::endl;
+          LOG(INFO) << curr_taxID << " has more than one child, updating LCA labels" << std::endl;
         td->updateLCA();
       }
-      /* if (_taxonomy_record.depth_vec()[td->tID] < 4) { */
-      /*   td->rmCommon(_taxonomy_record.depth_vec()); */
-      /* } */
-      /* int64_t num_rm; */
-      /* uint64_t constrained_size = getConstrainedSizeKC(td->tIDsBasis); */
-      /* uint64_t constrained_size = getConstrainedSizeSC(td->num_species); */
-      /* num_rm = static_cast<int64_t>(td->num_kmers) - */
-      /*          static_cast<int64_t>(constrained_size); */
-      /* if (num_rm > 0) { */
-      /*   if (_log) */
-      /*     LOG(INFO) << _taxonomy_record.changeIDtax(td->tID) */
-      /*               << " has more than one child, and " << num_rm */
-      /*               << " many k-mers above the constraint, shrinking the
-       * table" */
-      /*               << std::endl; */
-      /*   td->shrinkHT(static_cast<uint64_t>(num_rm), _b); */
-      /* } */
+
+      if (_taxonomy_record.depth_vec()[td->tID] <= LSR) {
+        td->filterLSR(_taxonomy_record.depth_vec(), LSR);
+      }
+
+      uint64_t constraint_size = getConstrainedSizeKC(td->tIDsBasis);
+      int64_t num_rm = static_cast<int64_t>(td->num_kmers) - static_cast<int64_t>(constraint_size);
+      if ((num_rm > 0) && _adaptive_size) {
+        if (_log)
+          LOG(INFO) << curr_taxID << " has " << num_rm << " k-mers above the constraint." << std::endl;
+        td->shrinkHT(static_cast<uint64_t>(num_rm), _b);
+      }
     }
     td->childrenHT.clear();
-    std::cout << "HTd has been constructed for " << _taxonomy_record.changeIDtax(td->tID)
-              << std::endl;
+    std::cout << "HTd has been constructed for " << curr_taxID << std::endl;
   }
 }
 
-bool
-Library::loadBatchHTs(HTs<encT>& ts, uint16_t curr_batch)
+bool Library::loadBatchHTs(HTs<encT> &ts, uint16_t curr_batch)
 {
   bool is_ok = true;
   std::string load_dirpath(_library_dirpath);
 
   if (_log)
-    LOG(INFO) << "Loading the library batch for " << _taxonomy_record.changeIDtax(ts.tID)
-              << std::endl;
+    LOG(INFO) << "Loading the library batch for " << _taxonomy_record.changeIDtax(ts.tID) << std::endl;
 
-  FILE* encf =
-    IO::open_file((load_dirpath + "/enc_arr-" + std::to_string(curr_batch)).c_str(), is_ok, "r");
+  FILE *encf = IO::open_file((load_dirpath + "/enc_arr-" + std::to_string(curr_batch)).c_str(), is_ok, "r");
   if (std::ferror(encf)) {
     std::puts("I/O error when reading encoding array from the library\n");
     is_ok = false;
@@ -484,8 +409,7 @@ Library::loadBatchHTs(HTs<encT>& ts, uint16_t curr_batch)
     std::fread(ts.enc_arr, sizeof(encT), _tbatch_size * _b, encf);
   std::fclose(encf);
 
-  FILE* indf =
-    IO::open_file((load_dirpath + "/ind_arr-" + std::to_string(curr_batch)).c_str(), is_ok, "r");
+  FILE *indf = IO::open_file((load_dirpath + "/ind_arr-" + std::to_string(curr_batch)).c_str(), is_ok, "r");
   if (std::ferror(indf)) {
     std::puts("I/O error when reading indicator array from the library\n");
     is_ok = false;
@@ -493,8 +417,7 @@ Library::loadBatchHTs(HTs<encT>& ts, uint16_t curr_batch)
     std::fread(ts.ind_arr, sizeof(uint8_t), _tbatch_size, indf);
   std::fclose(indf);
 
-  FILE* tlcaf =
-    IO::open_file((load_dirpath + "/tlca_arr-" + std::to_string(curr_batch)).c_str(), is_ok, "r");
+  FILE *tlcaf = IO::open_file((load_dirpath + "/tlca_arr-" + std::to_string(curr_batch)).c_str(), is_ok, "r");
   if (std::ferror(tlcaf)) {
     std::puts("I/O error when reading taxon-LCA array from the library\n");
     is_ok = false;
@@ -502,8 +425,7 @@ Library::loadBatchHTs(HTs<encT>& ts, uint16_t curr_batch)
     std::fread(ts.tlca_arr, sizeof(tT), _tbatch_size * _b, tlcaf);
   std::fclose(tlcaf);
 
-  FILE* scountf =
-    IO::open_file((load_dirpath + "/scount_arr-" + std::to_string(curr_batch)).c_str(), is_ok, "r");
+  FILE *scountf = IO::open_file((load_dirpath + "/scount_arr-" + std::to_string(curr_batch)).c_str(), is_ok, "r");
   if (std::ferror(scountf)) {
     std::puts("I/O error when reading species-count array from the library\n");
     is_ok = false;
@@ -513,29 +435,24 @@ Library::loadBatchHTs(HTs<encT>& ts, uint16_t curr_batch)
 
   if (_log) {
     if (is_ok)
-      LOG(NOTICE) << "Successfully loaded the batch library for "
-                  << _taxonomy_record.changeIDtax(ts.tID) << std::endl;
+      LOG(NOTICE) << "Successfully loaded the batch library for " << _taxonomy_record.changeIDtax(ts.tID) << std::endl;
     else
-      LOG(ERROR) << "Failed loading the batch library for " << _taxonomy_record.changeIDtax(ts.tID)
-                 << std::endl;
+      LOG(ERROR) << "Failed loading the batch library for " << _taxonomy_record.changeIDtax(ts.tID) << std::endl;
   }
 
   return is_ok;
 }
 
-bool
-Library::saveBatchHTs(HTs<encT>& ts, uint16_t curr_batch)
+bool Library::saveBatchHTs(HTs<encT> &ts, uint16_t curr_batch)
 {
   bool is_ok = true;
   std::string save_dirpath(_library_dirpath);
 
   if (_log)
-    LOG(INFO) << "Saving the built library batch for " << _taxonomy_record.changeIDtax(ts.tID)
-              << std::endl;
+    LOG(INFO) << "Saving the built library batch for " << _taxonomy_record.changeIDtax(ts.tID) << std::endl;
 
   {
-    FILE* encf =
-      IO::open_file((save_dirpath + "/enc_arr-" + std::to_string(curr_batch)).c_str(), is_ok, "wb");
+    FILE *encf = IO::open_file((save_dirpath + "/enc_arr-" + std::to_string(curr_batch)).c_str(), is_ok, "wb");
     std::fwrite(ts.enc_arr, sizeof(encT), ts.num_rows * ts.b, encf);
     if (std::ferror(encf)) {
       std::puts("I/O error when writing encoding array to the library.\n");
@@ -545,8 +462,7 @@ Library::saveBatchHTs(HTs<encT>& ts, uint16_t curr_batch)
   }
 
   {
-    FILE* indf =
-      IO::open_file((save_dirpath + "/ind_arr-" + std::to_string(curr_batch)).c_str(), is_ok, "wb");
+    FILE *indf = IO::open_file((save_dirpath + "/ind_arr-" + std::to_string(curr_batch)).c_str(), is_ok, "wb");
     std::fwrite(ts.ind_arr, sizeof(uint8_t), ts.num_rows, indf);
     if (std::ferror(indf)) {
       std::puts("I/O error when writing indicator array to the library.\n");
@@ -556,8 +472,7 @@ Library::saveBatchHTs(HTs<encT>& ts, uint16_t curr_batch)
   }
 
   {
-    FILE* tlcaf = IO::open_file(
-      (save_dirpath + "/tlca_arr-" + std::to_string(curr_batch)).c_str(), is_ok, "wb");
+    FILE *tlcaf = IO::open_file((save_dirpath + "/tlca_arr-" + std::to_string(curr_batch)).c_str(), is_ok, "wb");
     std::fwrite(ts.tlca_arr, sizeof(tT), ts.num_rows * ts.b, tlcaf);
     if (std::ferror(tlcaf)) {
       std::puts("I/O error when writing taxon-LCA array to the library.\n");
@@ -567,8 +482,7 @@ Library::saveBatchHTs(HTs<encT>& ts, uint16_t curr_batch)
   }
 
   {
-    FILE* scountf = IO::open_file(
-      (save_dirpath + "/scount_arr-" + std::to_string(curr_batch)).c_str(), is_ok, "wb");
+    FILE *scountf = IO::open_file((save_dirpath + "/scount_arr-" + std::to_string(curr_batch)).c_str(), is_ok, "wb");
     std::fwrite(ts.scount_arr, sizeof(scT), ts.num_rows * ts.b, scountf);
     if (std::ferror(scountf)) {
       std::puts("I/O error when writing species-count array to the library.\n");
@@ -579,18 +493,15 @@ Library::saveBatchHTs(HTs<encT>& ts, uint16_t curr_batch)
 
   if (_log) {
     if (is_ok)
-      LOG(NOTICE) << "Successfully saved the built batch library for "
-                  << _taxonomy_record.changeIDtax(ts.tID) << std::endl;
+      LOG(NOTICE) << "Successfully saved the built batch library for " << _taxonomy_record.changeIDtax(ts.tID) << std::endl;
     else
-      LOG(ERROR) << "Failed saving the built batch library for "
-                 << _taxonomy_record.changeIDtax(ts.tID) << std::endl;
+      LOG(ERROR) << "Failed saving the built batch library for " << _taxonomy_record.changeIDtax(ts.tID) << std::endl;
   }
 
   return is_ok;
 }
 
-bool
-Library::loadMetadata()
+bool Library::loadMetadata()
 {
   bool is_ok = true;
   if (_log)
@@ -598,7 +509,7 @@ Library::loadMetadata()
   std::string save_dirpath(_library_dirpath);
   std::vector<std::pair<tT, uint16_t>> bases_sizes;
 
-  FILE* metadataf = IO::open_file((save_dirpath + "/metadata").c_str(), is_ok, "rb");
+  FILE *metadataf = IO::open_file((save_dirpath + "/metadata").c_str(), is_ok, "rb");
   std::fread(&_k, sizeof(uint16_t), 1, metadataf);
   std::fread(&_h, sizeof(uint16_t), 1, metadataf);
   std::fread(&_b, sizeof(uint16_t), 1, metadataf);
@@ -631,8 +542,7 @@ Library::loadMetadata()
   return is_ok;
 }
 
-bool
-Library::saveMetadata()
+bool Library::saveMetadata()
 {
   bool is_ok = true;
   if (_log)
@@ -640,7 +550,7 @@ Library::saveMetadata()
   std::string save_dirpath(_library_dirpath);
   std::vector<std::pair<tT, uint16_t>> bases_sizes(_basis_to_size.begin(), _basis_to_size.end());
 
-  FILE* metadataf = IO::open_file((save_dirpath + "/metadata").c_str(), is_ok, "wb");
+  FILE *metadataf = IO::open_file((save_dirpath + "/metadata").c_str(), is_ok, "wb");
   std::fwrite(&_k, sizeof(uint16_t), 1, metadataf);
   std::fwrite(&_h, sizeof(uint16_t), 1, metadataf);
   std::fwrite(&_b, sizeof(uint16_t), 1, metadataf);
