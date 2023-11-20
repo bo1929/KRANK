@@ -3,7 +3,6 @@
 
 #include "common.h"
 #include "io.h"
-#include <unordered_map>
 
 class TaxonomyNCBI
 {

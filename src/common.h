@@ -6,6 +6,8 @@
 #include <assert.h>
 #include <bitset>
 #include <numeric>
+#include <unordered_map>
+#include <ostream>
 #include <chrono>
 #include <cmath>
 #include <cstddef>
@@ -14,10 +16,12 @@
 #include <cstdlib>
 #include <cstring>
 #include <ctype.h>
+#include <type_traits>
 #include <dirent.h>
 #include <fstream>
 #include <getopt.h>
 #include <iomanip>
+#include <cstdlib>
 #include <iostream>
 #include <limits>
 #include <list>
@@ -41,13 +45,14 @@
 #include <vector>
 #include <zlib.h>
 
-/* #define UINT32_MAX ((uint32_t)-1) */
-
 #ifdef _OPENMP
   #include <omp.h>
 #else
   #warning "OpenMP not found, multi-threading will be DISABLED and --num-threads option will be ignored!"
 #endif
+
+#define VERSION "v0.0.1"
+#define PRINT_VERSION printf("KRANK version: " VERSION "\n");
 
 extern unsigned int num_threads;
 extern std::random_device rd;
@@ -58,11 +63,18 @@ extern const unsigned char seq_nt4_table[128];
 template<typename T>
 using vvec = std::vector<std::vector<T>>;
 
-// TODO: Check if types are adequate.
-// TODO: Is it possible to set types automatically?
+#ifdef LARGE_TAXONOMY
+typedef uint32_t tT;
+typedef uint32_t scT;
+#else
 typedef uint16_t tT;
-typedef uint32_t encT;
 typedef uint16_t scT;
+#endif
+#ifdef SHORT_TABLE
+typedef uint64_t encT;
+#else
+typedef uint32_t encT;
+#endif
 
 namespace std {
   template<class T>

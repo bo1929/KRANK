@@ -17,6 +17,7 @@ Library::Library(const char *library_dirpath,
                  bool on_disk,
                  bool from_kmers,
                  uint8_t target_batch,
+                 bool verbose,
                  bool log)
   : _library_dirpath(library_dirpath)
   , _taxonomy_ncbi(nodes_filepath)
@@ -35,6 +36,7 @@ Library::Library(const char *library_dirpath,
   , _on_disk(on_disk)
   , _from_kmers(from_kmers)
   , _target_batch(target_batch)
+  , _verbose(verbose)
   , _log(log)
 {
   bool isDir = IO::ensureDirectory(_library_dirpath);
@@ -52,10 +54,13 @@ Library::Library(const char *library_dirpath,
     }
   } else {
     std::cout << "Library is at " << _library_dirpath << std::endl;
-    std::cout << "Sets of k-mers and corresponding hash keys are already on the disk." << std::endl;
+    if (_verbose)
+      std::cout << "Sets of k-mers and corresponding hash keys are already on the disk." << std::endl;
     Library::loadMetadata();
-    std::puts("Given parameters will be ignored.\n");
-    std::cout << "The metadata of the given library is loaded from the disk" << std::endl;
+    if (_verbose)
+      std::puts("Given parameters will be ignored.\n");
+    if (_log)
+      LOG(INFO) << "The metadata of the given library is loaded from the disk" << std::endl;
   }
 
   _lsh_vg = generateMaskLSH(_positions);
@@ -68,6 +73,8 @@ Library::Library(const char *library_dirpath,
   for (auto const &kv : _taxonomy_record.tID_to_input())
     _tID_vec.push_back(kv.first);
 
+  if (_verbose)
+    std::cout << "Reading and processing the input sequences..." << std::endl;
 #pragma omp parallel for schedule(dynamic), num_threads(num_threads)
   for (unsigned int i = 0; i < _tID_vec.size(); ++i) {
     tT tID_key = _tID_vec[i];
@@ -128,26 +135,31 @@ Library::Library(const char *library_dirpath,
   }
 
   _root_size = root_size;
-  std::cout << "Total number of (non-distinct) k-mers under the root: " << _root_size << std::endl;
+  if (_log)
+    LOG(INFO) << "Total number of (non-distinct) k-mers under the root: " << _root_size << std::endl;
 
-  std::cout << "Library is initialized and k-mers sets are ready to be streamed." << std::endl;
-  if (on_disk)
-    std::cout << "Stream will be on disk." << std::endl;
-  else
-    std::cout << "Stream will be in memory." << std::endl;
+  if (_verbose) {
+    std::cout << "Library is initialized and k-mers sets are ready to be streamed." << std::endl;
+    if (on_disk)
+      std::cout << "Stream will be on disk." << std::endl;
+    else
+      std::cout << "Stream will be in memory." << std::endl;
+  }
 
-  std::cout << "Details:" << std::endl;
-  std::cout << "\tSequences as input directly: " << std::noboolalpha << !_from_kmers << std::endl;
-  std::cout << "\tLength of the k-mer, k: " << std::to_string(_k) << std::endl;
-  std::cout << "\tLength of the minimizer window, w: " << std::to_string(_w) << std::endl;
-  std::cout << "\tNumber of positions of LSH, h: " << std::to_string(_h) << std::endl;
-  std::cout << "\tNumber of columns in the table, b: " << std::to_string(_b) << std::endl;
-  std::cout << "\tMaximum capacity size: " << _capacity_size << std::endl;
-  std::cout << "\tTable row batch size: " << _tbatch_size << std::endl;
-  std::cout << "\tTotal number of rows: " << _num_rows << std::endl;
-  std::cout << "\tNumber of species: " << _num_species << std::endl;
-  std::cout << "\tTotal number of (non-unique) kmers: " << _root_size << std::endl;
-  std::cout << std::endl;
+  if (_verbose) {
+    std::cout << "Details:" << std::endl;
+    std::cout << "\tSequences as input directly: " << std::noboolalpha << !_from_kmers << std::endl;
+    std::cout << "\tLength of the k-mer, k: " << std::to_string(_k) << std::endl;
+    std::cout << "\tLength of the minimizer window, w: " << std::to_string(_w) << std::endl;
+    std::cout << "\tNumber of positions of LSH, h: " << std::to_string(_h) << std::endl;
+    std::cout << "\tNumber of columns in the table, b: " << std::to_string(_b) << std::endl;
+    std::cout << "\tMaximum capacity size: " << _capacity_size << std::endl;
+    std::cout << "\tTable row batch size: " << _tbatch_size << std::endl;
+    std::cout << "\tTotal number of rows: " << _num_rows << std::endl;
+    std::cout << "\tNumber of species: " << _num_species << std::endl;
+    std::cout << "\tTotal number of (non-unique) kmers: " << _root_size << std::endl;
+    std::cout << std::endl;
+  }
 
   if (_log)
     LOG(INFO) << "Specified batch is " << static_cast<uint16_t>(_target_batch) << std::endl;
@@ -240,7 +252,8 @@ void Library::softLCA(HTs<encT> &ts, uint8_t curr_batch)
 
 void Library::build()
 {
-  std::cout << "Total number of batches is  " << _total_batches << std::endl;
+  if (_verbose)
+    std::cout << "Total number of batches is " << _total_batches << std::endl;
   unsigned int curr_batch = 0;
   for (unsigned int i = 0; i < _total_batches; ++i) {
     curr_batch++;
@@ -248,13 +261,18 @@ void Library::build()
       std::cout << "Building the library for batch " << curr_batch << "..." << std::endl;
       HTs<encT> ts_root(1, _k, _h, _b, _tbatch_size, &_lsh_vg, _ranking_method);
       Library::getBatchHTs(&ts_root);
+      if (_log)
+        LOG(INFO) << "The table is built." << std::endl;
       Library::resetInfo(ts_root, true, true);
       Library::countBasis(ts_root, curr_batch);
       Library::softLCA(ts_root, curr_batch);
+      if (_log)
+        LOG(INFO) << "Leaves are counted and k-mers are labeled with soft-LCA." << std::endl;
       Library::saveBatchHTs(ts_root, curr_batch);
     } else {
       Library::skipBatch();
-      std::cout << "Skipping the library building for batch  " << curr_batch << std::endl;
+      if (_log)
+        LOG(INFO) << "Skipping the library building for batch  " << curr_batch << std::endl;
     }
   }
 }
@@ -324,22 +342,22 @@ uint64_t Library::getConstrainedSizeSC(uint64_t num_basis)
 
 void Library::getBatchHTs(HTs<encT> *ts)
 {
-  if (_log)
-    LOG(INFO) << "Constructing the HTd for " << _taxonomy_record.changeIDtax(ts->tID) << std::endl;
+  if (_verbose)
+    std::cout << "Constructing the table for " << _taxonomy_record.changeIDtax(ts->tID) << std::endl;
   HTd<encT> td(ts->tID, ts->k, ts->h, ts->num_rows, ts->ptr_lsh_vg, _ranking_method);
   getBatchHTd(&td);
   if (_log)
     LOG(INFO) << "Converting from HTd to HTs for the taxon " << _taxonomy_record.changeIDtax(ts->tID) << std::endl;
   td.convertHTs(ts);
   if (_log)
-    std::cout << "HTs has been constructed for " << _taxonomy_record.changeIDtax(ts->tID) << std::endl;
+    LOG(INFO) << "The static hash table has been constructed for " << _taxonomy_record.changeIDtax(ts->tID) << std::endl;
 }
 
 void Library::getBatchHTd(HTd<encT> *td)
 {
   uint64_t curr_taxID = _taxonomy_record.changeIDtax(td->tID);
-  if (_log)
-    LOG(INFO) << "Constructing the HTd for " << curr_taxID << std::endl;
+  if (_verbose)
+    std::cout << "Constructing the table for " << curr_taxID << std::endl;
   if (_taxonomy_record.isBasis(td->tID)) {
     if (_on_disk) {
       _streamOD_map.at(td->tID).getBatch(td->enc_vvec, _tbatch_size);
@@ -348,7 +366,8 @@ void Library::getBatchHTd(HTd<encT> *td)
     }
     td->initBasis(td->tID);
     td->makeUnique();
-    std::cout << "Basis HTd has been constructed for " << curr_taxID << std::endl;
+    if (_log)
+      LOG(INFO) << "The dynamic hash table has been constructed for the leaf  " << curr_taxID << std::endl;
   } else {
     std::set<tT> &children_set = _taxonomy_record.child_map()[td->tID];
     size_t num_child = children_set.size();
@@ -389,7 +408,8 @@ void Library::getBatchHTd(HTd<encT> *td)
       }
     }
     td->childrenHT.clear();
-    std::cout << "HTd has been constructed for " << curr_taxID << std::endl;
+    if (_log)
+      LOG(INFO) << "The dynamic hash table has been constructed for " << curr_taxID << std::endl;
   }
 }
 
@@ -399,7 +419,7 @@ bool Library::loadBatchHTs(HTs<encT> &ts, uint16_t curr_batch)
   std::string load_dirpath(_library_dirpath);
 
   if (_log)
-    LOG(INFO) << "Loading the library batch for " << _taxonomy_record.changeIDtax(ts.tID) << std::endl;
+    LOG(INFO) << "Loading the library for batch " << curr_batch << std::endl;
 
   FILE *encf = IO::open_file((load_dirpath + "/enc_arr-" + std::to_string(curr_batch)).c_str(), is_ok, "r");
   if (std::ferror(encf)) {
@@ -435,9 +455,9 @@ bool Library::loadBatchHTs(HTs<encT> &ts, uint16_t curr_batch)
 
   if (_log) {
     if (is_ok)
-      LOG(NOTICE) << "Successfully loaded the batch library for " << _taxonomy_record.changeIDtax(ts.tID) << std::endl;
+      LOG(NOTICE) << "Successfully loaded the library for batch " << curr_batch << std::endl;
     else
-      LOG(ERROR) << "Failed loading the batch library for " << _taxonomy_record.changeIDtax(ts.tID) << std::endl;
+      LOG(ERROR) << "Failed loading the library for batch " << curr_batch << std::endl;
   }
 
   return is_ok;
@@ -448,8 +468,8 @@ bool Library::saveBatchHTs(HTs<encT> &ts, uint16_t curr_batch)
   bool is_ok = true;
   std::string save_dirpath(_library_dirpath);
 
-  if (_log)
-    LOG(INFO) << "Saving the built library batch for " << _taxonomy_record.changeIDtax(ts.tID) << std::endl;
+  if (_verbose)
+    std::cout << "Saving the built library batch " << curr_batch << std::endl;
 
   {
     FILE *encf = IO::open_file((save_dirpath + "/enc_arr-" + std::to_string(curr_batch)).c_str(), is_ok, "wb");
@@ -493,9 +513,9 @@ bool Library::saveBatchHTs(HTs<encT> &ts, uint16_t curr_batch)
 
   if (_log) {
     if (is_ok)
-      LOG(NOTICE) << "Successfully saved the built batch library for " << _taxonomy_record.changeIDtax(ts.tID) << std::endl;
+      LOG(NOTICE) << "Successfully saved the built the library for batch " << curr_batch << std::endl;
     else
-      LOG(ERROR) << "Failed saving the built batch library for " << _taxonomy_record.changeIDtax(ts.tID) << std::endl;
+      LOG(ERROR) << "Failed saving the built library for batch " << curr_batch << std::endl;
   }
 
   return is_ok;
@@ -504,8 +524,9 @@ bool Library::saveBatchHTs(HTs<encT> &ts, uint16_t curr_batch)
 bool Library::loadMetadata()
 {
   bool is_ok = true;
-  if (_log)
-    LOG(INFO) << "Loading metadata of the library" << std::endl;
+
+  if (_verbose)
+    std::cout << "Loading metadata of the library" << std::endl;
   std::string save_dirpath(_library_dirpath);
   std::vector<std::pair<tT, uint16_t>> bases_sizes;
 
@@ -545,8 +566,8 @@ bool Library::loadMetadata()
 bool Library::saveMetadata()
 {
   bool is_ok = true;
-  if (_log)
-    LOG(INFO) << "Saving metadata of the library" << std::endl;
+  if (_verbose)
+    std::cout << "Saving metadata of the library" << std::endl;
   std::string save_dirpath(_library_dirpath);
   std::vector<std::pair<tT, uint16_t>> bases_sizes(_basis_to_size.begin(), _basis_to_size.end());
 

@@ -78,6 +78,19 @@ TaxonomyRecord<T>::TaxonomyRecord(const char *input_filepath, TaxonomyNCBI taxon
     input_to_taxID[inputn] = (uint64_t)stoul(taxID);
   }
   input_file.close();
+
+#ifdef LARGE_TAXONOMY
+  if (std::numeric_limits<uint32_t>::max() < input_to_taxID.size()) {
+    std::cerr << "The number of input files exceeds supported limit (std::numeric_limits<uint32_t>::max)." << std::endl;
+    exit(EXIT_FAILURE);
+  }
+#else
+  if (std::numeric_limits<uint16_t>::max() < input_to_taxID.size()) {
+    std::cerr << "The number of input files exceeds supported limit (std::numeric_limits<uint16_t>::max)." << std::endl;
+    exit(EXIT_FAILURE);
+  }
+#endif
+
   _num_input = input_to_taxID.size();
 
   _tID_to_taxID[0] = 0;
@@ -85,6 +98,7 @@ TaxonomyRecord<T>::TaxonomyRecord(const char *input_filepath, TaxonomyNCBI taxon
   _taxID_to_tID[0] = 0;
   _taxID_to_tID[1] = 1;
   T curr_tID = 2;
+  uint64_t num_nodes = 1;
   uint64_t parent_taxID = 1;
 
   for (auto &kv : input_to_taxID) {
@@ -97,17 +111,31 @@ TaxonomyRecord<T>::TaxonomyRecord(const char *input_filepath, TaxonomyNCBI taxon
       parent_taxID = taxonomy.getParent(kv.second);
       while ((_taxID_to_tID.find(parent_taxID) == _taxID_to_tID.end()) && parent_taxID != 1) {
         curr_tID++;
+        num_nodes++;
         _tID_to_taxID[curr_tID] = parent_taxID;
         _tID_to_rank[curr_tID] = taxonomy.getRank(parent_taxID);
         _taxID_to_tID[parent_taxID] = curr_tID;
         parent_taxID = taxonomy.getParent(parent_taxID);
       }
       curr_tID++;
+      num_nodes++;
     } else {
       _input_to_tID[kv.first] = _taxID_to_tID[kv.second];
       _tID_to_input[_taxID_to_tID[kv.second]].push_back(kv.first);
     }
   }
+
+#ifdef LARGE_TAXONOMY
+  if (std::numeric_limits<uint32_t>::max() < num_nodes) {
+    std::cerr << "The number of taxonomy nodes exceeds supported limit (std::numeric_limits<uint32_t>::max)." << std::endl;
+    exit(EXIT_FAILURE);
+  }
+#else
+  if (std::numeric_limits<uint16_t>::max() < num_nodes) {
+    std::cerr << "The number of taxonomy nodes exceeds supported limit (std::numeric_limits<uint16_t>::max)." << std::endl;
+    exit(EXIT_FAILURE);
+  }
+#endif
 
   _num_nodes = curr_tID - 1;
 

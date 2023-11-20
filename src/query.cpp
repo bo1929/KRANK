@@ -5,19 +5,21 @@ Query::Query(std::vector<std::string> library_dirpaths,
              const char *query_filepath,
              uint8_t max_match_hdist,
              bool save_match_info,
+             bool verbose,
              bool log)
   : _library_dirpaths(library_dirpaths)
   , _output_dirpath(output_dirpath)
   , _query_filepath(query_filepath)
   , _max_match_hdist(max_match_hdist)
   , _save_match_info(save_match_info)
+  , _verbose(verbose)
   , _log(log)
 {
   _num_libraries = _library_dirpaths.size();
   _slib_ptr_v.resize(_num_libraries);
 
   for (unsigned int i = 0; i < _num_libraries; ++i) {
-    _slib_ptr_v[i] = std::make_unique<SearchL>(_library_dirpaths[i].c_str(), _log);
+    _slib_ptr_v[i] = std::make_unique<SearchL>(_library_dirpaths[i].c_str(), _verbose, _log);
     if (i == 0) {
       _tID_to_taxID = _slib_ptr_v[i]->_tID_to_taxID;
       _k = _slib_ptr_v[i]->_k;
@@ -26,9 +28,7 @@ Query::Query(std::vector<std::string> library_dirpaths,
     } else {
       if (!map_compare(_slib_ptr_v[i]->_tID_to_taxID, _tID_to_taxID) || (_tax_depth_vec != _slib_ptr_v[i]->_tax_depth_vec) ||
           (_tax_parent_vec != _slib_ptr_v[i]->_tax_parent_vec)) {
-        std::cerr << "All libraries to search in have to be built with the "
-                     "same taxonomy"
-                  << std::endl;
+        std::cerr << "All libraries to search in have to be built with the same taxonomy" << std::endl;
         exit(EXIT_FAILURE);
       }
       if (!(_k == _slib_ptr_v[i]->_k)) {
@@ -38,7 +38,8 @@ Query::Query(std::vector<std::string> library_dirpaths,
     }
   }
   if (IO::ensureDirectory(_output_dirpath)) {
-    std::cout << "Results will be written to " << _output_dirpath << std::endl;
+    if (_verbose)
+      std::cout << "Results will be written to " << _output_dirpath << std::endl;
   } else {
     std::cerr << "Directory to output results can not be found " << _output_dirpath << std::endl;
     exit(EXIT_FAILURE);
@@ -74,8 +75,7 @@ void Query::run(uint64_t rbatch_size)
   uint64_t mask_lr = ((u64m >> (64 - _k)) << 32) + ((u64m << 32) >> (64 - _k));
   for (unsigned int i = 0; i < _queryID_to_path.size(); ++i) {
     std::string queryID = keys[i];
-    if (_log)
-      LOG(NOTICE) << "Searching for k-mer matches for the query " << queryID << std::endl;
+    std::cout << "Searching for k-mer matches for the query " << queryID << std::endl;
     std::fstream ofs_match_info;
     if (_save_match_info) {
       if (_log)
@@ -158,8 +158,7 @@ void Query::run(uint64_t rbatch_size)
                       drop64Encoding32(_slib_ptr_v[lix]->_npositions, enc64_bp, enc64_lr, enc32_bp, enc32_lr);
                       dist = computeHammingDistance32(enc32_lr, _slib_ptr_v[lix]->_enc_arr[rix * _slib_ptr_v[lix]->_b + di]);
                     } else {
-                      std::puts("Available encoding types are 'uint64_t' and "
-                                "'uint32_t'\n.");
+                      std::puts("Available encoding types are 'uint64_t' and 'uint32_t'\n.");
                       exit(EXIT_FAILURE);
                     }
                     if (dist <= min_dist) {
@@ -240,20 +239,22 @@ void Query::run(uint64_t rbatch_size)
   }
 }
 
-Query::SearchL::SearchL(const char *library_dirpath, bool log)
+Query::SearchL::SearchL(const char *library_dirpath, bool verbose, bool log)
   : _library_dirpath(library_dirpath)
+  , _verbose(verbose)
   , _log(log)
 {
-  SearchL::loadMetadata();
-  _lsh_vg = generateMaskLSH(_positions);
-  SearchL::loadTaxonomy();
-
   if (IO::ensureDirectory(_library_dirpath)) {
-    std::cout << "Library will be read from " << _library_dirpath << std::endl;
+    if (_verbose)
+      std::cout << "Library will be read from " << _library_dirpath << std::endl;
   } else {
     std::cerr << "Library can not be found at " << _library_dirpath << std::endl;
     exit(EXIT_FAILURE);
   }
+
+  SearchL::loadMetadata();
+  _lsh_vg = generateMaskLSH(_positions);
+  SearchL::loadTaxonomy();
 
   try {
     _enc_arr = new encT[_num_rows * _b];
@@ -310,17 +311,19 @@ Query::SearchL::SearchL(const char *library_dirpath, bool log)
         LOG(INFO) << "Library has been loaded into the memory" << std::endl;
     }
   }
-  std::cout << "Library is loaded and ready for performing queries" << std::endl;
-  std::cout << "Details:" << std::endl;
-  std::cout << "\tLength of the k-mer, k: " << std::to_string(_k) << std::endl;
-  std::cout << "\tNumber of positions of LSH, h: " << std::to_string(_h) << std::endl;
-  std::cout << "\tNumber of columns in the table, b: " << std::to_string(_b) << std::endl;
-  std::cout << "\tMaximum capacity size: " << _capacity_size << std::endl;
-  std::cout << "\tTable row batch size: " << _tbatch_size << std::endl;
-  std::cout << "\tTotal number of rows: " << _num_rows << std::endl;
-  std::cout << "\tNumber of species: " << _num_species << std::endl;
-  std::cout << "\tTotal number of (non-unique) kmers: " << _root_size << std::endl;
-  std::cout << std::endl;
+  if (_verbose) {
+    std::cout << "Library is loaded and ready for performing queries" << std::endl;
+    std::cout << "Details:" << std::endl;
+    std::cout << "\tLength of the k-mer, k: " << std::to_string(_k) << std::endl;
+    std::cout << "\tNumber of positions of LSH, h: " << std::to_string(_h) << std::endl;
+    std::cout << "\tNumber of columns in the table, b: " << std::to_string(_b) << std::endl;
+    std::cout << "\tMaximum capacity size: " << _capacity_size << std::endl;
+    std::cout << "\tTable row batch size: " << _tbatch_size << std::endl;
+    std::cout << "\tTotal number of rows: " << _num_rows << std::endl;
+    std::cout << "\tNumber of species: " << _num_species << std::endl;
+    std::cout << "\tTotal number of (non-unique) kmers: " << _root_size << std::endl;
+    std::cout << std::endl;
+  }
 
   if (_log) {
     std::unordered_map<uint8_t, uint64_t> hist_map;
@@ -340,8 +343,8 @@ Query::SearchL::SearchL(const char *library_dirpath, bool log)
 bool Query::SearchL::loadMetadata()
 {
   bool is_ok = true;
-  if (_log)
-    LOG(INFO) << "Loading metadata of the library" << std::endl;
+  if (_verbose)
+    std::cout << "Loading metadata of the library" << std::endl;
   std::string load_dirpath(_library_dirpath);
 
   FILE *metadataf = IO::open_file((load_dirpath + "/metadata").c_str(), is_ok, "rb");
@@ -399,8 +402,8 @@ T Query::getLowestCommonAncestor(T a, T b)
 bool Query::SearchL::loadTaxonomy()
 {
   bool is_ok = true;
-  if (_log)
-    LOG(INFO) << "Loading taxonomy data and records of the library" << std::endl;
+  if (_verbose)
+    std::cout << "Loading taxonomy data and records of the library" << std::endl;
   std::string load_dirpath(_library_dirpath);
   std::vector<std::pair<tT, uint64_t>> tIDs_taxIDs;
 

@@ -25,6 +25,7 @@ public:
           bool on_disk = true,
           bool from_kmers = false,
           uint8_t target_batch = 0,
+          bool verbose = true,
           bool log = true);
 
 private:
@@ -57,6 +58,7 @@ private:
   bool _from_kmers;
   uint8_t _target_batch;
   bool _log;
+  bool _verbose;
   const uint16_t _rootID = 1;
 
 public:

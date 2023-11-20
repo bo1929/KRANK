@@ -2,52 +2,64 @@
 
 int main(int argc, char **argv)
 {
+  PRINT_VERSION
   AixLog::Log::init<AixLog::SinkCout>(AixLog::Severity::trace);
 
   CLI::App app{"KRANK: a memory-bound taxonomic identification tool."};
-  app.set_help_flag("--help", "Note to self: WABM.");
+  app.set_help_flag("--help");
   bool log = false;
   app.add_flag("--log,!--no-log", log, "Increased verbosity and extensive logging.");
+  bool verbose = true;
+  app.add_flag("--verbose,!--no-verbose", verbose, "Increased verbosity and extensive logging.");
   app.require_subcommand();
 
   CLI::App *sub_build = app.add_subcommand("build", "Builds a referenece library with given k-mers sets.");
   std::string library_dir;
-  sub_build->add_option("-l,--library-dir", library_dir, "Path to the directory containing the library.")->required();
+  sub_build->add_option("-l,--library-dir", library_dir, "Path to the directory containing the library.")
+    ->required()
+    ->check(CLI::ExistingDirectory);
   std::string taxonomy_dmp;
-  sub_build->add_option("-t,--taxonomy-dmp", taxonomy_dmp, "Path to the file containing the taxonomy dmp.")->required();
+  sub_build->add_option("-t,--taxonomy-dmp", taxonomy_dmp, "Path to the file containing the taxonomy dmp.")
+    ->required()
+    ->check(CLI::ExistingFile);
   std::string input_file;
   sub_build
     ->add_option("-i,--input-file", input_file, "Path to the file containing paths and taxon IDs of reference k-mer sets.")
-    ->required();
+    ->required()
+    ->check(CLI::ExistingFile);
   bool on_disk = true;
   sub_build->add_flag("--on-disk,!--in-memory",
                       on_disk,
                       "Are streams of k-mer sets going to be on the disk? "
                       "Default: --on-disk, note that --in-memory is memory hungry.");
   bool from_library = false;
-  sub_build->add_flag("--from_library,!--from-scratch",
+  sub_build->add_flag("--from-library,!--from-scratch",
                       from_library,
                       "Are k-mers already encoded and stored in the library? "
-                      "Default: --from-scratch, and it reads k-mers sets or sequences from given input paths.");
+                      "Default: --from-scratch, and it reads k-mer sets or sequences from given input paths.");
   bool from_kmers = false;
   sub_build->add_flag("--from-kmers,!--from-sequences",
                       from_kmers,
                       "Are given input files k-mers sets or sequences? "
                       "If sequences, k-mers sets will be extracted internally. "
                       "Default: --from-sequences.");
-  uint8_t k = 32;
-  sub_build->add_option("-k,--kmer-length", k, "Length of k-mers. Default: 32.");
-  uint8_t w = k;
-  sub_build->add_option("-w,--window-length", w, "Length of minimizer window. Default: k.");
-  uint8_t h = 13;
-  sub_build->add_option("-h,--num-positions", h, "Number of positions for the LSH. Default: 13.");
-  uint8_t b = 8;
-  sub_build->add_option("-b,--num-columns", b, "Number of columns of the table. Default: 8.");
-  uint8_t batch_size = 3;
+  uint8_t k = 28;
+  uint8_t w = k + 3;
+  sub_build->add_option("-k,--kmer-length", k, "Length of k-mers. Default: 28.");
+  sub_build->add_option("-w,--window-length", w, "Length of minimizer window. Default: k+3.");
+  sub_build->callback([&]() {
+    if (!(sub_build->count("-w") + sub_build->count("--window-length")))
+      w = k + 3;
+  });
+  uint8_t h = 12;
+  sub_build->add_option("-h,--num-positions", h, "Number of positions for the LSH. Default: 12.");
+  uint8_t b = 16;
+  sub_build->add_option("-b,--num-columns", b, "Number of columns of the table. Default: 16.");
+  uint8_t batch_size = 2;
   sub_build->add_option("-s,--batch-size",
                         batch_size,
                         "Number of bits to divide the table into batches. "
-                        "Default: 3, i.e., 8 batches.");
+                        "Default: 2, i.e., 4 batches.");
   uint8_t target_batch = 0;
   sub_build->add_option("--target-batch",
                         target_batch,
@@ -74,17 +86,19 @@ int main(int argc, char **argv)
                  output_dir,
                  "Path to the directory to output result files. "
                  "Default: the current working directory.")
-    ->required();
+    ->required()
+    ->check(CLI::ExistingDirectory);
   std::string query_file;
   sub_query
     ->add_option(
       "-q,--query-file", query_file, "Path to the tab-seperated file containing paths and IDs of query FASTA/FASTQ files.")
-    ->required();
+    ->required()
+    ->check(CLI::ExistingFile);
   uint8_t max_match_hdist = 5;
   sub_query->add_option("--max-match-distance,--max-match-hdist",
                         max_match_hdist,
                         "The maximum Hamming distance for a k-mer to be considered as a match. Default: 5.");
-  bool save_match_info = true;
+  bool save_match_info = false;
   sub_query->add_flag("--save-match-info,!--no-match-info",
                       save_match_info,
                       "Save macthing information to --output-dir for each query, this flag is given by default.");
@@ -92,13 +106,31 @@ int main(int argc, char **argv)
 
   CLI11_PARSE(app, argc, argv);
 
-  // Parameter check and display a report.
-  if (!(sub_build->count("-w") + sub_build->count("--window-length"))) {
-    w = k;
+  if (w < k)
+    std::cerr << "The minimizer window size w can not be smaller than k-mer length." << std::endl;
+  if (b < 2)
+    std::cerr << "The number of columns of the hash table, b, can not be smaller than 2." << std::endl;
+  if (h < 2)
+    std::cerr << "The number of positions for LSH, h, can not be smaller than 2." << std::endl;
+  if (h >= k)
+    std::cerr << "The number of positions for LSH, h, can not be greater than or equal to k-mer length." << std::endl;
+  if (batch_size > (2 * h - 1))
+    std::cerr << "The number of bits to determine the number of batches must be smaller than 2h." << std::endl;
+  if (target_batch > pow(2, batch_size))
+    std::cerr << "The given target batch index (starts from 1) is greater than the number of batches." << std::endl;
+  if (!(on_disk || !from_library))
+    std::cerr << "If k-mer sets are going to be read from the library, --on-disk must be set." << std::endl;
+  if (max_match_hdist > k)
+    std::cerr << "Maximum Hamming distance for a match can not be greater than k-mer length." << std::endl;
+#ifndef SHORT_TABLE
+  if ((k - h) > 16) {
+    std::cerr << "In order to use compact k-mer encodings, k and h must satisfy (k-h) <= 16." << std::endl;
+    exit(EXIT_FAILURE);
   }
-  assert(on_disk || !from_library);
+#endif
 
   if (sub_build->parsed()) {
+    std::cout << "Building the library..." << std::endl;
     Library l(library_dir.c_str(),
               taxonomy_dmp.c_str(),
               input_file.c_str(),
@@ -114,11 +146,15 @@ int main(int argc, char **argv)
               on_disk,
               from_kmers,
               target_batch,
+              verbose,
               log);
+    std::cout << "Library has been built and saved." << std::endl;
   }
 
   if (sub_query->parsed()) {
-    Query q(library_dir_v, output_dir.c_str(), query_file.c_str(), max_match_hdist, save_match_info, log);
+    std::cout << "Querying the given sequences..." << std::endl;
+    Query q(library_dir_v, output_dir.c_str(), query_file.c_str(), max_match_hdist, save_match_info, verbose, log);
+    std::cout << "Results for the input queries have been saved." << std::endl;
   }
 
   return 0;
