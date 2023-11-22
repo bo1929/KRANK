@@ -158,7 +158,7 @@ void Query::run(uint64_t rbatch_size)
                       drop64Encoding32(_slib_ptr_v[lix]->_npositions, enc64_bp, enc64_lr, enc32_bp, enc32_lr);
                       dist = computeHammingDistance32(enc32_lr, _slib_ptr_v[lix]->_enc_arr[rix * _slib_ptr_v[lix]->_b + di]);
                     } else {
-                      std::puts("Available encoding types are 'uint64_t' and 'uint32_t'\n.");
+                      std::puts("Available encoding types are 'uint64_t' and 'uint32_t'\n!");
                       exit(EXIT_FAILURE);
                     }
                     if (dist <= min_dist) {

@@ -72,7 +72,7 @@ TaxonomyRecord<T>::TaxonomyRecord(const char *input_filepath, TaxonomyNCBI taxon
     std::istringstream iss(line);
     std::string inputn, taxID;
     if (!(std::getline(iss, taxID, '\t') && std::getline(iss, inputn, '\t'))) {
-      std::cerr << "Failed to read file for taxon ID to input map." << std::endl;
+      std::cerr << "Failed to read file for taxon ID to input map!" << std::endl;
       exit(EXIT_FAILURE);
     }
     input_to_taxID[inputn] = (uint64_t)stoul(taxID);
@@ -81,12 +81,12 @@ TaxonomyRecord<T>::TaxonomyRecord(const char *input_filepath, TaxonomyNCBI taxon
 
 #ifdef LARGE_TAXONOMY
   if (std::numeric_limits<uint32_t>::max() < input_to_taxID.size()) {
-    std::cerr << "The number of input files exceeds supported limit (std::numeric_limits<uint32_t>::max)." << std::endl;
+    std::cerr << "The number of input files exceeds supported limit (std::numeric_limits<uint32_t>::max)!" << std::endl;
     exit(EXIT_FAILURE);
   }
 #else
   if (std::numeric_limits<uint16_t>::max() < input_to_taxID.size()) {
-    std::cerr << "The number of input files exceeds supported limit (std::numeric_limits<uint16_t>::max)." << std::endl;
+    std::cerr << "The number of input files exceeds supported limit (std::numeric_limits<uint16_t>::max)!" << std::endl;
     exit(EXIT_FAILURE);
   }
 #endif
@@ -127,12 +127,12 @@ TaxonomyRecord<T>::TaxonomyRecord(const char *input_filepath, TaxonomyNCBI taxon
 
 #ifdef LARGE_TAXONOMY
   if (std::numeric_limits<uint32_t>::max() < num_nodes) {
-    std::cerr << "The number of taxonomy nodes exceeds supported limit (std::numeric_limits<uint32_t>::max)." << std::endl;
+    std::cerr << "The number of taxonomy nodes exceeds supported limit (std::numeric_limits<uint32_t>::max)!" << std::endl;
     exit(EXIT_FAILURE);
   }
 #else
   if (std::numeric_limits<uint16_t>::max() < num_nodes) {
-    std::cerr << "The number of taxonomy nodes exceeds supported limit (std::numeric_limits<uint16_t>::max)." << std::endl;
+    std::cerr << "The number of taxonomy nodes exceeds supported limit (std::numeric_limits<uint16_t>::max)!" << std::endl;
     exit(EXIT_FAILURE);
   }
 #endif

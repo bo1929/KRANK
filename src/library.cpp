@@ -15,8 +15,9 @@ Library::Library(const char *library_dirpath,
                  uint32_t tbatch_size,
                  bool from_library,
                  bool on_disk,
-                 bool from_kmers,
+                 bool input_kmers,
                  uint8_t target_batch,
+                 bool only_init,
                  bool verbose,
                  bool log)
   : _library_dirpath(library_dirpath)
@@ -34,8 +35,9 @@ Library::Library(const char *library_dirpath,
   , _tbatch_size(tbatch_size)
   , _from_library(from_library)
   , _on_disk(on_disk)
-  , _from_kmers(from_kmers)
+  , _input_kmers(input_kmers)
   , _target_batch(target_batch)
+  , _only_init(only_init)
   , _verbose(verbose)
   , _log(log)
 {
@@ -49,13 +51,13 @@ Library::Library(const char *library_dirpath,
     }
     getRandomPositions();
     if (_target_batch != 0) {
-      std::cerr << "A specific batch can not be built seperately before saving k-mer sets into the library." << std::endl;
+      std::cerr << "A specific batch can not be built seperately before saving k-mer sets into the library!" << std::endl;
       exit(EXIT_FAILURE);
     }
   } else {
     std::cout << "Library is at " << _library_dirpath << std::endl;
     if (_verbose)
-      std::cout << "Sets of k-mers and corresponding hash keys are already on the disk." << std::endl;
+      std::cout << "Sets of k-mers and corresponding hash keys are already on the disk" << std::endl;
     Library::loadMetadata();
     if (_verbose)
       std::puts("Given parameters will be ignored.\n");
@@ -90,7 +92,7 @@ Library::Library(const char *library_dirpath,
     uint64_t size_basis = 0;
     StreamIM<encT> sIM(filepath_v, _k, _w, _h, &_lsh_vg, &_npositions);
     if (!_from_library) {
-      if (_from_kmers)
+      if (_input_kmers)
         size_basis = sIM.readInput(static_cast<uint64_t>(DEFAULT_BATCH_SIZE));
       else
         size_basis = sIM.extractInput(1);
@@ -122,7 +124,7 @@ Library::Library(const char *library_dirpath,
     if (_on_disk) {
 #pragma omp critical
       {
-        _streamOD_map.emplace(std::make_pair(tID_key, StreamOD<encT>(disk_path.c_str())));
+        _streamOD_map.emplace(std::make_pair(tID_key, StreamOD<encT>(disk_path)));
         _streamOD_map.at(tID_key).openStream();
       }
       sIM.clearStream();
@@ -139,16 +141,16 @@ Library::Library(const char *library_dirpath,
     LOG(INFO) << "Total number of (non-distinct) k-mers under the root: " << _root_size << std::endl;
 
   if (_verbose) {
-    std::cout << "Library is initialized and k-mers sets are ready to be streamed." << std::endl;
+    std::cout << "Library is initialized and k-mers sets are ready to be streamed" << std::endl;
     if (on_disk)
-      std::cout << "Stream will be on disk." << std::endl;
+      std::cout << "Stream will be on disk" << std::endl;
     else
-      std::cout << "Stream will be in memory." << std::endl;
+      std::cout << "Stream will be in memory" << std::endl;
   }
 
   if (_verbose) {
     std::cout << "Details:" << std::endl;
-    std::cout << "\tSequences as input directly: " << std::noboolalpha << !_from_kmers << std::endl;
+    std::cout << "\tSequences as input directly: " << std::noboolalpha << !_input_kmers << std::endl;
     std::cout << "\tLength of the k-mer, k: " << std::to_string(_k) << std::endl;
     std::cout << "\tLength of the minimizer window, w: " << std::to_string(_w) << std::endl;
     std::cout << "\tNumber of positions of LSH, h: " << std::to_string(_h) << std::endl;
@@ -168,14 +170,18 @@ Library::Library(const char *library_dirpath,
     Library::saveMetadata();
     bool taxonomy_saved = _taxonomy_record.saveTaxonomyRecord(_library_dirpath);
     if (_log)
-      LOG(INFO) << "Metadata has been saved to the library." << std::endl;
+      LOG(INFO) << "Metadata has been saved to the library" << std::endl;
   } else {
     if (_log)
-      LOG(INFO) << "Metadata has been read from the library, won't be saved again." << std::endl;
+      LOG(INFO) << "Metadata has been read from the library, won't be saved again" << std::endl;
   }
 
-  if (_from_library || (_target_batch == 0))
+  if (!_only_init)
     Library::build();
+
+  for (unsigned int i = 0; i < _tID_vec.size(); ++i) {
+    _streamOD_map.at(_tID_vec[i]).closeStream();
+  }
 }
 
 void Library::countBasis(HTs<encT> &ts, uint8_t curr_batch)
@@ -184,19 +190,16 @@ void Library::countBasis(HTs<encT> &ts, uint8_t curr_batch)
   for (unsigned int i = 0; i < _tID_vec.size(); ++i) {
     tT tID_key = _tID_vec[i];
     std::vector<std::pair<uint32_t, encT>> lsh_enc_vec;
-    _streamOD_map.at(tID_key).load(lsh_enc_vec);
+    _streamOD_map.at(tID_key).load(lsh_enc_vec, (curr_batch - 1) * _tbatch_size, curr_batch * _tbatch_size);
     std::vector<bool> nseen(ts.num_rows * _b, true);
     for (unsigned int i = 0; i < lsh_enc_vec.size(); ++i) {
-      if ((lsh_enc_vec[i].first >= (curr_batch - 1) * _tbatch_size) && (lsh_enc_vec[i].first < curr_batch * _tbatch_size)) {
-        uint32_t rix = lsh_enc_vec[i].first - (curr_batch - 1) * _tbatch_size;
-        for (unsigned int j = 0; j < ts.ind_arr[rix]; ++j) {
-          if (ts.enc_arr[rix * _b + j] == lsh_enc_vec[i].second) {
-            if (nseen[rix * _b + j]) {
-#pragma omp critical
-              nseen[rix * _b + j] = false;
+      uint32_t rix = lsh_enc_vec[i].first - (curr_batch - 1) * _tbatch_size;
+      for (unsigned int j = 0; j < ts.ind_arr[rix]; ++j) {
+        if (ts.enc_arr[rix * _b + j] == lsh_enc_vec[i].second) {
+          if (nseen[rix * _b + j]) {
+            nseen[rix * _b + j] = false;
 #pragma omp atomic update
-              ts.scount_arr[rix * _b + j]++;
-            }
+            ts.scount_arr[rix * _b + j]++;
           }
         }
       }
@@ -224,28 +227,52 @@ void Library::softLCA(HTs<encT> &ts, uint8_t curr_batch)
   for (unsigned int i = 0; i < _tID_vec.size(); ++i) {
     tT tID_key = _tID_vec[i];
     std::vector<std::pair<uint32_t, encT>> lsh_enc_vec;
-    _streamOD_map.at(tID_key).load(lsh_enc_vec);
+    _streamOD_map.at(tID_key).load(lsh_enc_vec, (curr_batch - 1) * _tbatch_size, curr_batch * _tbatch_size);
     std::vector<bool> nseen(ts.num_rows * _b, true);
     double p_update;
     for (unsigned int i = 0; i < lsh_enc_vec.size(); ++i) {
-      if ((lsh_enc_vec[i].first >= (curr_batch - 1) * _tbatch_size) && (lsh_enc_vec[i].first < curr_batch * _tbatch_size)) {
-        uint32_t rix = lsh_enc_vec[i].first - (curr_batch - 1) * _tbatch_size;
-        for (unsigned int j = 0; j < ts.ind_arr[rix]; ++j) {
-          if ((ts.enc_arr[rix * _b + j] == lsh_enc_vec[i].second) && nseen[rix * _b + j]) {
+      uint32_t rix = lsh_enc_vec[i].first - (curr_batch - 1) * _tbatch_size;
+      for (unsigned int j = 0; j < ts.ind_arr[rix]; ++j) {
+        if ((ts.enc_arr[rix * _b + j] == lsh_enc_vec[i].second) && nseen[rix * _b + j]) {
+          nseen[rix * _b + j] = false;
+          if (ts.scount_arr[rix * _b + j] <= 2)
+            p_update = 1;
+          else
+            p_update = 1 / log2(pow((ts.scount_arr[rix * _b + j] - 1) / s, 2) + 2);
+          std::bernoulli_distribution bt(p_update);
+          if (bt(gen)) {
 #pragma omp critical
-            nseen[rix * _b + j] = false;
-            if (ts.scount_arr[rix * _b + j] <= 2)
-              p_update = 1;
-            else
-              p_update = 1 / log2(pow((ts.scount_arr[rix * _b + j] - 1) / s, 2) + 2);
-            std::bernoulli_distribution bt(p_update);
-            if (bt(gen)) {
-#pragma omp critical
-              ts.tlca_arr[rix * _b + j] = _taxonomy_record.getLowestCommonAncestor(ts.tlca_arr[rix * _b + j], tID_key);
-            }
+            ts.tlca_arr[rix * _b + j] = _taxonomy_record.getLowestCommonAncestor(ts.tlca_arr[rix * _b + j], tID_key);
           }
         }
       }
+    }
+  }
+}
+
+void Library::annotateInfo()
+{
+  if (_verbose)
+    std::cout << "Total number of batches is " << _total_batches << std::endl;
+  unsigned int curr_batch = 0;
+  for (unsigned int i = 0; i < _total_batches; ++i) {
+    curr_batch++;
+    if ((_target_batch == 0) || (_target_batch == curr_batch)) {
+      std::cout << "Annotating k-mners in the library for batch " << curr_batch << "..." << std::endl;
+      HTs<encT> ts_root(1, _k, _h, _b, _tbatch_size, &_lsh_vg, _ranking_method);
+      Library::loadBatchHTs(ts_root, curr_batch);
+      if (_log)
+        LOG(INFO) << "The table is loaded" << std::endl;
+      Library::resetInfo(ts_root, true, true);
+      Library::countBasis(ts_root, curr_batch);
+      Library::softLCA(ts_root, curr_batch);
+      if (_log)
+        LOG(INFO) << "Leaves are counted and k-mers are labeled with soft-LCA" << std::endl;
+      Library::saveBatchHTs(ts_root, curr_batch);
+    } else {
+      Library::skipBatch();
+      if (_log)
+        LOG(INFO) << "Skipping the library annotation for batch  " << curr_batch << std::endl;
     }
   }
 }
@@ -262,12 +289,12 @@ void Library::build()
       HTs<encT> ts_root(1, _k, _h, _b, _tbatch_size, &_lsh_vg, _ranking_method);
       Library::getBatchHTs(&ts_root);
       if (_log)
-        LOG(INFO) << "The table is built." << std::endl;
+        LOG(INFO) << "The table is built" << std::endl;
       Library::resetInfo(ts_root, true, true);
       Library::countBasis(ts_root, curr_batch);
       Library::softLCA(ts_root, curr_batch);
       if (_log)
-        LOG(INFO) << "Leaves are counted and k-mers are labeled with soft-LCA." << std::endl;
+        LOG(INFO) << "Leaves are counted and k-mers are labeled with soft-LCA" << std::endl;
       Library::saveBatchHTs(ts_root, curr_batch);
     } else {
       Library::skipBatch();
@@ -403,7 +430,7 @@ void Library::getBatchHTd(HTd<encT> *td)
       int64_t num_rm = static_cast<int64_t>(td->num_kmers) - static_cast<int64_t>(constraint_size);
       if ((num_rm > 0) && _adaptive_size) {
         if (_log)
-          LOG(INFO) << curr_taxID << " has " << num_rm << " k-mers above the constraint." << std::endl;
+          LOG(INFO) << curr_taxID << " has " << num_rm << " k-mers above the constraint" << std::endl;
         td->shrinkHT(static_cast<uint64_t>(num_rm), _b);
       }
     }
@@ -469,7 +496,7 @@ bool Library::saveBatchHTs(HTs<encT> &ts, uint16_t curr_batch)
   std::string save_dirpath(_library_dirpath);
 
   if (_verbose)
-    std::cout << "Saving the built library batch " << curr_batch << std::endl;
+    std::cout << "Saving the library batch " << curr_batch << std::endl;
 
   {
     FILE *encf = IO::open_file((save_dirpath + "/enc_arr-" + std::to_string(curr_batch)).c_str(), is_ok, "wb");
@@ -513,9 +540,9 @@ bool Library::saveBatchHTs(HTs<encT> &ts, uint16_t curr_batch)
 
   if (_log) {
     if (is_ok)
-      LOG(NOTICE) << "Successfully saved the built the library for batch " << curr_batch << std::endl;
+      LOG(NOTICE) << "Successfully saved thethe library for batch " << curr_batch << std::endl;
     else
-      LOG(ERROR) << "Failed saving the built library for batch " << curr_batch << std::endl;
+      LOG(ERROR) << "Failed saving the library for batch " << curr_batch << std::endl;
   }
 
   return is_ok;

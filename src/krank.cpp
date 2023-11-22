@@ -8,9 +8,9 @@ int main(int argc, char **argv)
   CLI::App app{"KRANK: a memory-bound taxonomic identification tool."};
   app.set_help_flag("--help");
   bool log = false;
-  app.add_flag("--log,!--no-log", log, "Increased verbosity and extensive logging.");
+  app.add_flag("--log,!--no-log", log, "Extensive logging, might be too much and helpful for troubleshooting.");
   bool verbose = true;
-  app.add_flag("--verbose,!--no-verbose", verbose, "Increased verbosity and extensive logging.");
+  app.add_flag("--verbose,!--no-verbose", verbose, "Increased verbosity and progress report.");
   app.require_subcommand();
 
   CLI::App *sub_build = app.add_subcommand("build", "Builds a referenece library with given k-mers sets.");
@@ -37,12 +37,13 @@ int main(int argc, char **argv)
                       from_library,
                       "Are k-mers already encoded and stored in the library? "
                       "Default: --from-scratch, and it reads k-mer sets or sequences from given input paths.");
-  bool from_kmers = false;
-  sub_build->add_flag("--from-kmers,!--from-sequences",
-                      from_kmers,
+  bool input_kmers = false;
+  sub_build->add_flag("--input-kmers,!--input-sequences",
+                      input_kmers,
                       "Are given input files k-mers sets or sequences? "
                       "If sequences, k-mers sets will be extracted internally. "
-                      "Default: --from-sequences.");
+                      "Ignored if --input-library given. "
+                      "Default: --input-sequences.");
   uint8_t k = 28;
   uint8_t w = k + 3;
   sub_build->add_option("-k,--kmer-length", k, "Length of k-mers. Default: 28.");
@@ -61,13 +62,19 @@ int main(int argc, char **argv)
                         "Number of bits to divide the table into batches. "
                         "Default: 2, i.e., 4 batches.");
   uint8_t target_batch = 0;
+  bool only_init = false;
   sub_build->add_option("--target-batch",
                         target_batch,
                         "The specific library batch to be built. "
-                        "Default: 0, i.e., all batches will be processed one by one.");
+                        "If 0, all batches will be processed one by one. "
+                        "If not given, library will only be initialized after reading the input data and encoding k-mers.");
+  sub_build->callback([&]() {
+    if (!sub_build->count("--target-batch"))
+      only_init = true;
+  });
   std::map<std::string, RankingMethod> map_ranking{{"random_kmer", random_kmer},
                                                    {"representative_kmer", representative_kmer}};
-  RankingMethod ranking_method = {representative_kmer};
+  RankingMethod ranking_method = representative_kmer;
   sub_build
     ->add_option(
       "--kmer-ranking", ranking_method, "Which strategy will be used for k-mer ranking? (random_kmer, representative_kmer)")
@@ -120,8 +127,15 @@ int main(int argc, char **argv)
     std::cerr << "The given target batch index (starts from 1) is greater than the number of batches." << std::endl;
   if (!(on_disk || !from_library))
     std::cerr << "If k-mer sets are going to be read from the library, --on-disk must be set." << std::endl;
+  if (!((target_batch != 0) || !from_library))
+    std::cerr << "If a target batch is specified (other than 0), k-mer sets must be read from the library." << std::endl;
   if (max_match_hdist > k)
     std::cerr << "Maximum Hamming distance for a match can not be greater than k-mer length." << std::endl;
+  if ((w < k) || (b < 2) || (h < 2) || (h >= k) || (batch_size > (2 * h - 1)) || (target_batch > pow(2, batch_size)) ||
+      (!(on_disk || !from_library)) || (max_match_hdist > k)) {
+    exit(EXIT_FAILURE);
+  }
+
 #ifndef SHORT_TABLE
   if ((k - h) > 16) {
     std::cerr << "In order to use compact k-mer encodings, k and h must satisfy (k-h) <= 16." << std::endl;
@@ -144,17 +158,18 @@ int main(int argc, char **argv)
               pow(2, 2 * h - batch_size), // tbatch_size
               from_library,
               on_disk,
-              from_kmers,
+              input_kmers,
               target_batch,
+              only_init,
               verbose,
               log);
-    std::cout << "Library has been built and saved." << std::endl;
+    std::cout << "Library has been built and saved" << std::endl;
   }
 
   if (sub_query->parsed()) {
     std::cout << "Querying the given sequences..." << std::endl;
     Query q(library_dir_v, output_dir.c_str(), query_file.c_str(), max_match_hdist, save_match_info, verbose, log);
-    std::cout << "Results for the input queries have been saved." << std::endl;
+    std::cout << "Results for the input queries have been saved" << std::endl;
   }
 
   return 0;

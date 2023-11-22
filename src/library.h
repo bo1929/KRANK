@@ -25,6 +25,7 @@ public:
           bool on_disk = true,
           bool from_kmers = false,
           uint8_t target_batch = 0,
+          bool only_init = false,
           bool verbose = true,
           bool log = true);
 
@@ -55,8 +56,9 @@ private:
   uint64_t _num_species;
   bool _on_disk;
   bool _from_library;
-  bool _from_kmers;
+  bool _input_kmers;
   uint8_t _target_batch;
+  bool _only_init;
   bool _log;
   bool _verbose;
   const uint16_t _rootID = 1;
@@ -73,6 +75,7 @@ public:
   void getRandomPositions();
   void skipBatch();
   void build();
+  void annotateInfo();
   void resetInfo(HTs<encT> &ts, bool reset_scount, bool reset_tlca);
   void softLCA(HTs<encT> &ts, uint8_t curr_batch);
   void countBasis(HTs<encT> &ts, uint8_t curr_batch);

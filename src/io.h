@@ -31,7 +31,7 @@ namespace IO {
   FILE *open_file(const char *filepath, bool &is_ok, const char *mode);
 
   std::ifstream open_ifstream(const char *filepath, bool is_ok);
-}
+} // namespace IO
 
 template<typename encT>
 struct StreamIM
@@ -60,8 +60,7 @@ struct StreamIM
     , w(w)
     , ptr_lsh_vg(ptr_lsh_vg)
     , ptr_npositions(ptr_npositions)
-  {
-  }
+  {}
   bool save(const char *filepath);
   bool load(const char *filepath);
   void clearStream();
@@ -77,21 +76,21 @@ struct StreamOD
 {
   uint32_t f_rix;
   uint32_t curr_rix;
-  const char *filepath;
+  std::string filepath;
   std::ifstream vec_ifs;
   std::streampos curr_pos;
   bool is_open;
 
-  StreamOD(const char *filepath)
+  StreamOD(std::string filepath)
     : filepath(filepath)
     , curr_rix(0)
     , f_rix(0)
-  {
-  }
+    , is_open(false)
+  {}
   void openStream();
   void closeStream();
   uint64_t getBatch(vvec<encT> &batch_table, uint32_t tbatch_size, bool contd = false);
-  void load(std::vector<std::pair<uint32_t, encT>> &lsh_enc_vec);
+  void load(std::vector<std::pair<uint32_t, encT>> &lsh_enc_vec, uint32_t bix, uint32_t eix);
 };
 
 #define DEFAULT_BATCH_SIZE 1048576
