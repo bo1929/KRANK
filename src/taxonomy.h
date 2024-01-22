@@ -21,7 +21,7 @@ template<typename T>
 class TaxonomyRecord
 {
 private:
-  T _num_input;
+  uint64_t _num_input;
   T _num_nodes;
   std::unordered_map<T, std::string> _tID_to_rank;
   std::unordered_map<T, uint64_t> _tID_to_taxID;

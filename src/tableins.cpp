@@ -69,13 +69,13 @@ template void HTs<uint64_t>::shrinkHT(uint64_t num_rm);
 
 template void HTs<uint32_t>::shrinkHT(uint64_t num_rm);
 
-template std::unordered_map<size_t, uint64_t> HTd<uint64_t>::histRowSizes();
+template std::map<size_t, uint64_t> HTd<uint64_t>::histRowSizes();
 
-template std::unordered_map<size_t, uint64_t> HTd<uint32_t>::histRowSizes();
+template std::map<size_t, uint64_t> HTd<uint32_t>::histRowSizes();
 
-template std::unordered_map<uint8_t, uint64_t> HTs<uint64_t>::histRowSizes();
+template std::map<uint8_t, uint64_t> HTs<uint64_t>::histRowSizes();
 
-template std::unordered_map<uint8_t, uint64_t> HTs<uint32_t>::histRowSizes();
+template std::map<uint8_t, uint64_t> HTs<uint32_t>::histRowSizes();
 
 template void HTd<uint32_t>::convertHTs(HTs<uint32_t> *table);
 

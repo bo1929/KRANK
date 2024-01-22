@@ -1,5 +1,10 @@
 #include "io.h"
 
+struct vhash
+{
+  inline std::size_t operator()(const std::pair<int, int> &v) const { return v.second; }
+};
+
 template<typename T>
 inline void sortColumns(vvec<T> &table)
 {
@@ -171,12 +176,18 @@ uint64_t StreamIM<encT>::extractInput(uint64_t rbatch_size)
   uint64_t u64m = std::numeric_limits<uint64_t>::max();
   uint64_t mask_bp = u64m >> (32 - k) * 2;
   uint64_t mask_lr = ((u64m >> (64 - k)) << 32) + ((u64m << 32) >> (64 - k));
-  unsigned int i, l, c;
-  for (std::string &filepath : filepath_v) {
-    size_t lfix = lsh_enc_vec.size();
+  size_t last_ix = lsh_enc_vec.size();
+  for (unsigned int fix = 0; fix < filepath_v.size(); ++fix) {
+    unsigned int i, l, c;
+    std::string &filepath = filepath_v[fix];
+#pragma omp critical
+    {
+      std::cout << "Processing " << filepath << "(" << fix << "/" << filepath_v.size() << ")" << std::endl;
+    }
     kseq_t *reader = IO::getReader(filepath.c_str());
     std::vector<sseq_t> seqBatch;
     IO::readBatch(seqBatch, reader, rbatch_size);
+    std::vector<std::pair<uint32_t, encT>> lsh_enc_vec_f;
     while (!(seqBatch.empty())) {
       for (uint32_t ix = 0; ix < seqBatch.size(); ++ix) {
         if (seqBatch[ix].len >= k) {
@@ -190,9 +201,9 @@ uint64_t StreamIM<encT>::extractInput(uint64_t rbatch_size)
           uint8_t ldiff = w - k + 1;
           std::string kmer_seq;
           uint8_t kix = 0;
-          size_t wix = lsh_enc_vec.size();
+          size_t wix = lsh_enc_vec_f.size();
           std::vector<std::pair<uint32_t, encT>> lsh_enc_win(ldiff);
-          lsh_enc_vec.resize(wix + seqBatch[ix].len - k + 1);
+          lsh_enc_vec_f.resize(wix + seqBatch[ix].len - k + 1);
           for (i = l = 0; i < seqBatch[ix].len; ++i) {
             c = seq_nt4_table[static_cast<uint8_t>(seqBatch[ix].nseq[i])];
             if (c < 4) { // not an "N" base
@@ -221,7 +232,7 @@ uint64_t StreamIM<encT>::extractInput(uint64_t rbatch_size)
                     lsh_enc_win[kix % ldiff] = std::make_pair(rix, cenc64_lr);
                     kix++;
                   } else {
-                    lsh_enc_vec[wix] = std::make_pair(rix, cenc64_lr);
+                    lsh_enc_vec_f[wix] = std::make_pair(rix, cenc64_lr);
                     wix++;
                   }
                 } else if (std::is_same<encT, uint32_t>::value) {
@@ -230,7 +241,7 @@ uint64_t StreamIM<encT>::extractInput(uint64_t rbatch_size)
                     lsh_enc_win[kix % ldiff] = std::make_pair(rix, cenc32_lr);
                     kix++;
                   } else {
-                    lsh_enc_vec[wix] = std::make_pair(rix, cenc32_lr);
+                    lsh_enc_vec_f[wix] = std::make_pair(rix, cenc32_lr);
                     wix++;
                   }
                 } else {
@@ -239,7 +250,7 @@ uint64_t StreamIM<encT>::extractInput(uint64_t rbatch_size)
                 }
               }
               if ((l >= w || ((i == seqBatch[ix].len - 1) && l >= k)) && ldiff > 1) {
-                lsh_enc_vec[wix] = *std::min_element(
+                lsh_enc_vec_f[wix] = *std::min_element(
                   lsh_enc_win.begin(), lsh_enc_win.end(), [](std::pair<uint32_t, encT> lhs, std::pair<uint32_t, encT> rhs) {
                     return murmur64(lhs.second) < murmur64(rhs.second);
                     /* return lhs.second < rhs.second; */
@@ -249,23 +260,29 @@ uint64_t StreamIM<encT>::extractInput(uint64_t rbatch_size)
             } else
               l = 0;
           }
-          lsh_enc_vec.resize(wix);
+          lsh_enc_vec_f.resize(wix);
         }
       }
       IO::readBatch(seqBatch, reader, rbatch_size);
     }
     kseq_destroy(reader);
     gzclose(reader->f->f);
-    lsh_enc_vec.shrink_to_fit();
-    std::sort(std::next(lsh_enc_vec.begin(), lfix),
-              lsh_enc_vec.end(),
-              [](const std::pair<uint32_t, encT> &l, const std::pair<uint32_t, encT> &r) {
-                if (l.first == r.first)
-                  return l.second < r.second;
-                else
-                  return l.first < r.first;
-              });
-    lsh_enc_vec.erase(std::unique(std::next(lsh_enc_vec.begin(), lfix), lsh_enc_vec.end()), lsh_enc_vec.end());
+    lsh_enc_vec_f.shrink_to_fit();
+    lsh_enc_vec.insert(lsh_enc_vec.end(), lsh_enc_vec_f.begin(), lsh_enc_vec_f.end());
+    if (((fix % GENOME_BATCH_SIZE) == 0) || (fix == (filepath_v.size() - 1))) {
+      if (fix == 0)
+        std::sort(lsh_enc_vec.begin() + last_ix,
+                  lsh_enc_vec.end(),
+                  [](const std::pair<uint32_t, encT> &l, const std::pair<uint32_t, encT> &r) {
+                    if (l.first == r.first)
+                      return l.second < r.second;
+                    else
+                      return l.first < r.first;
+                  });
+      std::inplace_merge(lsh_enc_vec.begin(), lsh_enc_vec.begin() + last_ix, lsh_enc_vec.end());
+      lsh_enc_vec.erase(std::unique(lsh_enc_vec.begin(), lsh_enc_vec.end()), lsh_enc_vec.end());
+      last_ix = lsh_enc_vec.size();
+    }
   }
   tnum_kmers = lsh_enc_vec.size();
   return tnum_kmers;
@@ -364,13 +381,13 @@ uint64_t StreamIM<encT>::readInput(uint64_t rbatch_size)
 }
 
 template<typename encT>
-std::unordered_map<uint8_t, uint64_t> StreamIM<encT>::histRowSizes()
+std::map<uint8_t, uint64_t> StreamIM<encT>::histRowSizes()
 {
-  std::unordered_map<uint32_t, uint8_t> row_sizes;
+  std::map<uint32_t, uint8_t> row_sizes;
   for (auto kv : lsh_enc_vec) {
     row_sizes[kv.first]++;
   }
-  std::unordered_map<uint8_t, uint64_t> hist_map;
+  std::map<uint8_t, uint64_t> hist_map;
   for (auto kv : row_sizes) {
     hist_map[kv.second]++;
   }
@@ -493,6 +510,6 @@ template void StreamOD<uint32_t>::load(std::vector<std::pair<uint32_t, uint32_t>
 
 template void StreamOD<uint64_t>::load(std::vector<std::pair<uint32_t, uint64_t>> &lsh_enc_vec, uint32_t bix, uint32_t eix);
 
-template std::unordered_map<uint8_t, uint64_t> StreamIM<uint64_t>::histRowSizes();
+template std::map<uint8_t, uint64_t> StreamIM<uint64_t>::histRowSizes();
 
-template std::unordered_map<uint8_t, uint64_t> StreamIM<uint32_t>::histRowSizes();
+template std::map<uint8_t, uint64_t> StreamIM<uint32_t>::histRowSizes();

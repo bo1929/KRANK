@@ -34,7 +34,7 @@ maskLSH generateMaskLSH(std::vector<uint8_t> &positions)
   return lsh_vg;
 }
 
-uint32_t computeValueLSH(uint64_t enc_bp, maskLSH lsh_vg)
+uint32_t computeValueLSH(uint64_t enc_bp, maskLSH &lsh_vg)
 {
   uint64_t res = 0;
   unsigned int i = 0;

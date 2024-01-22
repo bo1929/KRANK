@@ -76,6 +76,7 @@ public:
   void skipBatch();
   void build();
   void annotateInfo();
+  void processLeaf(tT tID_key);
   void resetInfo(HTs<encT> &ts, bool reset_scount, bool reset_tlca);
   void softLCA(HTs<encT> &ts, uint8_t curr_batch);
   void countBasis(HTs<encT> &ts, uint8_t curr_batch);
@@ -83,5 +84,15 @@ public:
   decltype(_positions) &positions() { return _positions; }
   decltype(_lsh_vg) &lsh_vg() { return _lsh_vg; }
 };
+
+inline bool exists_test(const char *filepath)
+{
+  if (FILE *file = fopen(filepath, "r")) {
+    fclose(file);
+    return true;
+  } else {
+    return false;
+  }
+}
 
 #endif

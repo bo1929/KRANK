@@ -1,6 +1,7 @@
 #include "library.h"
 
 #define LSR 3
+#define BLOATCOEF 3
 
 Library::Library(const char *library_dirpath,
                  const char *nodes_filepath,
@@ -42,6 +43,8 @@ Library::Library(const char *library_dirpath,
   , _log(log)
 {
   bool isDir = IO::ensureDirectory(_library_dirpath);
+  _root_size = 0;
+  _num_species = _taxonomy_record.tID_to_input().size();
   if (!_from_library) {
     if (isDir) {
       std::cout << "Library will be created at " << _library_dirpath << std::endl;
@@ -60,84 +63,45 @@ Library::Library(const char *library_dirpath,
       std::cout << "Sets of k-mers and corresponding hash keys are already on the disk" << std::endl;
     Library::loadMetadata();
     if (_verbose)
-      std::puts("Given parameters will be ignored.\n");
+      std::puts("Given parameters will be ignored (except batch size and target batch).\n");
     if (_log)
       LOG(INFO) << "The metadata of the given library is loaded from the disk" << std::endl;
+  }
+
+  if (_tbatch_size != tbatch_size) {
+    LOG(NOTICE) << "The number of batches that will be used has been changed." << std::endl;
+    LOG(INFO) << "The batch size and target rows are updated accordingly." << std::endl;
+    _tbatch_size = tbatch_size;
   }
 
   _lsh_vg = generateMaskLSH(_positions);
   _num_rows = pow(2, 2 * _h);
   _total_batches = _num_rows / _tbatch_size;
 
-  uint64_t root_size = 0;
-  _num_species = _taxonomy_record.tID_to_input().size();
   _tID_vec.reserve(_num_species);
   for (auto const &kv : _taxonomy_record.tID_to_input())
     _tID_vec.push_back(kv.first);
 
+  std::sort(_tID_vec.begin(), _tID_vec.end(), [&](const tT &x, const tT &y) {
+    return _taxonomy_record.tID_to_input()[x].size() > _taxonomy_record.tID_to_input()[y].size();
+  });
+
   if (_verbose)
     std::cout << "Reading and processing the input sequences..." << std::endl;
+
 #pragma omp parallel for schedule(dynamic), num_threads(num_threads)
   for (unsigned int i = 0; i < _tID_vec.size(); ++i) {
     tT tID_key = _tID_vec[i];
-    std::string disk_path(_library_dirpath);
-    disk_path = disk_path + "/lsh_enc_vec-" + std::to_string(tID_key);
-    std::vector<std::string> &filepath_v = _taxonomy_record.tID_to_input()[tID_key];
-    if (_log) {
-#pragma omp critical
-      {
-        LOG(INFO) << "Processing k-mer set for taxon " << _taxonomy_record.changeIDtax(tID_key) << std::endl;
-      }
-    }
-    uint64_t size_basis = 0;
-    StreamIM<encT> sIM(filepath_v, _k, _w, _h, &_lsh_vg, &_npositions);
-    if (!_from_library) {
-      if (_input_kmers)
-        size_basis = sIM.readInput(static_cast<uint64_t>(DEFAULT_BATCH_SIZE));
-      else
-        size_basis = sIM.extractInput(1);
-    } else {
-      bool loadIM = sIM.load(disk_path.c_str());
-      size_basis = sIM.lsh_enc_vec.size();
-    }
-#pragma omp critical
-    {
-      _basis_to_size[tID_key] = size_basis;
-      root_size += size_basis;
-    }
-
-    if ((!_from_library) && _on_disk) {
-      bool is_ok = sIM.save(disk_path.c_str());
-      if (!is_ok) {
-        std::cerr << "Error saving to " << disk_path << " for " << _taxonomy_record.changeIDtax(tID_key) << std::endl;
-        exit(EXIT_FAILURE);
-      }
-      if (_log) {
-#pragma omp critical
-        {
-          LOG(INFO) << "LSH-value and encoding pairs has been saved for " << _taxonomy_record.changeIDtax(tID_key)
-                    << std::endl;
-        }
-      }
-    }
-
-    if (_on_disk) {
-#pragma omp critical
-      {
-        _streamOD_map.emplace(std::make_pair(tID_key, StreamOD<encT>(disk_path)));
-        _streamOD_map.at(tID_key).openStream();
-      }
-      sIM.clearStream();
-    } else {
-#pragma omp critical
-      {
-        _streamIM_map.insert(std::make_pair(tID_key, sIM));
-      }
-    }
+    processLeaf(tID_key);
   }
 
-  _root_size = root_size;
-  if (_log)
+  if (_log || _verbose) {
+    std::cout << "LSH positions:" << std::endl;
+    for (auto p : _positions)
+      std::cout << " " << std::to_string(p);
+  }
+
+  if (_log || _verbose)
     LOG(INFO) << "Total number of (non-distinct) k-mers under the root: " << _root_size << std::endl;
 
   if (_verbose) {
@@ -159,7 +123,7 @@ Library::Library(const char *library_dirpath,
     std::cout << "\tTable row batch size: " << _tbatch_size << std::endl;
     std::cout << "\tTotal number of rows: " << _num_rows << std::endl;
     std::cout << "\tNumber of species: " << _num_species << std::endl;
-    std::cout << "\tTotal number of (non-unique) kmers: " << _root_size << std::endl;
+    std::cout << "\tTotal number of (non-distinct) kmers: " << _root_size << std::endl;
     std::cout << std::endl;
   }
 
@@ -179,8 +143,75 @@ Library::Library(const char *library_dirpath,
   if (!_only_init)
     Library::build();
 
-  for (unsigned int i = 0; i < _tID_vec.size(); ++i) {
-    _streamOD_map.at(_tID_vec[i]).closeStream();
+  for (auto &kv : _streamOD_map) {
+    kv.second.closeStream();
+  }
+}
+
+void Library::processLeaf(tT tID_key)
+{
+  std::string disk_path(_library_dirpath);
+  disk_path = disk_path + "/lsh_enc_vec-" + std::to_string(tID_key);
+  std::vector<std::string> &filepath_v = _taxonomy_record.tID_to_input()[tID_key];
+  if (_log) {
+#pragma omp critical
+    {
+      LOG(INFO) << "Processing k-mer set for taxon " << _taxonomy_record.changeIDtax(tID_key) << std::endl;
+    }
+  }
+  uint64_t size_basis = 0;
+  StreamIM<encT> sIM(filepath_v, _k, _w, _h, &_lsh_vg, &_npositions);
+  if (!_from_library) {
+    if (!exists_test(disk_path.c_str())) {
+      if (_input_kmers)
+        size_basis = sIM.readInput(static_cast<uint64_t>(DEFAULT_BATCH_SIZE));
+      else
+        size_basis = sIM.extractInput(1);
+    } else {
+      bool is_ok = sIM.load(disk_path.c_str());
+      size_basis = sIM.lsh_enc_vec.size();
+      if (_log) {
+#pragma omp critical
+        {
+          LOG(NOTICE) << "Encodings and hash values already exist for " << _taxonomy_record.changeIDtax(tID_key)
+                      << std::endl;
+        }
+      }
+    }
+#pragma omp critical
+    {
+      _basis_to_size[tID_key] = size_basis;
+      _root_size += size_basis;
+    }
+    if (_on_disk) {
+      bool is_ok = sIM.save(disk_path.c_str());
+      if (!is_ok) {
+        std::cerr << "Error saving to " << disk_path << " for " << _taxonomy_record.changeIDtax(tID_key) << std::endl;
+        exit(EXIT_FAILURE);
+      }
+      if (_log) {
+#pragma omp critical
+        {
+          LOG(INFO) << "LSH-value and encoding pairs has been saved for " << _taxonomy_record.changeIDtax(tID_key)
+                    << std::endl;
+        }
+      }
+    }
+  } else if (!_on_disk) {
+    bool is_ok = sIM.load(disk_path.c_str());
+#pragma omp critical
+    {
+      _streamIM_map.insert(std::make_pair(tID_key, sIM));
+    }
+  } else {
+#pragma omp critical
+    {
+      _streamOD_map.emplace(std::make_pair(tID_key, StreamOD<encT>(disk_path)));
+      _streamOD_map.at(tID_key).openStream();
+    }
+  }
+  if (_on_disk) {
+    sIM.clearStream();
   }
 }
 
@@ -242,7 +273,9 @@ void Library::softLCA(HTs<encT> &ts, uint8_t curr_batch)
           std::bernoulli_distribution bt(p_update);
           if (bt(gen)) {
 #pragma omp critical
-            ts.tlca_arr[rix * _b + j] = _taxonomy_record.getLowestCommonAncestor(ts.tlca_arr[rix * _b + j], tID_key);
+            {
+              ts.tlca_arr[rix * _b + j] = _taxonomy_record.getLowestCommonAncestor(ts.tlca_arr[rix * _b + j], tID_key);
+            }
           }
         }
       }
@@ -262,7 +295,7 @@ void Library::annotateInfo()
       HTs<encT> ts_root(1, _k, _h, _b, _tbatch_size, &_lsh_vg, _ranking_method);
       Library::loadBatchHTs(ts_root, curr_batch);
       if (_log)
-        LOG(INFO) << "The table is loaded" << std::endl;
+        LOG(INFO) << "The table has been loaded" << std::endl;
       Library::resetInfo(ts_root, true, true);
       Library::countBasis(ts_root, curr_batch);
       Library::softLCA(ts_root, curr_batch);
@@ -289,7 +322,7 @@ void Library::build()
       HTs<encT> ts_root(1, _k, _h, _b, _tbatch_size, &_lsh_vg, _ranking_method);
       Library::getBatchHTs(&ts_root);
       if (_log)
-        LOG(INFO) << "The table is built" << std::endl;
+        LOG(INFO) << "The table has been built" << std::endl;
       Library::resetInfo(ts_root, true, true);
       Library::countBasis(ts_root, curr_batch);
       Library::softLCA(ts_root, curr_batch);
@@ -378,27 +411,36 @@ void Library::getBatchHTs(HTs<encT> *ts)
   td.convertHTs(ts);
   if (_log)
     LOG(INFO) << "The static hash table has been constructed for " << _taxonomy_record.changeIDtax(ts->tID) << std::endl;
+  if (_log) {
+    std::cout << "Histogram for # of table columns:" << std::endl;
+    for (auto kv : ts->histRowSizes())
+      std::cout << "\t" << static_cast<unsigned int>(kv.first) << " : " << kv.second << std::endl;
+  }
 }
 
 void Library::getBatchHTd(HTd<encT> *td)
 {
   uint64_t curr_taxID = _taxonomy_record.changeIDtax(td->tID);
+  uint64_t num_batch_kmers;
   if (_verbose)
-    std::cout << "Constructing the table for " << curr_taxID << std::endl;
+    LOG(INFO) << "Constructing the table for " << curr_taxID << std::endl;
   if (_taxonomy_record.isBasis(td->tID)) {
     if (_on_disk) {
-      _streamOD_map.at(td->tID).getBatch(td->enc_vvec, _tbatch_size);
+      num_batch_kmers = _streamOD_map.at(td->tID).getBatch(td->enc_vvec, _tbatch_size);
     } else {
-      _streamIM_map.at(td->tID).getBatch(td->enc_vvec, _tbatch_size);
+      num_batch_kmers = _streamIM_map.at(td->tID).getBatch(td->enc_vvec, _tbatch_size);
     }
     td->initBasis(td->tID);
-    td->makeUnique();
-    if (_log)
-      LOG(INFO) << "The dynamic hash table has been constructed for the leaf  " << curr_taxID << std::endl;
+    td->makeUnique(true);
+    if (_log) {
+      LOG(INFO) << "The dynamic hash table has been constructed for the leaf " << curr_taxID << std::endl;
+      LOG(INFO) << "The number of k-mers read for this batch is " << num_batch_kmers << "/" << _basis_to_size[td->tID]
+                << std::endl;
+    }
   } else {
     std::set<tT> &children_set = _taxonomy_record.child_map()[td->tID];
     size_t num_child = children_set.size();
-    std::vector<double> children(num_child);
+    std::vector<tT> children(num_child);
     std::copy(children_set.begin(), children_set.end(), children.begin());
     td->childrenHT.assign(num_child, HTd<encT>(0, td->k, td->h, td->num_rows, td->ptr_lsh_vg, td->ranking_method));
     for (unsigned int ti = 0; ti < num_child; ++ti) {
@@ -416,15 +458,15 @@ void Library::getBatchHTd(HTd<encT> *td)
     td->updateSize();
 
     if (td->childrenHT.size() > 1) {
-      if (td->tID != 0 && td->tID != 1) {
-        if (_log)
-          LOG(INFO) << curr_taxID << " has more than one child, updating LCA labels" << std::endl;
-        td->updateLCA();
-      }
+      /*   if (td->tID != 0 && td->tID != 1) { */
+      /*     if (_log) */
+      /*       LOG(INFO) << curr_taxID << " has more than one child, updating LCA labels" << std::endl; */
+      /*     td->updateLCA(); // computes hard-LCA labels along the way, just in case */
+      /*   } */
 
-      if (_taxonomy_record.depth_vec()[td->tID] <= LSR) {
-        td->filterLSR(_taxonomy_record.depth_vec(), LSR);
-      }
+      /* if (_taxonomy_record.depth_vec()[td->tID] <= LSR) { */
+      /*   td->filterLSR(_taxonomy_record.depth_vec(), LSR); // removes k-mers with hard-LCA above LSR rank */
+      /* } */
 
       uint64_t constraint_size = getConstrainedSizeKC(td->tIDsBasis);
       int64_t num_rm = static_cast<int64_t>(td->num_kmers) - static_cast<int64_t>(constraint_size);
@@ -437,6 +479,11 @@ void Library::getBatchHTd(HTd<encT> *td)
     td->childrenHT.clear();
     if (_log)
       LOG(INFO) << "The dynamic hash table has been constructed for " << curr_taxID << std::endl;
+  }
+  if (_log) {
+    std::cout << "Histogram for # of table columns:" << std::endl;
+    for (auto kv : td->histRowSizes())
+      std::cout << "\t" << kv.first << " : " << kv.second << std::endl;
   }
 }
 
@@ -555,7 +602,7 @@ bool Library::loadMetadata()
   if (_verbose)
     std::cout << "Loading metadata of the library" << std::endl;
   std::string save_dirpath(_library_dirpath);
-  std::vector<std::pair<tT, uint16_t>> bases_sizes;
+  std::vector<std::pair<tT, uint64_t>> bases_sizes;
 
   FILE *metadataf = IO::open_file((save_dirpath + "/metadata").c_str(), is_ok, "rb");
   std::fread(&_k, sizeof(uint16_t), 1, metadataf);
@@ -568,7 +615,7 @@ bool Library::loadMetadata()
   std::fread(&_num_species, sizeof(uint64_t), 1, metadataf);
   std::fread(&_root_size, sizeof(uint64_t), 1, metadataf);
   bases_sizes.resize(_num_species);
-  std::fread(bases_sizes.data(), sizeof(std::pair<tT, uint16_t>), _num_species, metadataf);
+  std::fread(bases_sizes.data(), sizeof(std::pair<tT, uint64_t>), _num_species, metadataf);
   _positions.resize(_h);
   std::fread(_positions.data(), sizeof(uint8_t), _positions.size(), metadataf);
   _npositions.resize(_k - _h);
@@ -579,6 +626,10 @@ bool Library::loadMetadata()
     is_ok = false;
   }
   std::fclose(metadataf);
+
+  for (auto kv : bases_sizes) {
+    _basis_to_size[kv.first] = kv.second;
+  }
 
   if (_log) {
     if (is_ok)
@@ -596,7 +647,7 @@ bool Library::saveMetadata()
   if (_verbose)
     std::cout << "Saving metadata of the library" << std::endl;
   std::string save_dirpath(_library_dirpath);
-  std::vector<std::pair<tT, uint16_t>> bases_sizes(_basis_to_size.begin(), _basis_to_size.end());
+  std::vector<std::pair<tT, uint64_t>> bases_sizes(_basis_to_size.begin(), _basis_to_size.end());
 
   FILE *metadataf = IO::open_file((save_dirpath + "/metadata").c_str(), is_ok, "wb");
   std::fwrite(&_k, sizeof(uint16_t), 1, metadataf);
@@ -608,7 +659,7 @@ bool Library::saveMetadata()
   std::fwrite(&_num_rows, sizeof(uint64_t), 1, metadataf);
   std::fwrite(&_num_species, sizeof(uint64_t), 1, metadataf);
   std::fwrite(&_root_size, sizeof(uint64_t), 1, metadataf);
-  std::fwrite(bases_sizes.data(), sizeof(std::pair<tT, uint16_t>), bases_sizes.size(), metadataf);
+  std::fwrite(bases_sizes.data(), sizeof(std::pair<tT, uint64_t>), bases_sizes.size(), metadataf);
   std::fwrite(_positions.data(), sizeof(uint8_t), _positions.size(), metadataf);
   std::fwrite(_npositions.data(), sizeof(uint8_t), _npositions.size(), metadataf);
 

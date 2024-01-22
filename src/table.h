@@ -118,7 +118,7 @@ struct HTs
   void updateAfter(std::unordered_map<encT, scT> &scount_map, std::unordered_map<encT, tT> &tlca_map, uint32_t rix);
   void accumulateCounts(std::unordered_map<encT, scT> &scount_map, HTs<encT> &child, uint32_t rix);
   void getRowOrdering(std::vector<unsigned int> &row_order, bool reverse);
-  std::unordered_map<uint8_t, uint64_t> histRowSizes();
+  std::map<uint8_t, uint64_t> histRowSizes();
 };
 
 template<typename encT>
@@ -173,7 +173,7 @@ struct HTd
   void updateLCA();
   void filterLSR(std::vector<uint8_t> &depth_vec, uint8_t slr_depth);
   void getRowOrdering(std::vector<unsigned int> &row_order, bool reverse);
-  std::unordered_map<size_t, uint64_t> histRowSizes();
+  std::map<size_t, uint64_t> histRowSizes();
 };
 
 #endif

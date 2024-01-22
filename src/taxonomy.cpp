@@ -79,18 +79,6 @@ TaxonomyRecord<T>::TaxonomyRecord(const char *input_filepath, TaxonomyNCBI taxon
   }
   input_file.close();
 
-#ifdef LARGE_TAXONOMY
-  if (std::numeric_limits<uint32_t>::max() < input_to_taxID.size()) {
-    std::cerr << "The number of input files exceeds supported limit (std::numeric_limits<uint32_t>::max)!" << std::endl;
-    exit(EXIT_FAILURE);
-  }
-#else
-  if (std::numeric_limits<uint16_t>::max() < input_to_taxID.size()) {
-    std::cerr << "The number of input files exceeds supported limit (std::numeric_limits<uint16_t>::max)!" << std::endl;
-    exit(EXIT_FAILURE);
-  }
-#endif
-
   _num_input = input_to_taxID.size();
 
   _tID_to_taxID[0] = 0;
@@ -127,12 +115,14 @@ TaxonomyRecord<T>::TaxonomyRecord(const char *input_filepath, TaxonomyNCBI taxon
 
 #ifdef LARGE_TAXONOMY
   if (std::numeric_limits<uint32_t>::max() < num_nodes) {
-    std::cerr << "The number of taxonomy nodes exceeds supported limit (std::numeric_limits<uint32_t>::max)!" << std::endl;
+    std::cerr << "The number of taxonomy nodes " << num_nodes
+              << " exceeds supported limit (std::numeric_limits<uint32_t>::max)!" << std::endl;
     exit(EXIT_FAILURE);
   }
 #else
   if (std::numeric_limits<uint16_t>::max() < num_nodes) {
-    std::cerr << "The number of taxonomy nodes exceeds supported limit (std::numeric_limits<uint16_t>::max)!" << std::endl;
+    std::cerr << "The number of taxonomy nodes " << num_nodes
+              << " exceeds supported limit (std::numeric_limits<uint16_t>::max)!" << std::endl;
     exit(EXIT_FAILURE);
   }
 #endif
@@ -228,8 +218,12 @@ bool TaxonomyRecord<T>::saveTaxonomyRecord(const char *library_dirpath)
   std::string save_filepath(library_dirpath);
   std::vector<std::pair<T, uint64_t>> tIDs_taxIDs(_tID_to_taxID.begin(), _tID_to_taxID.end());
 
+  std::cout << _num_input << std::endl;
+  std::cout << _num_nodes << std::endl;
+  std::cout << tIDs_taxIDs.size() << std::endl;
+
   FILE *taxonomyf = IO::open_file((save_filepath + "/taxonomy").c_str(), is_ok, "wb");
-  std::fwrite(&_num_input, sizeof(T), 1, taxonomyf);
+  std::fwrite(&_num_input, sizeof(uint64_t), 1, taxonomyf);
   std::fwrite(&_num_nodes, sizeof(T), 1, taxonomyf);
   std::fwrite(tIDs_taxIDs.data(), sizeof(std::pair<T, uint64_t>), _num_nodes, taxonomyf);
   std::fwrite(_parent_vec.data(), sizeof(T), _num_nodes, taxonomyf);

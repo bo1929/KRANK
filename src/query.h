@@ -17,7 +17,7 @@ public:
         const char *query_filepath,
         uint8_t max_match_hdist = 5,
         bool save_match_info = true,
-        bool verbose = true,
+        bool verbose = false,
         bool log = false);
   void run(uint64_t rbatch_size = DEFAULT_BATCH_SIZE);
   template<typename T>
@@ -26,9 +26,8 @@ public:
 private:
   struct SearchL
   {
-    SearchL(const char *library_dirpath, bool verbose, bool log = false);
+    SearchL(const char *library_dirpath, bool log = false);
     bool _log;
-    bool _verbose;
     const char *_library_dirpath;
     uint8_t _k;
     uint8_t _h;
@@ -48,7 +47,7 @@ private:
     std::vector<tT> _tax_parent_vec;
     std::vector<uint8_t> _tax_depth_vec;
     const uint16_t _rootID = 1;
-    std::vector<std::pair<tT, uint16_t>> _bases_sizes;
+    std::vector<std::pair<tT, uint64_t>> _bases_sizes;
     encT *_enc_arr;
     tT *_tlca_arr;
     // scT* _scount_ar;
@@ -60,7 +59,6 @@ private:
     decltype(_positions) &positions() { return _positions; }
     decltype(_lsh_vg) &lsh_vg() { return _lsh_vg; }
   };
-  bool _verbose;
   bool _log;
   std::vector<std::string> _library_dirpaths;
   const char *_query_filepath;

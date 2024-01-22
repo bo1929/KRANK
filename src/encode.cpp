@@ -1,6 +1,6 @@
 #include "encode.h"
 
-void kmerEncodingBPCompute(const char *seq, uint64_t &enc_bp)
+bool kmerEncodingBPCompute(const char *seq, uint64_t &enc_bp)
 {
   enc_bp = 0;
   for (unsigned int i = 0; i < static_cast<unsigned int>(strlen(seq)); i++) {
@@ -11,13 +11,16 @@ void kmerEncodingBPCompute(const char *seq, uint64_t &enc_bp)
       enc_bp += 2;
     } else if (seq[i] == 'C') {
       enc_bp += 1;
-    } else {
+    } else if (seq[i] == 'A') {
       enc_bp += 0;
+    } else {
+      return false;
     }
   }
+  return true;
 }
 
-void kmerEncodingCompute(const char *seq, uint64_t &enc_lr, uint64_t &enc_bp)
+bool kmerEncodingCompute(const char *seq, uint64_t &enc_lr, uint64_t &enc_bp)
 {
   enc_lr = 0;
   enc_bp = 0;
@@ -33,14 +36,17 @@ void kmerEncodingCompute(const char *seq, uint64_t &enc_lr, uint64_t &enc_bp)
     } else if (seq[i] == 'C') {
       enc_lr += 1;
       enc_bp += 1;
-    } else {
+    } else if (seq[i] == 'A') {
       enc_lr += 0;
       enc_bp += 0;
+    } else {
+      return false;
     }
   }
+  return true;
 }
 
-void kmerEncodingComputeC(const char *seq, uint64_t &enc_lr, uint64_t &enc_bp)
+bool kmerEncodingComputeC(const char *seq, uint64_t &enc_lr, uint64_t &enc_bp)
 {
   enc_lr = 0;
   enc_bp = 0;
@@ -56,14 +62,17 @@ void kmerEncodingComputeC(const char *seq, uint64_t &enc_lr, uint64_t &enc_bp)
     } else if (seq[i] == 'G') {
       enc_lr += 1;
       enc_bp += 1;
-    } else {
+    } else if (seq[i] == 'T') {
       enc_lr += 0;
       enc_bp += 0;
+    } else {
+      return false;
     }
   }
+  return true;
 }
 
-void kmerEncodingUpdate(const char *seq, uint64_t &enc_lr, uint64_t &enc_bp)
+bool kmerEncodingUpdate(const char *seq, uint64_t &enc_lr, uint64_t &enc_bp)
 {
   enc_lr = enc_lr << 1;
   enc_bp = enc_bp << 2;
@@ -78,13 +87,16 @@ void kmerEncodingUpdate(const char *seq, uint64_t &enc_lr, uint64_t &enc_bp)
   } else if (seq[0] == 'C') {
     enc_lr += 1;
     enc_bp += 1;
-  } else {
+  } else if (seq[0] == 'A') {
     enc_lr += 0;
     enc_bp += 0;
+  } else {
+    return false;
   }
+  return true;
 }
 
-void kmerEncodingUpdateC(const char *seq, uint64_t &enc_lr, uint64_t &enc_bp)
+bool kmerEncodingUpdateC(const char *seq, uint64_t &enc_lr, uint64_t &enc_bp)
 {
   enc_lr = enc_lr << 1;
   enc_bp = enc_bp << 2;
@@ -99,8 +111,11 @@ void kmerEncodingUpdateC(const char *seq, uint64_t &enc_lr, uint64_t &enc_bp)
   } else if (seq[0] == 'G') {
     enc_lr += 1;
     enc_bp += 1;
-  } else {
+  } else if (seq[0] == 'T') {
     enc_lr += 0;
     enc_bp += 0;
+  } else {
+    return false;
   }
+  return true;
 }

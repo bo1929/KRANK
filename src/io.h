@@ -68,7 +68,7 @@ struct StreamIM
   uint64_t readInput(uint64_t rbatch_size);
   uint64_t extractInput(uint64_t rbatch_size);
   uint64_t getBatch(vvec<encT> &batch_table, uint32_t tbatch_size);
-  std::unordered_map<uint8_t, uint64_t> histRowSizes();
+  std::map<uint8_t, uint64_t> histRowSizes();
 };
 
 template<typename encT>
@@ -94,5 +94,6 @@ struct StreamOD
 };
 
 #define DEFAULT_BATCH_SIZE 1048576
+#define GENOME_BATCH_SIZE 50
 
 #endif

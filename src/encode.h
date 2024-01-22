@@ -4,15 +4,15 @@
 #include "common.h"
 #include "io.h"
 
-void kmerEncodingBPCompute(const char *seq, uint64_t &enc_bp);
+bool kmerEncodingBPCompute(const char *seq, uint64_t &enc_bp);
 
-void kmerEncodingCompute(const char *seq, uint64_t &enc_lr, uint64_t &enc_bp);
+bool kmerEncodingCompute(const char *seq, uint64_t &enc_lr, uint64_t &enc_bp);
 
-void kmerEncodingComputeC(const char *seq, uint64_t &enc_lr, uint64_t &enc_bp);
+bool kmerEncodingComputeC(const char *seq, uint64_t &enc_lr, uint64_t &enc_bp);
 
-void kmerEncodingUpdate(const char *seq, uint64_t &enc_lr, uint64_t &enc_bp);
+bool kmerEncodingUpdate(const char *seq, uint64_t &enc_lr, uint64_t &enc_bp);
 
-void kmerEncodingUpdateC(const char *seq, uint64_t &enc_lr, uint64_t &enc_bp);
+bool kmerEncodingUpdateC(const char *seq, uint64_t &enc_lr, uint64_t &enc_bp);
 
 void retrieveEncodings(const char *fpath, uint64_t *&enc_arr, uint32_t num_kmers, unsigned int batch_size);
 
