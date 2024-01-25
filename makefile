@@ -14,7 +14,7 @@ OBJECTS = build/io.o build/common.o build/query.o build/library.o \
 
 # rules
 #--------------------------------------------
-all: clean $(PROGRAM)
+all: $(PROGRAM)
 
 # generic rule for compiling *.cpp -> *.o
 build/%.o: src/%.cpp
