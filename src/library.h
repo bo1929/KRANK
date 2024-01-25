@@ -6,6 +6,7 @@
 #include "lsh.h"
 #include "table.h"
 #include "taxonomy.h"
+#include "filesystem.hpp"
 
 class Library
 {
@@ -22,7 +23,6 @@ public:
           uint64_t capacitiy_size,
           uint32_t num_batch_rows,
           bool from_library = false,
-          bool on_disk = true,
           bool from_kmers = false,
           uint8_t target_batch = 0,
           bool only_init = false,
@@ -49,12 +49,10 @@ private:
   maskLSH _lsh_vg;
   std::vector<uint8_t> _positions;
   std::vector<uint8_t> _npositions;
-  std::unordered_map<tT, StreamIM<encT>> _streamIM_map;
-  std::unordered_map<tT, StreamOD<encT>> _streamOD_map;
+  std::unordered_map<tT, inputStream<encT>> _inputStream_map;
   std::unordered_map<tT, uint64_t> _basis_to_size;
   std::vector<tT> _tID_vec;
   uint64_t _num_species;
-  bool _on_disk;
   bool _from_library;
   bool _input_kmers;
   uint8_t _target_batch;
@@ -66,10 +64,10 @@ private:
 public:
   uint64_t getConstrainedSizeKC(std::set<tT> tIDsBasis);
   uint64_t getConstrainedSizeSC(uint64_t num_basis);
-  void getBatchHTd(HTd<encT> *td);
-  void getBatchHTs(HTs<encT> *ts);
-  bool saveBatchHTs(HTs<encT> &ts, uint16_t curr_batch);
-  bool loadBatchHTs(HTs<encT> &ts, uint16_t curr_batch);
+  void getBatchHTd(HTd<encT> *td, unsigned int curr_batch);
+  void getBatchHTs(HTs<encT> *ts, unsigned int curr_batch);
+  bool saveBatchHTs(HTs<encT> &ts, unsigned int curr_batch);
+  bool loadBatchHTs(HTs<encT> &ts, unsigned int curr_batch);
   bool saveMetadata();
   bool loadMetadata();
   void getRandomPositions();
@@ -78,21 +76,11 @@ public:
   void annotateInfo();
   void processLeaf(tT tID_key);
   void resetInfo(HTs<encT> &ts, bool reset_scount, bool reset_tlca);
-  void softLCA(HTs<encT> &ts, uint8_t curr_batch);
-  void countBasis(HTs<encT> &ts, uint8_t curr_batch);
+  void softLCA(HTs<encT> &ts, unsigned int curr_batch);
+  void countBasis(HTs<encT> &ts, unsigned int curr_batch);
   decltype(_npositions) &npositions() { return _npositions; }
   decltype(_positions) &positions() { return _positions; }
   decltype(_lsh_vg) &lsh_vg() { return _lsh_vg; }
 };
-
-inline bool exists_test(const char *filepath)
-{
-  if (FILE *file = fopen(filepath, "r")) {
-    fclose(file);
-    return true;
-  } else {
-    return false;
-  }
-}
 
 #endif

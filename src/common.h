@@ -1,7 +1,6 @@
 #ifndef _COMMON_H
 #define _COMMON_H
 
-#include "aixlog.hpp"
 #include <algorithm>
 #include <assert.h>
 #include <bitset>
@@ -45,6 +44,7 @@
 #include <utility>
 #include <vector>
 #include <zlib.h>
+#include "aixlog.hpp"
 
 #ifdef _OPENMP
   #include <omp.h>
@@ -54,6 +54,8 @@
 
 #define VERSION "v0.0.1"
 #define PRINT_VERSION printf("KRANK version: " VERSION "\n");
+
+#define MAX_NUM_TASKS 8
 
 extern unsigned int num_threads;
 extern std::random_device rd;

@@ -54,7 +54,7 @@ void HTd<encT>::makeUnique(bool update_size)
     std::puts("HTd has unsorted columns before making rows unique.\n");
   }
 #endif
-#pragma omp parallel for num_threads(num_threads), schedule(dynamic)
+#pragma omp parallel for schedule(dynamic)
   for (uint32_t rix = 0; rix < num_rows; ++rix) {
     if (!enc_vvec[rix].empty()) {
       std::unordered_map<encT, scT> scount_map{};
@@ -102,7 +102,7 @@ void HTs<encT>::makeUnique(bool update_size)
     std::puts("HTs has unsorted columns before making rows unique.\n");
   }
 #endif
-#pragma omp parallel for num_threads(num_threads), schedule(dynamic)
+#pragma omp parallel for schedule(dynamic)
   for (uint32_t rix = 0; rix < num_rows; ++rix) {
     if (ind_arr[rix] > 0) {
       std::unordered_map<encT, scT> scount_map{};
@@ -123,7 +123,7 @@ void HTs<encT>::makeUnique(bool update_size)
 template<typename encT>
 void HTd<encT>::sortColumns()
 {
-#pragma omp parallel for num_threads(num_threads), schedule(dynamic)
+#pragma omp parallel for schedule(dynamic)
   for (uint32_t rix = 0; rix < num_rows; ++rix) {
     if (!enc_vvec[rix].empty()) {
       std::unordered_map<encT, scT> scount_map{};
@@ -139,7 +139,7 @@ template<typename encT>
 void HTs<encT>::sortColumns()
 {
   uint8_t b = HTs<encT>::b;
-#pragma omp parallel for num_threads(num_threads), schedule(dynamic)
+#pragma omp parallel for schedule(dynamic)
   for (uint32_t rix = 0; rix < num_rows; ++rix) {
     if (ind_arr[rix] > 0) {
       std::unordered_map<encT, scT> scount_map{};
@@ -155,7 +155,7 @@ template<typename encT>
 bool HTd<encT>::areColumnsSorted()
 {
   bool is_ok = true;
-#pragma omp parallel for num_threads(num_threads), schedule(dynamic)
+#pragma omp parallel for schedule(dynamic)
   for (uint32_t rix = 0; rix < num_rows; ++rix) {
     if (!enc_vvec[rix].empty() && !std::is_sorted(enc_vvec[rix].begin(), enc_vvec[rix].end())) {
 #pragma omp atomic write
@@ -169,7 +169,7 @@ template<typename encT>
 bool HTs<encT>::areColumnsSorted()
 {
   bool is_ok = true;
-#pragma omp parallel for num_threads(num_threads), schedule(dynamic)
+#pragma omp parallel for schedule(dynamic)
   for (uint32_t rix = 0; rix < num_rows; ++rix) {
     if ((ind_arr[rix] > 0) && !std::is_sorted(enc_arr + (rix * b), enc_arr + (rix * b) + ind_arr[rix])) {
 #pragma omp atomic write
@@ -205,7 +205,7 @@ void HTs<encT>::clearRows()
 #ifdef DEBUG
   LOG(INFO) << "The current size, before clearing, of the table is " << num_kmers << std::endl;
 #endif
-#pragma omp parallel for num_threads(num_threads), schedule(dynamic)
+#pragma omp parallel for schedule(dynamic)
   for (uint32_t rix = 0; rix < num_rows; ++rix) {
     ind_arr[rix] = 0;
   }
@@ -247,7 +247,7 @@ void HTd<encT>::initBasis(tT tID)
 #ifdef DEBUG
   LOG(INFO) << "The current size of the table is " << num_kmers << std::endl;
 #endif
-#pragma omp parallel for num_threads(num_threads), schedule(dynamic)
+#pragma omp parallel for schedule(dynamic)
   for (uint32_t rix = 0; rix < num_rows; ++rix) {
     if (!enc_vvec[rix].empty()) {
       scount_vvec[rix].resize(enc_vvec[rix].size());
@@ -266,7 +266,7 @@ void HTd<encT>::initBasis(tT tID)
 template<typename encT>
 void HTd<encT>::trimColumns(size_t b_max)
 {
-#pragma omp parallel for num_threads(num_threads), schedule(dynamic)
+#pragma omp parallel for schedule(dynamic)
   for (uint32_t rix = 0; rix < num_rows; ++rix) {
     if (enc_vvec[rix].size() > b_max) {
       enc_vvec[rix].resize(b_max);
@@ -306,7 +306,7 @@ void HTd<encT>::pruneColumns(size_t b_max)
 #ifdef DEBUG
   LOG(INFO) << "The current size, before pruning, of the table is " << num_kmers << std::endl;
 #endif
-#pragma omp parallel for num_threads(num_threads), schedule(dynamic)
+#pragma omp parallel for schedule(dynamic)
   for (uint32_t rix = 0; rix < num_rows; ++rix) {
     if (enc_vvec[rix].size() > b_max) {
       std::vector<size_t> ixs;
@@ -387,7 +387,7 @@ void HTd<encT>::unionRows(HTd<encT> &child, bool update_size)
   }
 #endif
   assert(num_rows == child.num_rows);
-#pragma omp parallel for num_threads(num_threads), schedule(dynamic)
+#pragma omp parallel for schedule(dynamic)
   for (uint32_t rix = 0; rix < num_rows; ++rix) {
     if (!enc_vvec[rix].empty() && !child.enc_vvec[rix].empty()) {
       std::unordered_map<encT, scT> scount_map{};
@@ -445,7 +445,7 @@ void HTs<encT>::unionRows(HTs<encT> &child, bool update_size)
 #endif
   assert(b == child.b);
   assert(num_rows == child.num_rows);
-#pragma omp parallel for num_threads(num_threads), schedule(dynamic)
+#pragma omp parallel for schedule(dynamic)
   for (uint32_t rix = 0; rix < num_rows; ++rix) {
     unsigned int ix = rix * b;
     if ((child.ind_arr[rix] > 0) && (ind_arr[rix] > 0)) {
@@ -526,7 +526,7 @@ void HTd<encT>::shrinkHT(uint64_t num_rm, size_t b_max)
     std::vector<unsigned int> row_order;
     HTd<encT>::getRowOrdering(row_order, true);
     size_t n = static_cast<uint64_t>(to_rm) / num_rows + 1;
-#pragma omp parallel for num_threads(num_threads) schedule(dynamic)
+#pragma omp parallel for schedule(dynamic)
     for (uint32_t ix = 0; ix < row_order.size(); ++ix) {
       uint32_t &rix = row_order[ix];
       if (enc_vvec[rix].size() >= n) {
@@ -596,7 +596,7 @@ void HTs<encT>::shrinkHT(uint64_t num_rm)
     std::vector<unsigned int> row_order;
     HTs<encT>::getRowOrdering(row_order, true);
     size_t n = to_rm / num_rows + 1;
-#pragma omp parallel for num_threads(num_threads) schedule(dynamic)
+#pragma omp parallel for schedule(dynamic)
     for (uint32_t ix = 0; ix < row_order.size(); ++ix) {
       uint32_t &rix = row_order[ix];
       if (ind_arr[rix] >= n) {
@@ -642,7 +642,7 @@ template<typename encT>
 void HTd<encT>::updateLCA()
 {
   if (childrenHT.size() > 1) {
-#pragma omp parallel for num_threads(num_threads) schedule(dynamic) private(gen)
+#pragma omp parallel for schedule(dynamic) private(gen)
     for (uint32_t rix = 0; rix < num_rows; ++rix) {
       if (enc_vvec[rix].size() > 0) {
         std::unordered_map<encT, tT> tlca_map{};
@@ -667,7 +667,7 @@ template<typename encT>
 void HTs<encT>::updateLCA()
 {
   if (childrenHT.size() > 1) {
-#pragma omp parallel for num_threads(num_threads) schedule(dynamic) private(gen)
+#pragma omp parallel for schedule(dynamic) private(gen)
     for (uint32_t rix = 0; rix < num_rows; ++rix) {
       if (ind_arr[rix] > 0) {
         std::unordered_map<encT, tT> tlca_map{};
@@ -694,15 +694,15 @@ void HTd<encT>::convertHTs(HTs<encT> *new_table)
   assert(new_table->h == h);
   assert(new_table->num_rows == num_rows);
   assert(new_table->ptr_lsh_vg == ptr_lsh_vg);
-  uint8_t b = new_table->b;
+  size_t b = new_table->b;
   uint32_t num_rows = new_table->num_rows;
-  new_table->clearRows();
+  /* new_table->clearRows(); */
   HTd<encT>::pruneColumns(b);
 #pragma omp parallel for num_threads(num_threads), schedule(dynamic)
   for (uint32_t rix = 0; rix < num_rows; ++rix) {
     if (enc_vvec[rix].size() < b) {
       new_table->ind_arr[rix] = enc_vvec[rix].size();
-      if (new_table->ind_arr[rix]) {
+      if (new_table->ind_arr[rix] > 0) {
         std::copy(enc_vvec[rix].begin(), enc_vvec[rix].end(), new_table->enc_arr + (rix * b));
         std::copy(scount_vvec[rix].begin(), scount_vvec[rix].end(), new_table->scount_arr + (rix * b));
         /* std::copy(tlca_vvec[rix].begin(), tlca_vvec[rix].end(), new_table->tlca_arr + (rix * b)); */
@@ -722,7 +722,7 @@ void HTd<encT>::convertHTs(HTs<encT> *new_table)
 template<typename encT>
 void HTd<encT>::filterLSR(std::vector<uint8_t> &depth_vec, uint8_t slr_depth)
 {
-#pragma omp parallel for num_threads(num_threads) schedule(dynamic)
+#pragma omp parallel for schedule(dynamic)
   for (uint32_t rix = 0; rix < num_rows; ++rix) {
     if (tlca_vvec[rix].size() >= 1) {
       std::vector<size_t> ixs;

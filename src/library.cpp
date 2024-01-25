@@ -1,7 +1,6 @@
 #include "library.h"
 
-#define LSR 3
-#define BLOATCOEF 3
+#define LSR 4
 
 Library::Library(const char *library_dirpath,
                  const char *nodes_filepath,
@@ -15,7 +14,6 @@ Library::Library(const char *library_dirpath,
                  uint64_t capacity_size,
                  uint32_t tbatch_size,
                  bool from_library,
-                 bool on_disk,
                  bool input_kmers,
                  uint8_t target_batch,
                  bool only_init,
@@ -35,56 +33,60 @@ Library::Library(const char *library_dirpath,
   , _capacity_size(capacity_size)
   , _tbatch_size(tbatch_size)
   , _from_library(from_library)
-  , _on_disk(on_disk)
   , _input_kmers(input_kmers)
   , _target_batch(target_batch)
   , _only_init(only_init)
   , _verbose(verbose)
   , _log(log)
 {
-  bool isDir = IO::ensureDirectory(_library_dirpath);
   _root_size = 0;
   _num_species = _taxonomy_record.tID_to_input().size();
   if (!_from_library) {
-    if (isDir) {
-      std::cout << "Library will be created at " << _library_dirpath << std::endl;
+    if (IO::ensureDirectory(_library_dirpath)) {
+      std::cout << "Library directory exists, current files will be overwritten " << _library_dirpath << std::endl;
+    } else if (ghc::filesystem::create_directories(_library_dirpath)) {
+      std::cout << "Library directory has been created at the given path " << _library_dirpath << std::endl;
     } else {
-      std::cerr << "Library can not be created at " << _library_dirpath << std::endl;
+      std::cerr << "Library directory can not be created at the given path " << _library_dirpath << std::endl;
       exit(EXIT_FAILURE);
     }
     getRandomPositions();
-    if (_target_batch != 0) {
-      std::cerr << "A specific batch can not be built seperately before saving k-mer sets into the library!" << std::endl;
-      exit(EXIT_FAILURE);
-    }
   } else {
-    std::cout << "Library is at " << _library_dirpath << std::endl;
-    if (_verbose)
-      std::cout << "Sets of k-mers and corresponding hash keys are already on the disk" << std::endl;
+    std::cout << "Library has been found at the given path " << _library_dirpath << std::endl;
     Library::loadMetadata();
     if (_verbose)
-      std::puts("Given parameters will be ignored (except batch size and target batch).\n");
-    if (_log)
-      LOG(INFO) << "The metadata of the given library is loaded from the disk" << std::endl;
+      std::puts("Given parameters will be ignored, parameters found in library metadata will be used.\n");
   }
 
-  if (_tbatch_size != tbatch_size) {
+  if (_tbatch_size != tbatch_size) { // REMOVE
     LOG(NOTICE) << "The number of batches that will be used has been changed." << std::endl;
     LOG(INFO) << "The batch size and target rows are updated accordingly." << std::endl;
     _tbatch_size = tbatch_size;
-  }
+  } // REMOVE
 
   _lsh_vg = generateMaskLSH(_positions);
   _num_rows = pow(2, 2 * _h);
   _total_batches = _num_rows / _tbatch_size;
 
+  if (_target_batch > _total_batches) {
+    std::cerr << "Given target " << _target_batch << " can not be greater than # of batches " << _total_batches << std::endl;
+    exit(EXIT_FAILURE);
+  }
+
   _tID_vec.reserve(_num_species);
   for (auto const &kv : _taxonomy_record.tID_to_input())
     _tID_vec.push_back(kv.first);
-
   std::sort(_tID_vec.begin(), _tID_vec.end(), [&](const tT &x, const tT &y) {
     return _taxonomy_record.tID_to_input()[x].size() > _taxonomy_record.tID_to_input()[y].size();
   });
+
+  if (!from_library) {
+    for (int i = 1; i <= _total_batches; ++i) {
+      std::string batch_dirpath = _library_dirpath;
+      batch_dirpath += +"/batch" + std::to_string(i);
+      ghc::filesystem::create_directory(batch_dirpath);
+    }
+  }
 
   if (_verbose)
     std::cout << "Reading and processing the input sequences..." << std::endl;
@@ -96,20 +98,17 @@ Library::Library(const char *library_dirpath,
   }
 
   if (_log || _verbose) {
-    std::cout << "LSH positions:" << std::endl;
+    std::cout << "LSH positions:";
     for (auto p : _positions)
       std::cout << " " << std::to_string(p);
+    std::cout << std::endl;
   }
 
   if (_log || _verbose)
     LOG(INFO) << "Total number of (non-distinct) k-mers under the root: " << _root_size << std::endl;
 
   if (_verbose) {
-    std::cout << "Library is initialized and k-mers sets are ready to be streamed" << std::endl;
-    if (on_disk)
-      std::cout << "Stream will be on disk" << std::endl;
-    else
-      std::cout << "Stream will be in memory" << std::endl;
+    std::cout << "Library has been set and k-mers sets are ready to be streamed" << std::endl;
   }
 
   if (_verbose) {
@@ -142,16 +141,10 @@ Library::Library(const char *library_dirpath,
 
   if (!_only_init)
     Library::build();
-
-  for (auto &kv : _streamOD_map) {
-    kv.second.closeStream();
-  }
 }
 
 void Library::processLeaf(tT tID_key)
 {
-  std::string disk_path(_library_dirpath);
-  disk_path = disk_path + "/lsh_enc_vec-" + std::to_string(tID_key);
   std::vector<std::string> &filepath_v = _taxonomy_record.tID_to_input()[tID_key];
   if (_log) {
 #pragma omp critical
@@ -160,16 +153,16 @@ void Library::processLeaf(tT tID_key)
     }
   }
   uint64_t size_basis = 0;
-  StreamIM<encT> sIM(filepath_v, _k, _w, _h, &_lsh_vg, &_npositions);
+  inputHandler<encT> pI(filepath_v, _k, _w, _h, &_lsh_vg, &_npositions);
   if (!_from_library) {
-    if (!exists_test(disk_path.c_str())) {
+    if (!pI.checkInput(_library_dirpath, tID_key, _total_batches)) {
       if (_input_kmers)
-        size_basis = sIM.readInput(static_cast<uint64_t>(DEFAULT_BATCH_SIZE));
+        size_basis = pI.readInput(static_cast<uint64_t>(DEFAULT_BATCH_SIZE));
       else
-        size_basis = sIM.extractInput(1);
+        size_basis = pI.extractInput(1);
     } else {
-      bool is_ok = sIM.load(disk_path.c_str());
-      size_basis = sIM.lsh_enc_vec.size();
+      bool is_ok = pI.loadInput(_library_dirpath, tID_key, _total_batches);
+      size_basis = pI.lsh_enc_vec.size();
       if (_log) {
 #pragma omp critical
         {
@@ -183,45 +176,34 @@ void Library::processLeaf(tT tID_key)
       _basis_to_size[tID_key] = size_basis;
       _root_size += size_basis;
     }
-    if (_on_disk) {
-      bool is_ok = sIM.save(disk_path.c_str());
-      if (!is_ok) {
-        std::cerr << "Error saving to " << disk_path << " for " << _taxonomy_record.changeIDtax(tID_key) << std::endl;
-        exit(EXIT_FAILURE);
-      }
-      if (_log) {
-#pragma omp critical
-        {
-          LOG(INFO) << "LSH-value and encoding pairs has been saved for " << _taxonomy_record.changeIDtax(tID_key)
-                    << std::endl;
-        }
-      }
+    bool is_ok = pI.saveInput(_library_dirpath, tID_key, _total_batches, _tbatch_size);
+    if (!is_ok) {
+      std::cerr << "Error saving LSH-value and encoding pairs for " << _taxonomy_record.changeIDtax(tID_key) << std::endl;
+      exit(EXIT_FAILURE);
     }
-  } else if (!_on_disk) {
-    bool is_ok = sIM.load(disk_path.c_str());
+    if (_log) {
 #pragma omp critical
-    {
-      _streamIM_map.insert(std::make_pair(tID_key, sIM));
+      {
+        LOG(INFO) << "LSH-value and encoding pairs has been saved for " << _taxonomy_record.changeIDtax(tID_key)
+                  << std::endl;
+      }
     }
   } else {
 #pragma omp critical
     {
-      _streamOD_map.emplace(std::make_pair(tID_key, StreamOD<encT>(disk_path)));
-      _streamOD_map.at(tID_key).openStream();
+      _inputStream_map.emplace(std::make_pair(tID_key, inputStream<encT>(_library_dirpath, tID_key)));
     }
   }
-  if (_on_disk) {
-    sIM.clearStream();
-  }
+  pI.clearInput();
 }
 
-void Library::countBasis(HTs<encT> &ts, uint8_t curr_batch)
+void Library::countBasis(HTs<encT> &ts, unsigned int curr_batch)
 {
 #pragma omp parallel for schedule(dynamic), num_threads(num_threads)
   for (unsigned int i = 0; i < _tID_vec.size(); ++i) {
     tT tID_key = _tID_vec[i];
     std::vector<std::pair<uint32_t, encT>> lsh_enc_vec;
-    _streamOD_map.at(tID_key).load(lsh_enc_vec, (curr_batch - 1) * _tbatch_size, curr_batch * _tbatch_size);
+    _inputStream_map.at(tID_key).loadBatch(lsh_enc_vec, curr_batch);
     std::vector<bool> nseen(ts.num_rows * _b, true);
     for (unsigned int i = 0; i < lsh_enc_vec.size(); ++i) {
       uint32_t rix = lsh_enc_vec[i].first - (curr_batch - 1) * _tbatch_size;
@@ -251,14 +233,14 @@ void Library::resetInfo(HTs<encT> &ts, bool reset_scount, bool reset_tlca)
   }
 }
 
-void Library::softLCA(HTs<encT> &ts, uint8_t curr_batch)
+void Library::softLCA(HTs<encT> &ts, unsigned int curr_batch)
 {
   double s = 4.0;
 #pragma omp parallel for schedule(dynamic), num_threads(num_threads)
   for (unsigned int i = 0; i < _tID_vec.size(); ++i) {
     tT tID_key = _tID_vec[i];
     std::vector<std::pair<uint32_t, encT>> lsh_enc_vec;
-    _streamOD_map.at(tID_key).load(lsh_enc_vec, (curr_batch - 1) * _tbatch_size, curr_batch * _tbatch_size);
+    _inputStream_map.at(tID_key).loadBatch(lsh_enc_vec, curr_batch);
     std::vector<bool> nseen(ts.num_rows * _b, true);
     double p_update;
     for (unsigned int i = 0; i < lsh_enc_vec.size(); ++i) {
@@ -302,10 +284,6 @@ void Library::annotateInfo()
       if (_log)
         LOG(INFO) << "Leaves are counted and k-mers are labeled with soft-LCA" << std::endl;
       Library::saveBatchHTs(ts_root, curr_batch);
-    } else {
-      Library::skipBatch();
-      if (_log)
-        LOG(INFO) << "Skipping the library annotation for batch  " << curr_batch << std::endl;
     }
   }
 }
@@ -320,7 +298,7 @@ void Library::build()
     if ((_target_batch == 0) || (_target_batch == curr_batch)) {
       std::cout << "Building the library for batch " << curr_batch << "..." << std::endl;
       HTs<encT> ts_root(1, _k, _h, _b, _tbatch_size, &_lsh_vg, _ranking_method);
-      Library::getBatchHTs(&ts_root);
+      Library::getBatchHTs(&ts_root, curr_batch);
       if (_log)
         LOG(INFO) << "The table has been built" << std::endl;
       Library::resetInfo(ts_root, true, true);
@@ -329,28 +307,6 @@ void Library::build()
       if (_log)
         LOG(INFO) << "Leaves are counted and k-mers are labeled with soft-LCA" << std::endl;
       Library::saveBatchHTs(ts_root, curr_batch);
-    } else {
-      Library::skipBatch();
-      if (_log)
-        LOG(INFO) << "Skipping the library building for batch  " << curr_batch << std::endl;
-    }
-  }
-}
-
-void Library::skipBatch()
-{
-  vvec<encT> tmp;
-  if (_on_disk) {
-#pragma omp parallel for schedule(dynamic), num_threads(num_threads)
-    for (unsigned int i = 0; i < _tID_vec.size(); ++i) {
-      tT tID_key = _tID_vec[i];
-      _streamOD_map.at(tID_key).getBatch(tmp, _tbatch_size, true);
-    }
-  } else {
-#pragma omp parallel for schedule(dynamic), num_threads(num_threads)
-    for (unsigned int i = 0; i < _tID_vec.size(); ++i) {
-      tT tID_key = _tID_vec[i];
-      _streamIM_map.at(tID_key).getBatch(tmp, _tbatch_size);
     }
   }
 }
@@ -400,12 +356,22 @@ uint64_t Library::getConstrainedSizeSC(uint64_t num_basis)
   return constrained_size;
 }
 
-void Library::getBatchHTs(HTs<encT> *ts)
+void Library::getBatchHTs(HTs<encT> *ts, unsigned int curr_batch)
 {
   if (_verbose)
     std::cout << "Constructing the table for " << _taxonomy_record.changeIDtax(ts->tID) << std::endl;
   HTd<encT> td(ts->tID, ts->k, ts->h, ts->num_rows, ts->ptr_lsh_vg, _ranking_method);
-  getBatchHTd(&td);
+
+  omp_set_nested(1);
+  omp_set_num_threads(MAX_NUM_TASKS);
+#pragma omp parallel
+  {
+#pragma omp single
+    {
+      getBatchHTd(&td, curr_batch);
+    }
+  }
+#pragma omp taskwait
   if (_log)
     LOG(INFO) << "Converting from HTd to HTs for the taxon " << _taxonomy_record.changeIDtax(ts->tID) << std::endl;
   td.convertHTs(ts);
@@ -418,20 +384,16 @@ void Library::getBatchHTs(HTs<encT> *ts)
   }
 }
 
-void Library::getBatchHTd(HTd<encT> *td)
+void Library::getBatchHTd(HTd<encT> *td, unsigned int curr_batch)
 {
   uint64_t curr_taxID = _taxonomy_record.changeIDtax(td->tID);
   uint64_t num_batch_kmers;
   if (_verbose)
     LOG(INFO) << "Constructing the table for " << curr_taxID << std::endl;
   if (_taxonomy_record.isBasis(td->tID)) {
-    if (_on_disk) {
-      num_batch_kmers = _streamOD_map.at(td->tID).getBatch(td->enc_vvec, _tbatch_size);
-    } else {
-      num_batch_kmers = _streamIM_map.at(td->tID).getBatch(td->enc_vvec, _tbatch_size);
-    }
+    num_batch_kmers = _inputStream_map.at(td->tID).retrieveBatch(td->enc_vvec, _tbatch_size, curr_batch);
     td->initBasis(td->tID);
-    td->makeUnique(true);
+    /* td->makeUnique(true); */
     if (_log) {
       LOG(INFO) << "The dynamic hash table has been constructed for the leaf " << curr_taxID << std::endl;
       LOG(INFO) << "The number of k-mers read for this batch is " << num_batch_kmers << "/" << _basis_to_size[td->tID]
@@ -448,10 +410,23 @@ void Library::getBatchHTd(HTd<encT> *td)
         LOG(INFO) << "Building for the child " << _taxonomy_record.changeIDtax(children[ti]) << " of " << curr_taxID
                   << std::endl;
       td->childrenHT[ti].tID = children[ti];
-      getBatchHTd(&(td->childrenHT[ti]));
+#pragma omp task untied
+      {
+        getBatchHTd(&(td->childrenHT[ti]), curr_batch);
+      }
     }
+#pragma omp taskwait
+
     if (_log)
       LOG(INFO) << "Taking the union of tables of children of " << curr_taxID << std::endl;
+
+    if (_taxonomy_record.depth_vec()[td->tID] <= LSR)
+      omp_set_num_threads(num_threads);
+    else if (MAX_NUM_TASKS < num_threads)
+      omp_set_num_threads((num_threads + MAX_NUM_TASKS - 1) / MAX_NUM_TASKS);
+    else
+      omp_set_num_threads(1);
+
     for (auto &td_c : td->childrenHT) {
       td->unionRows(td_c, false);
     }
@@ -487,7 +462,7 @@ void Library::getBatchHTd(HTd<encT> *td)
   }
 }
 
-bool Library::loadBatchHTs(HTs<encT> &ts, uint16_t curr_batch)
+bool Library::loadBatchHTs(HTs<encT> &ts, unsigned int curr_batch)
 {
   bool is_ok = true;
   std::string load_dirpath(_library_dirpath);
@@ -537,7 +512,7 @@ bool Library::loadBatchHTs(HTs<encT> &ts, uint16_t curr_batch)
   return is_ok;
 }
 
-bool Library::saveBatchHTs(HTs<encT> &ts, uint16_t curr_batch)
+bool Library::saveBatchHTs(HTs<encT> &ts, unsigned int curr_batch)
 {
   bool is_ok = true;
   std::string save_dirpath(_library_dirpath);
