@@ -21,7 +21,7 @@ bool inputHandler<encT>::saveInput(const char *dirpath, tT tID_key, uint16_t tot
 {
   bool is_ok = true;
   auto vec_begin = lsh_enc_vec.begin();
-  auto vec_end = lsh_enc_vec.begin();
+  auto vec_end = lsh_enc_vec.end();
   for (int i = 1; i <= total_batches; ++i) {
     std::string batch_dirpath = dirpath;
     batch_dirpath += +"/batch" + std::to_string(i);
@@ -29,7 +29,7 @@ bool inputHandler<encT>::saveInput(const char *dirpath, tT tID_key, uint16_t tot
     FILE *vec_f = IO::open_file(disk_path.c_str(), is_ok, "wb");
     auto vec_p =
       std::upper_bound(vec_begin, vec_end, i * tbatch_size - 1, [](uint32_t value, const std::pair<uint32_t, encT> &p) {
-        return p.first < value;
+        return p.first > value;
       });
     if (vec_p != lsh_enc_vec.end()) {
       uint64_t num_elements = std::distance(vec_begin, vec_p);
@@ -270,15 +270,14 @@ uint64_t inputHandler<encT>::extractInput(uint64_t rbatch_size)
     lsh_enc_vec_f.shrink_to_fit();
     lsh_enc_vec.insert(lsh_enc_vec.end(), lsh_enc_vec_f.begin(), lsh_enc_vec_f.end());
     if (((fix % GENOME_BATCH_SIZE) == 0) || (fix == (filepath_v.size() - 1))) {
-      if (fix == 0)
-        std::sort(lsh_enc_vec.begin() + last_ix,
-                  lsh_enc_vec.end(),
-                  [](const std::pair<uint32_t, encT> &l, const std::pair<uint32_t, encT> &r) {
-                    if (l.first == r.first)
-                      return l.second < r.second;
-                    else
-                      return l.first < r.first;
-                  });
+      std::sort(lsh_enc_vec.begin() + last_ix,
+                lsh_enc_vec.end(),
+                [](const std::pair<uint32_t, encT> &l, const std::pair<uint32_t, encT> &r) {
+                  if (l.first == r.first)
+                    return l.second < r.second;
+                  else
+                    return l.first < r.first;
+                });
       std::inplace_merge(lsh_enc_vec.begin(), lsh_enc_vec.begin() + last_ix, lsh_enc_vec.end());
       lsh_enc_vec.erase(std::unique(lsh_enc_vec.begin(), lsh_enc_vec.end()), lsh_enc_vec.end());
       last_ix = lsh_enc_vec.size();

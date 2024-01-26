@@ -55,7 +55,7 @@
 #define VERSION "v0.0.1"
 #define PRINT_VERSION printf("KRANK version: " VERSION "\n");
 
-#define MAX_NUM_TASKS 8
+#define MAX_NUM_TASKS 12
 
 extern unsigned int num_threads;
 extern std::random_device rd;
