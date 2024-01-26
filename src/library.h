@@ -24,7 +24,7 @@ public:
           uint32_t num_batch_rows,
           bool from_library = false,
           bool from_kmers = false,
-          uint8_t target_batch = 0,
+          uint16_t target_batch = 0,
           bool only_init = false,
           bool verbose = true,
           bool log = true);
@@ -55,7 +55,7 @@ private:
   uint64_t _num_species;
   bool _from_library;
   bool _input_kmers;
-  uint8_t _target_batch;
+  uint16_t _target_batch;
   bool _only_init;
   bool _log;
   bool _verbose;

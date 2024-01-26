@@ -166,7 +166,6 @@ uint64_t inputStream<encT>::retrieveBatch(vvec<encT> &btable, uint32_t tbatch_si
     std::cout << __PRETTY_FUNCTION__ << std::endl;
     std::puts("I/O eror when reading LSH-value and encoding pairs.\n");
   }
-  std::cout << num_retrieved << ", " << num_kmers << std::endl;
   assert(num_retrieved == num_kmers);
   batch_ifs.close();
   return num_retrieved;
