@@ -62,7 +62,7 @@ int main(int argc, char **argv)
                         batch_size,
                         "Number of bits to divide the table into batches. "
                         "Default: 2, i.e., 4 batches.");
-  uint8_t target_batch = 0;
+  uint16_t target_batch = 0;
   bool only_init = false;
   sub_build->add_option("--target-batch",
                         target_batch,

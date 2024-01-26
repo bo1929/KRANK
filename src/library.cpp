@@ -15,7 +15,7 @@ Library::Library(const char *library_dirpath,
                  uint32_t tbatch_size,
                  bool from_library,
                  bool input_kmers,
-                 uint8_t target_batch,
+                 uint16_t target_batch,
                  bool only_init,
                  bool verbose,
                  bool log)
@@ -389,7 +389,7 @@ void Library::getBatchHTd(HTd<encT> *td, unsigned int curr_batch)
   uint64_t curr_taxID = _taxonomy_record.changeIDtax(td->tID);
   uint64_t num_batch_kmers;
   if (_verbose)
-    LOG(INFO) << "Constructing the table for " << curr_taxID << std::endl;
+    std::cout << "Constructing the table for " << curr_taxID << std::endl;
   if (_taxonomy_record.isBasis(td->tID)) {
     num_batch_kmers = _inputStream_map.at(td->tID).retrieveBatch(td->enc_vvec, _tbatch_size, curr_batch);
     td->initBasis(td->tID);
