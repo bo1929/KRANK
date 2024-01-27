@@ -58,12 +58,6 @@ Library::Library(const char *library_dirpath,
       std::puts("Given parameters will be ignored, parameters found in library metadata will be used.\n");
   }
 
-  if (_tbatch_size != tbatch_size) { // REMOVE
-    LOG(NOTICE) << "The number of batches that will be used has been changed." << std::endl;
-    LOG(INFO) << "The batch size and target rows are updated accordingly." << std::endl;
-    _tbatch_size = tbatch_size;
-  } // REMOVE
-
   _lsh_vg = generateMaskLSH(_positions);
   _num_rows = pow(2, 2 * _h);
   _total_batches = _num_rows / _tbatch_size;
