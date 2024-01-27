@@ -218,10 +218,6 @@ bool TaxonomyRecord<T>::saveTaxonomyRecord(const char *library_dirpath)
   std::string save_filepath(library_dirpath);
   std::vector<std::pair<T, uint64_t>> tIDs_taxIDs(_tID_to_taxID.begin(), _tID_to_taxID.end());
 
-  std::cout << _num_input << std::endl;
-  std::cout << _num_nodes << std::endl;
-  std::cout << tIDs_taxIDs.size() << std::endl;
-
   FILE *taxonomyf = IO::open_file((save_filepath + "/taxonomy").c_str(), is_ok, "wb");
   std::fwrite(&_num_input, sizeof(uint64_t), 1, taxonomyf);
   std::fwrite(&_num_nodes, sizeof(T), 1, taxonomyf);

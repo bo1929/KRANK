@@ -302,11 +302,11 @@ Query::SearchL::SearchL(const char *library_dirpath, bool log)
     std::fclose(indf);
     if (!is_ok) {
       if (_log)
-        LOG(INFO) << "Failed to load the library into the memory" << std::endl;
+        LOG(INFO) << "Failed to load the library into the memory: " << i << std::endl;
       exit(EXIT_FAILURE);
     } else {
       if (_log)
-        LOG(INFO) << "Library has been loaded into the memory" << std::endl;
+        LOG(INFO) << "Library has been loaded into the memory: " << i << "/" << _total_batches << std::endl;
     }
   }
   std::cout << "Library is loaded and ready for performing queries" << std::endl;
@@ -322,7 +322,7 @@ Query::SearchL::SearchL(const char *library_dirpath, bool log)
   std::cout << std::endl;
 
   if (_log) {
-    std::unordered_map<uint8_t, uint64_t> hist_map;
+    std::map<uint8_t, uint64_t> hist_map;
     for (unsigned int rix = 0; rix < _num_rows; ++rix) {
       hist_map[_ind_arr[rix]]++;
     }
@@ -333,6 +333,18 @@ Query::SearchL::SearchL(const char *library_dirpath, bool log)
     for (auto kv : hist_map)
       std::cout << "\t" << static_cast<uint16_t>(kv.first) << " : " << static_cast<float>(kv.second) / _num_rows
                 << std::endl;
+    /* std::map<uint64_t, uint64_t> tlca_counts; */
+    /* for (unsigned int rix = 0; rix < _num_rows; ++rix) { */
+    /*   for (unsigned int cix = 0; cix < _ind_arr[rix]; ++cix) { */
+    /*     tlca_counts[_tID_to_taxID[_tlca_arr[rix * _b + cix]]]++; */
+    /*   } */
+    /* } */
+    /* LOG(INFO) << "Number of k-mers with each taxonomic LCA:" << std::endl; */
+    /* std::cout << "\tTaxonomic-ID" */
+    /*           << " : " */
+    /*           << "# of k-mers" << std::endl; */
+    /* for (auto kv : tlca_counts) */
+    /*   std::cout << "\t" << kv.first << " : " << kv.second << std::endl; */
   }
 }
 
