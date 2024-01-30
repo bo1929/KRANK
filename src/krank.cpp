@@ -118,6 +118,10 @@ int main(int argc, char **argv)
     std::cerr << "The number of columns of the hash table, b, can not be smaller than 2." << std::endl;
   if (h < 2)
     std::cerr << "The number of positions for LSH, h, can not be smaller than 2." << std::endl;
+  if (h > 16)
+    std::cerr << "The number of positions for LSH, h, can not be greater than or equal to 16." << std::endl;
+  if (k > 32)
+    std::cerr << "The maximum allowed k-mer length is 32." << std::endl;
   if (h >= k)
     std::cerr << "The number of positions for LSH, h, can not be greater than or equal to k-mer length." << std::endl;
   if (batch_size > (2 * h - 1))
@@ -126,8 +130,8 @@ int main(int argc, char **argv)
     std::cerr << "The given target batch index (starts from 1) is greater than the number of batches." << std::endl;
   if (max_match_hdist > k)
     std::cerr << "Maximum Hamming distance for a match can not be greater than k-mer length." << std::endl;
-  if ((w < k) || (b < 2) || (h < 2) || (h >= k) || (batch_size > (2 * h - 1)) || (target_batch > pow(2, batch_size)) ||
-      (max_match_hdist > k)) {
+  if ((w < k) || (b < 2) || (h < 2) || (h > 16) || (k > 32) || (h >= k) || (batch_size > (2 * h - 1)) ||
+      (target_batch > pow(2, batch_size)) || (max_match_hdist > k)) {
     exit(EXIT_FAILURE);
   }
 #ifndef SHORT_TABLE

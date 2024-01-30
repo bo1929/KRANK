@@ -29,7 +29,7 @@ HTd<encT>::mapBefore(std::unordered_map<encT, scT> &scount_map, std::unordered_m
 {
   for (unsigned int i = 0; i < enc_vvec[rix].size(); ++i) {
     scount_map[enc_vvec[rix][i]] = scount_vvec[rix][i];
-    /* tlca_map[enc_vvec[rix][i]] = tlca_vvec[rix][i]; */
+    tlca_map[enc_vvec[rix][i]] = tlca_vvec[rix][i];
   }
 }
 
@@ -37,10 +37,10 @@ template<typename encT>
 inline void
 HTd<encT>::updateAfter(std::unordered_map<encT, scT> &scount_map, std::unordered_map<encT, tT> &tlca_map, uint32_t rix)
 {
-  /* tlca_vvec[rix].resize(enc_vvec[rix].size()); */
+  tlca_vvec[rix].resize(enc_vvec[rix].size());
   scount_vvec[rix].resize(enc_vvec[rix].size());
   for (unsigned int i = 0; i < enc_vvec[rix].size(); ++i) {
-    /* tlca_vvec[rix][i] = tlca_map[enc_vvec[rix][i]]; */
+    tlca_vvec[rix][i] = tlca_map[enc_vvec[rix][i]];
     scount_vvec[rix][i] = scount_map[enc_vvec[rix][i]];
   }
 }
@@ -252,11 +252,11 @@ void HTd<encT>::initBasis(tT tID)
     if (!enc_vvec[rix].empty()) {
       scount_vvec[rix].resize(enc_vvec[rix].size());
       std::fill(scount_vvec[rix].begin(), scount_vvec[rix].end(), 1);
-      /* tlca_vvec[rix].resize(enc_vvec[rix].size()); */
-      /* std::fill(tlca_vvec[rix].begin(), tlca_vvec[rix].end(), tID); */
+      tlca_vvec[rix].resize(enc_vvec[rix].size());
+      std::fill(tlca_vvec[rix].begin(), tlca_vvec[rix].end(), tID);
     } else {
       scount_vvec[rix].clear();
-      /* tlca_vvec[rix].clear(); */
+      tlca_vvec[rix].clear();
     }
   }
   num_basis = 1;
@@ -271,7 +271,7 @@ void HTd<encT>::trimColumns(size_t b_max)
     if (enc_vvec[rix].size() > b_max) {
       enc_vvec[rix].resize(b_max);
       scount_vvec[rix].resize(b_max);
-      /* tlca_vvec[rix].resize(b_max); */
+      tlca_vvec[rix].resize(b_max);
     }
   }
 #ifdef DEBUG
@@ -283,15 +283,11 @@ void HTd<encT>::trimColumns(size_t b_max)
 template<typename encT>
 void HTd<encT>::getScores(std::vector<float> &scores_vec, uint32_t rix)
 {
-  std::unordered_map<scT, scT> cmap{};
   std::unordered_map<encT, float> values_map{};
   for (auto &ht : childrenHT) {
-    for (unsigned int i = 0; i < ht.enc_vvec[rix].size(); ++i)
-      cmap[ht.tID]++;
-  }
-  for (auto &ht : childrenHT) {
-    for (unsigned int i = 0; i < ht.enc_vvec[rix].size(); ++i) {
-      values_map[ht.enc_vvec[rix][i]] += static_cast<float>(ht.scount_vvec[rix][i]) / static_cast<float>(cmap[ht.tID]);
+    size_t rsize = ht.enc_vvec[rix].size();
+    for (unsigned int i = 0; i < rsize; ++i) {
+      values_map[ht.enc_vvec[rix][i]] += static_cast<float>(ht.scount_vvec[rix][i]) / static_cast<float>(rsize);
     }
   }
   scores_vec.resize(enc_vvec[rix].size());
@@ -324,7 +320,7 @@ void HTd<encT>::pruneColumns(size_t b_max)
       }
       vecRemoveIxs(enc_vvec[rix], ixs);
       vecRemoveIxs(scount_vvec[rix], ixs);
-      /* vecRemoveIxs(tlca_vvec[rix], ixs); */
+      vecRemoveIxs(tlca_vvec[rix], ixs);
     }
   }
   HTd<encT>::updateSize();
@@ -403,7 +399,7 @@ void HTd<encT>::unionRows(HTd<encT> &child, bool update_size)
     } else if (!child.enc_vvec[rix].empty()) {
       enc_vvec[rix] = child.enc_vvec[rix];
       scount_vvec[rix] = child.scount_vvec[rix];
-      /* tlca_vvec[rix] = child.tlca_vvec[rix]; */
+      tlca_vvec[rix] = child.tlca_vvec[rix];
     }
   }
   num_basis += child.num_basis;
@@ -549,7 +545,7 @@ void HTd<encT>::shrinkHT(uint64_t num_rm, size_t b_max)
           }
           vecRemoveIxs(scount_vvec[rix], ixs);
           vecRemoveIxs(enc_vvec[rix], ixs);
-          /* vecRemoveIxs(tlca_vvec[rix], ixs); */
+          vecRemoveIxs(tlca_vvec[rix], ixs);
 #pragma omp atomic update
           to_rm = to_rm - ixs.size();
         }
@@ -642,14 +638,14 @@ template<typename encT>
 void HTd<encT>::updateLCA()
 {
   if (childrenHT.size() > 1) {
-#pragma omp parallel for schedule(dynamic) private(gen)
+#pragma omp parallel for schedule(dynamic)
     for (uint32_t rix = 0; rix < num_rows; ++rix) {
       if (enc_vvec[rix].size() > 0) {
         std::unordered_map<encT, tT> tlca_map{};
         for (auto &ht : childrenHT) {
           for (unsigned int i = 0; i < ht.enc_vvec[rix].size(); ++i) {
             if (tlca_map.find(ht.enc_vvec[rix][i]) == tlca_map.end())
-              tlca_map[ht.enc_vvec[rix][i]] = ht.tID;
+              tlca_map[ht.enc_vvec[rix][i]] = ht.tlca_vvec[rix][i];
             else
               tlca_map[ht.enc_vvec[rix][i]] = tID;
           }
@@ -667,14 +663,14 @@ template<typename encT>
 void HTs<encT>::updateLCA()
 {
   if (childrenHT.size() > 1) {
-#pragma omp parallel for schedule(dynamic) private(gen)
+#pragma omp parallel for schedule(dynamic)
     for (uint32_t rix = 0; rix < num_rows; ++rix) {
       if (ind_arr[rix] > 0) {
         std::unordered_map<encT, tT> tlca_map{};
         for (auto &ht : childrenHT) {
           for (unsigned int i = 0; i < ht.ind_arr[rix]; ++i) {
             if (tlca_map.find(ht.enc_arr[rix * ht.b + i]) == tlca_map.end())
-              tlca_map[ht.enc_arr[rix * ht.b + i]] = ht.tID;
+              tlca_map[ht.enc_arr[rix * ht.b + i]] = ht.tlca_arr[rix * ht.b + i];
             else
               tlca_map[ht.enc_arr[rix * ht.b + i]] = tID;
           }
@@ -705,13 +701,13 @@ void HTd<encT>::convertHTs(HTs<encT> *new_table)
       if (new_table->ind_arr[rix] > 0) {
         std::copy(enc_vvec[rix].begin(), enc_vvec[rix].end(), new_table->enc_arr + (rix * b));
         std::copy(scount_vvec[rix].begin(), scount_vvec[rix].end(), new_table->scount_arr + (rix * b));
-        /* std::copy(tlca_vvec[rix].begin(), tlca_vvec[rix].end(), new_table->tlca_arr + (rix * b)); */
+        std::copy(tlca_vvec[rix].begin(), tlca_vvec[rix].end(), new_table->tlca_arr + (rix * b));
       }
     } else {
       new_table->ind_arr[rix] = b;
       std::copy(enc_vvec[rix].begin(), enc_vvec[rix].begin() + b, new_table->enc_arr + (rix * b));
       std::copy(scount_vvec[rix].begin(), scount_vvec[rix].begin() + b, new_table->scount_arr + (rix * b));
-      /* std::copy(tlca_vvec[rix].begin(), tlca_vvec[rix].begin() + b, new_table->tlca_arr + (rix * b)); */
+      std::copy(tlca_vvec[rix].begin(), tlca_vvec[rix].begin() + b, new_table->tlca_arr + (rix * b));
     }
   }
   new_table->num_basis = num_basis;
@@ -727,7 +723,7 @@ void HTd<encT>::filterLSR(std::vector<uint8_t> &depth_vec, uint8_t slr_depth)
     if (tlca_vvec[rix].size() >= 1) {
       std::vector<size_t> ixs;
       for (unsigned int j = 0; j < tlca_vvec[rix].size(); ++j) {
-        if (depth_vec[tlca_vvec[rix][j]] < slr_depth)
+        if (depth_vec[tlca_vvec[rix][j]] <= slr_depth)
           ixs.push_back(j);
       }
       vecRemoveIxs(scount_vvec[rix], ixs);

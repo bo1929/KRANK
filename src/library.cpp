@@ -198,16 +198,16 @@ void Library::countBasis(HTs<encT> &ts, unsigned int curr_batch)
     tT tID_key = _tID_vec[i];
     std::vector<std::pair<uint32_t, encT>> lsh_enc_vec;
     _inputStream_map.at(tID_key).loadBatch(lsh_enc_vec, curr_batch);
-    std::vector<bool> nseen(ts.num_rows * _b, true);
+    /* std::vector<bool> nseen(ts.num_rows * _b, true); */
     for (unsigned int i = 0; i < lsh_enc_vec.size(); ++i) {
       uint32_t rix = lsh_enc_vec[i].first - (curr_batch - 1) * _tbatch_size;
       for (unsigned int j = 0; j < ts.ind_arr[rix]; ++j) {
         if (ts.enc_arr[rix * _b + j] == lsh_enc_vec[i].second) {
-          if (nseen[rix * _b + j]) {
-            nseen[rix * _b + j] = false;
+          /* if (nseen[rix * _b + j]) { */
+          /* nseen[rix * _b + j] = false; */
 #pragma omp atomic update
-            ts.scount_arr[rix * _b + j]++;
-          }
+          ts.scount_arr[rix * _b + j]++;
+          /* } */
         }
       }
     }
@@ -229,20 +229,21 @@ void Library::resetInfo(HTs<encT> &ts, bool reset_scount, bool reset_tlca)
 
 void Library::softLCA(HTs<encT> &ts, unsigned int curr_batch)
 {
-  double s = 4.0;
+  double s = 6.0;
+  unsigned int k = 5;
 #pragma omp parallel for schedule(dynamic), num_threads(num_threads)
   for (unsigned int i = 0; i < _tID_vec.size(); ++i) {
     tT tID_key = _tID_vec[i];
     std::vector<std::pair<uint32_t, encT>> lsh_enc_vec;
     _inputStream_map.at(tID_key).loadBatch(lsh_enc_vec, curr_batch);
-    std::vector<bool> nseen(ts.num_rows * _b, true);
+    /* std::vector<bool> nseen(ts.num_rows * _b, true); */
     double p_update;
     for (unsigned int i = 0; i < lsh_enc_vec.size(); ++i) {
       uint32_t rix = lsh_enc_vec[i].first - (curr_batch - 1) * _tbatch_size;
       for (unsigned int j = 0; j < ts.ind_arr[rix]; ++j) {
-        if ((ts.enc_arr[rix * _b + j] == lsh_enc_vec[i].second) && nseen[rix * _b + j]) {
-          nseen[rix * _b + j] = false;
-          if (ts.scount_arr[rix * _b + j] <= 2)
+        if ((ts.enc_arr[rix * _b + j] == lsh_enc_vec[i].second)) { // && nseen[rix * _b + j]
+          /* nseen[rix * _b + j] = false; */
+          if (ts.scount_arr[rix * _b + j] <= k)
             p_update = 1;
           else
             p_update = 1 / log2(pow((ts.scount_arr[rix * _b + j] - 1) / s, 2) + 2);
@@ -427,15 +428,15 @@ void Library::getBatchHTd(HTd<encT> *td, unsigned int curr_batch)
     td->updateSize();
 
     if (td->childrenHT.size() > 1) {
-      /*   if (td->tID != 0 && td->tID != 1) { */
-      /*     if (_log) */
-      /*       LOG(INFO) << curr_taxID << " has more than one child, updating LCA labels" << std::endl; */
-      /*     td->updateLCA(); // computes hard-LCA labels along the way, just in case */
-      /*   } */
+      if (td->tID != 0 && td->tID != 1) {
+        if (_log)
+          LOG(INFO) << curr_taxID << " has more than one child, updating LCA labels" << std::endl;
+        td->updateLCA(); // computes hard-LCA labels along the way
+      }
 
-      /* if (_taxonomy_record.depth_vec()[td->tID] <= LSR) { */
-      /*   td->filterLSR(_taxonomy_record.depth_vec(), LSR); // removes k-mers with hard-LCA above LSR rank */
-      /* } */
+      if (_taxonomy_record.depth_vec()[td->tID] <= LSR) {
+        td->filterLSR(_taxonomy_record.depth_vec(), LSR); // removes k-mers with hard-LCA above LSR rank
+      }
 
       uint64_t constraint_size = getConstrainedSizeKC(td->tIDsBasis);
       int64_t num_rm = static_cast<int64_t>(td->num_kmers) - static_cast<int64_t>(constraint_size);
@@ -445,6 +446,7 @@ void Library::getBatchHTd(HTd<encT> *td, unsigned int curr_batch)
         td->shrinkHT(static_cast<uint64_t>(num_rm), _b);
       }
     }
+
     td->childrenHT.clear();
     if (_log)
       LOG(INFO) << "The dynamic hash table has been constructed for " << curr_taxID << std::endl;
