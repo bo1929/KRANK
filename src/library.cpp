@@ -1,6 +1,6 @@
 #include "library.h"
 
-#define LSR 4
+#define LSR 3
 
 Library::Library(const char *library_dirpath,
                  const char *nodes_filepath,
@@ -356,7 +356,6 @@ void Library::getBatchHTs(HTs<encT> *ts, unsigned int curr_batch)
   if (_verbose)
     std::cout << "Constructing the table for " << _taxonomy_record.changeIDtax(ts->tID) << std::endl;
   HTd<encT> td(ts->tID, ts->k, ts->h, ts->num_rows, ts->ptr_lsh_vg, _ranking_method);
-
   omp_set_nested(1);
   omp_set_num_threads(MAX_NUM_TASKS);
 #pragma omp parallel
@@ -367,6 +366,8 @@ void Library::getBatchHTs(HTs<encT> *ts, unsigned int curr_batch)
     }
   }
 #pragma omp taskwait
+  if (_taxonomy_record.depth_vec()[td.tID] <= LSR)
+    td.ranking_method = random_kmer;
   if (_log)
     LOG(INFO) << "Converting from HTd to HTs for the taxon " << _taxonomy_record.changeIDtax(ts->tID) << std::endl;
   td.convertHTs(ts);
@@ -411,6 +412,8 @@ void Library::getBatchHTd(HTd<encT> *td, unsigned int curr_batch)
       }
     }
 #pragma omp taskwait
+    if (_taxonomy_record.depth_vec()[td->tID] <= LSR)
+      td->ranking_method = random_kmer;
 
     if (_log)
       LOG(INFO) << "Taking the union of tables of children of " << curr_taxID << std::endl;
