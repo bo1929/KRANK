@@ -1,5 +1,5 @@
 # KRANK
-
+:bangbang: This tutorial and examples are outdated, and will be updated soon. :bangbang:
 ## Quickstart
 KRANK consists of two main subprograms: `build` and `query`.
 You can extract *k*-mer sets from input sequences, and build a KRANK library using `krank build [OPTIONS]`.
