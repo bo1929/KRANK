@@ -5,6 +5,7 @@
 #include <assert.h>
 #include <bitset>
 #include <numeric>
+#include <sys/stat.h>
 #include <unordered_map>
 #include <unordered_set>
 #include <ostream>
@@ -55,11 +56,13 @@
 #define VERSION "v0.0.1"
 #define PRINT_VERSION printf("KRANK version: " VERSION "\n");
 
-#define MAX_NUM_TASKS 12
+#define LNUM_TASKS 8
+#define LSR 3
 
 extern unsigned int num_threads;
 extern std::random_device rd;
 extern std::mt19937 gen;
+extern unsigned int num_tasks;
 extern std::bernoulli_distribution ct;
 extern const unsigned char seq_nt4_table[128];
 

@@ -51,8 +51,11 @@ private:
   std::vector<uint8_t> _npositions;
   std::unordered_map<tT, inputStream<encT>> _inputStream_map;
   std::unordered_map<tT, uint64_t> _basis_to_size;
+  std::unordered_map<tT, uint64_t> _tID_to_size;
+  std::unordered_map<tT, size_t> _basis_to_ninput;
   std::vector<tT> _tID_vec;
   uint64_t _num_species;
+  uint64_t _num_nodes;
   bool _from_library;
   bool _input_kmers;
   uint16_t _target_batch;
@@ -62,7 +65,7 @@ private:
   const uint16_t _rootID = 1;
 
 public:
-  uint64_t getConstrainedSizeKC(std::set<tT> tIDsBasis);
+  uint64_t getConstrainedSizeKC(tT curr_tID);
   uint64_t getConstrainedSizeSC(uint64_t num_basis);
   void getBatchHTd(HTd<encT> *td, unsigned int curr_batch);
   void getBatchHTs(HTs<encT> *ts, unsigned int curr_batch);

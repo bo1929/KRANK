@@ -24,6 +24,7 @@ private:
   uint64_t _num_input;
   T _num_nodes;
   std::unordered_map<T, std::string> _tID_to_rank;
+  std::unordered_map<tT, uint64_t> _tID_to_lsroot;
   std::unordered_map<T, uint64_t> _tID_to_taxID;
   std::unordered_map<uint64_t, T> _taxID_to_tID;
   std::unordered_map<std::string, T> _input_to_tID;
@@ -40,8 +41,11 @@ public:
   T changeIDt(uint64_t taxID);
   bool isBasis(T tID);
   decltype(_tID_to_input) &tID_to_input() { return _tID_to_input; }
+  decltype(_tID_to_lsroot) &tID_to_lsroot() { return _tID_to_lsroot; }
   decltype(_child_map) &child_map() { return _child_map; }
+  decltype(_parent_vec) &parent_vec() { return _parent_vec; }
   decltype(_depth_vec) &depth_vec() { return _depth_vec; }
+  decltype(_num_nodes) &get_num_nodes() { return _num_nodes; }
   bool saveTaxonomyRecord(const char *library_dirpath);
 };
 

@@ -1186,7 +1186,7 @@ namespace AixLog {
 } // namespace AixLog
 
 #ifdef _WIN32
-  // We restore the ERROR Windows macro
+// We restore the ERROR Windows macro
   #pragma pop_macro("ERROR")
   #pragma pop_macro("DEBUG")
 #endif

@@ -10,7 +10,7 @@ TaxonomyNCBI::TaxonomyNCBI(const char *nodes_filepath)
 
   std::string line;
   uint64_t node_id, parent_id;
-  std::string name, rank, junk;
+  std::string name, trank, junk;
 
   const std::string delim = "\t|\t";
   while (getline(nodes_file, line)) {
@@ -40,7 +40,7 @@ TaxonomyNCBI::TaxonomyNCBI(const char *nodes_filepath)
           break;
         case 2: parent_id = (uint64_t)stoul(token); break;
         case 3:
-          rank = token;
+          trank = token;
           finished = true;
           break;
       }
@@ -48,7 +48,7 @@ TaxonomyNCBI::TaxonomyNCBI(const char *nodes_filepath)
     if (node_id == 1)
       parent_id = 0;
     _parent_map[node_id] = parent_id;
-    _rank_map[node_id] = rank;
+    _rank_map[node_id] = trank;
   }
   nodes_file.close();
 }
@@ -151,6 +151,15 @@ TaxonomyRecord<T>::TaxonomyRecord(const char *input_filepath, TaxonomyNCBI taxon
     if (curr_tID == 1)
       depth++;
     _depth_vec[kv.first] = depth;
+  }
+
+  tT tmp_tID = 0;
+  for (unsigned int tID_i = 1; tID_i <= _num_nodes; ++tID_i) {
+    tmp_tID = tID_i;
+    while (_depth_vec[tmp_tID] > LSR) {
+      tmp_tID = _parent_vec[tmp_tID];
+    }
+    _tID_to_lsroot[tID_i] = tmp_tID;
   }
 }
 
