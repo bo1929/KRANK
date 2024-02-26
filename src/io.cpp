@@ -33,7 +33,6 @@ bool inputHandler<encT>::saveInput(const char *dirpath, tT tID_key, uint16_t tot
       });
     if (vec_p != lsh_enc_vec.end()) {
       uint64_t num_elements = std::distance(vec_begin, vec_p);
-      // uint64_t num_offset = std::distance(lsh_enc_vec.begin(), vec_begin);
       std::fwrite(&(*vec_begin), sizeof(std::pair<uint32_t, encT>), num_elements, vec_f);
       if (std::ferror(vec_f)) {
         std::puts("I/O error when writing LSH-value and encoding pairs in the below function.\n");
@@ -46,6 +45,18 @@ bool inputHandler<encT>::saveInput(const char *dirpath, tT tID_key, uint16_t tot
     std::fclose(vec_f);
     vec_begin = vec_p;
   }
+
+  std::string rcounts_dirpath = dirpath;
+  rcounts_dirpath += "/rcounts";
+  std::vector<std::pair<encT, uint64_t>> rcounts_vec(rcounts.begin(), rcounts.end());
+  FILE *rcounts_f = IO::open_file((rcounts_dirpath + "/" + std::to_string(tID_key)).c_str(), is_ok, "wb");
+  std::fwrite(rcounts_vec.data(), sizeof(std::pair<encT, uint64_t>), rcounts_vec.size(), rcounts_f);
+  if (std::ferror(rcounts_f)) {
+    std::puts("I/O error when writing the genome counts for the shared k-mers.\n");
+    is_ok = false;
+  }
+  std::fclose(rcounts_f);
+
   return is_ok;
 }
 
@@ -131,6 +142,24 @@ void inputStream<encT>::loadBatch(std::vector<std::pair<uint32_t, encT>> &lsh_en
     std::puts("I/O eror when reading LSH-value and encoding pairs.\n");
   }
   batch_ifs.close();
+}
+
+template<typename encT>
+void inputStream<encT>::loadCounts(std::unordered_map<encT, uint64_t> &rcounts)
+{
+  bool is_ok = true;
+  std::string rcounts_path = dirpath;
+  rcounts_path += "/rcounts/" + std::to_string(tID_key);
+  std::vector<std::pair<encT, uint64_t>> rcounts_vec;
+  uint64_t num_kmers = ghc::filesystem::file_size(rcounts_path) / sizeof(std::pair<encT, uint64_t>);
+  FILE *rcounts_f = IO::open_file((rcounts_path).c_str(), is_ok, "rb");
+  std::fread(rcounts_vec.data(), sizeof(std::pair<encT, uint64_t>), num_kmers, rcounts_f);
+  if (std::ferror(rcounts_f)) {
+    std::puts("I/O error when reading the genome counts for the shared k-mers.\n");
+    is_ok = false;
+  }
+  std::fclose(rcounts_f);
+  std::copy(rcounts_vec.begin(), rcounts_vec.end(), std::inserter(rcounts, rcounts.begin()));
 }
 
 template<typename encT>
@@ -278,7 +307,12 @@ uint64_t inputHandler<encT>::extractInput(uint64_t rbatch_size)
                     return l.first < r.first;
                 });
       std::inplace_merge(lsh_enc_vec.begin(), lsh_enc_vec.begin() + last_ix, lsh_enc_vec.end());
-      lsh_enc_vec.erase(std::unique(lsh_enc_vec.begin(), lsh_enc_vec.end()), lsh_enc_vec.end());
+      auto nuniq_it = std::unique(lsh_enc_vec.begin(), lsh_enc_vec.end());
+      auto rone_it = std::unique(nuniq_it, lsh_enc_vec.end());
+      for (auto it = nuniq_it; it != rone_it; ++it) {
+        rcounts[it->second]++;
+      }
+      lsh_enc_vec.erase(nuniq_it, lsh_enc_vec.end());
       last_ix = lsh_enc_vec.size();
     }
   }
@@ -371,7 +405,12 @@ uint64_t inputHandler<encT>::readInput(uint64_t rbatch_size)
               else
                 return l.first < r.first;
             });
-  lsh_enc_vec.erase(std::unique(lsh_enc_vec.begin(), lsh_enc_vec.end()), lsh_enc_vec.end());
+  auto nuniq_it = std::unique(lsh_enc_vec.begin(), lsh_enc_vec.end());
+  auto rone_it = std::unique(nuniq_it, lsh_enc_vec.end());
+  for (auto it = nuniq_it; it != rone_it; ++it) {
+    rcounts[it->second]++;
+  }
+  lsh_enc_vec.erase(nuniq_it, lsh_enc_vec.end());
   tnum_kmers = lsh_enc_vec.size();
   if (tnum_kmers_sum != tnum_kmers)
     std::puts("Duplicate k-mers exist in the given input k-mer set!");
@@ -411,7 +450,7 @@ bool IO::ensureDirectory(const char *dirpath)
 kseq_t *IO::getReader(const char *fpath)
 {
   gzFile fp;
-  fp = gzopen(fpath, "r");
+  fp = gzopen(fpath, "rb");
   if (fp == nullptr) {
     std::cerr << "Failed to open file at " << fpath << std::endl;
     exit(1);
@@ -502,6 +541,10 @@ inputStream<uint32_t>::loadBatch(std::vector<std::pair<uint32_t, uint32_t>> &lsh
 
 template void
 inputStream<uint64_t>::loadBatch(std::vector<std::pair<uint32_t, uint64_t>> &lsh_enc_vec, unsigned int curr_batch);
+
+template void inputStream<uint64_t>::loadCounts(std::unordered_map<uint64_t, uint64_t> &rcounts);
+
+template void inputStream<uint32_t>::loadCounts(std::unordered_map<uint32_t, uint64_t> &rcounts);
 
 template uint64_t
 inputStream<uint32_t>::retrieveBatch(vvec<uint32_t> &btable, uint32_t tbatch_size, unsigned int curr_batch);
