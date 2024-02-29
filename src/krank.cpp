@@ -166,7 +166,7 @@ int main(int argc, char **argv)
   if (sub_query->parsed()) {
     std::cout << "Querying the given sequences..." << std::endl;
     Query q(library_dir_v, output_dir.c_str(), query_file.c_str(), max_match_hdist, save_match_info, verbose, log);
-    q.run(DEFAULT_BATCH_SIZE);
+    q.perform(DEFAULT_BATCH_SIZE);
     std::cout << "Results for the input queries have been saved" << std::endl;
   }
 

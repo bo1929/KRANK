@@ -69,6 +69,10 @@ extern const unsigned char seq_nt4_table[128];
 template<typename T>
 using vvec = std::vector<std::vector<T>>;
 
+typedef std::vector<std::string> vvec_string;
+typedef std::vector<std::vector<uint8_t>> vvec_uint8;
+typedef std::vector<std::vector<uint64_t>> vvec_uint64;
+
 #ifdef LARGE_TAXONOMY
 typedef uint32_t tT;
 typedef uint32_t scT;

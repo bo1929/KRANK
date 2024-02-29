@@ -1,7 +1,7 @@
 #include "table.h"
 
 /* #undef DEBUG */
-#define FL true
+#define FL false
 
 template<typename encT>
 std::map<size_t, uint64_t> HTd<encT>::histRowSizes()
@@ -283,11 +283,16 @@ void HTd<encT>::trimColumns(size_t b_max)
 template<typename encT>
 void HTd<encT>::getScores(std::vector<float> &scores_vec, uint32_t rix)
 {
+  /* min_size; */
+  for (auto &ht : childrenHT) {}
   std::unordered_map<encT, float> values_map{};
   for (auto &ht : childrenHT) {
-    auto sum_scount = std::accumulate(ht.scount_vvec[rix].begin(), ht.scount_vvec[rix].end(), 0);
+    /* auto sum_scount = std::accumulate(ht.scount_vvec[rix].begin(), ht.scount_vvec[rix].end(), 0); */
+    size_t row_size = ht.enc_vvec[rix].size();
     for (unsigned int i = 0; i < ht.scount_vvec[rix].size(); ++i) {
-      values_map[ht.enc_vvec[rix][i]] += static_cast<float>(ht.scount_vvec[rix][i]) / static_cast<float>(sum_scount);
+      /* std::beta_distribution beta_dist(1 / childrenHT.size(), 1 / childrenHT.size()); */
+      /* std::binomial_distribution<> d(4, beta_dist(gen)); */
+      values_map[ht.enc_vvec[rix][i]] += static_cast<float>(ht.scount_vvec[rix][i]) / row_size;
     }
   }
   scores_vec.resize(enc_vvec[rix].size());
@@ -344,8 +349,7 @@ void HTs<encT>::getScores(std::vector<float> &scores_vec, uint32_t rix)
   }
   for (auto &ht : childrenHT) {
     for (unsigned int i = 0; i < ht.ind_arr[rix]; ++i) {
-      values_map[ht.enc_arr[rix * b + i]] +=
-        static_cast<float>(ht.scount_arr[rix * b + i]) / static_cast<float>(cmap[ht.tID]);
+      values_map[ht.enc_arr[rix * b + i]] += static_cast<float>(ht.scount_arr[rix * b + i]) / ht.ind_arr[rix];
     }
   }
   scores_vec.resize(ind_arr[rix]);
