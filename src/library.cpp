@@ -19,8 +19,8 @@ Library::Library(const char *library_dirpath,
                  bool verbose,
                  bool log)
   : _library_dirpath(library_dirpath)
-  , _taxonomy_ncbi(nodes_filepath)
-  , _taxonomy_record(input_filepath, _taxonomy_ncbi)
+  , _taxonomy_input(nodes_filepath)
+  , _taxonomy_record(input_filepath, _taxonomy_input)
   , _nodes_filepath(nodes_filepath)
   , _input_filepath(input_filepath)
   , _k(k)
@@ -181,6 +181,7 @@ void Library::processLeaf(tT tID_key)
         tmp_tID = _taxonomy_record.parent_vec()[tmp_tID];
       }
       _root_size += size_basis;
+      _tID_to_size[1] += size_basis;
     }
     bool is_ok = pI.saveInput(_library_dirpath, tID_key, _total_batches, _tbatch_size);
     if (!is_ok) {
@@ -345,9 +346,9 @@ uint64_t Library::getConstrainedSizeKC(tT curr_tID)
 {
   uint64_t constrained_size;
   uint64_t sum_size = _tID_to_size[curr_tID];
-  uint64_t kingdom_size = _tID_to_size[_taxonomy_record.tID_to_lsroot()[curr_tID]];
-  /* float sq_ratio = sqrt(static_cast<float>(sum_size) / static_cast<float>(_root_size)); */
-  float sq_ratio = sqrt(static_cast<float>(sum_size) / static_cast<float>(kingdom_size));
+  /* uint64_t kingdom_size = _tID_to_size[_taxonomy_record.tID_to_lsroot()[curr_tID]]; */
+  /* float sq_ratio = sqrt(static_cast<float>(sum_size) / static_cast<float>(kingdom_size)); */
+  float sq_ratio = sqrt(static_cast<float>(sum_size) / static_cast<float>(_root_size));
   float batch_ratio = static_cast<float>(_tbatch_size) / static_cast<float>(_num_rows);
   constrained_size = static_cast<uint64_t>(_capacity_size * sq_ratio * batch_ratio);
   return constrained_size;
@@ -597,13 +598,15 @@ bool Library::loadMetadata()
   std::fread(&_num_species, sizeof(uint64_t), 1, metadata_f);
   std::fread(&_num_nodes, sizeof(uint64_t), 1, metadata_f);
   std::fread(&_root_size, sizeof(uint64_t), 1, metadata_f);
+
   bases_sizes.resize(_num_species);
-  std::fread(bases_sizes.data(), sizeof(std::pair<tT, uint64_t>), _num_species, metadata_f);
   tIDs_sizes.resize(_num_nodes);
-  std::fread(tIDs_sizes.data(), sizeof(std::pair<tT, uint64_t>), _num_nodes, metadata_f);
   _positions.resize(_h);
-  std::fread(_positions.data(), sizeof(uint8_t), _positions.size(), metadata_f);
   _npositions.resize(_k - _h);
+
+  std::fread(bases_sizes.data(), sizeof(std::pair<tT, uint64_t>), _num_species, metadata_f);
+  std::fread(tIDs_sizes.data(), sizeof(std::pair<tT, uint64_t>), _num_nodes, metadata_f);
+  std::fread(_positions.data(), sizeof(uint8_t), _positions.size(), metadata_f);
   std::fread(_npositions.data(), sizeof(uint8_t), _npositions.size(), metadata_f);
 
   if (std::ferror(metadata_f)) {

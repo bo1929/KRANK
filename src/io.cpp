@@ -89,9 +89,11 @@ bool inputHandler<encT>::loadInput(const char *dirpath, tT tID_key, uint16_t tot
     const size_t bufsize = 1024 * 1024;
     char buf[bufsize];
     vec_ifs.rdbuf()->pubsetbuf(buf, bufsize);
-    if (vec_ifs.good()) {
-      lsh_enc_vec.resize(ghc::filesystem::file_size(disk_path) / sizeof(std::pair<uint32_t, encT>));
-      vec_ifs.read(reinterpret_cast<char *>(lsh_enc_vec.data()), lsh_enc_vec.size() * sizeof(std::pair<uint32_t, encT>));
+    size_t sr = ghc::filesystem::file_size(disk_path) / sizeof(std::pair<uint32_t, encT>);
+    if (vec_ifs.good() && sr > 0) {
+      auto rd = reinterpret_cast<char *>(lsh_enc_vec.data() + lsh_enc_vec.size());
+      lsh_enc_vec.resize(lsh_enc_vec.size() + sr);
+      vec_ifs.read(rd, sr * sizeof(std::pair<uint32_t, encT>));
     }
     if (vec_ifs.fail() || (vec_ifs.peek() != EOF)) {
       std::puts("I/O error when reading LSH-value and encoding pairs in the below function.\n");

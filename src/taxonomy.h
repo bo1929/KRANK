@@ -4,17 +4,19 @@
 #include "common.h"
 #include "io.h"
 
-class TaxonomyNCBI
+class TaxonomyInput
 {
-public:
-  TaxonomyNCBI(const char *nodes_filepath);
-  uint64_t getParent(uint64_t taxID);
-  std::string getRank(uint64_t taxID);
-  void printTaxonomyNCBI();
-
 private:
   std::unordered_map<uint64_t, uint64_t> _parent_map;
   std::unordered_map<uint64_t, std::string> _rank_map;
+
+public:
+  TaxonomyInput(const char *nodes_filepath);
+  uint64_t getParent(uint64_t taxID);
+  std::string getRank(uint64_t taxID);
+  void printTaxonomyInput();
+  decltype(_parent_map) &parent_map() { return _parent_map; }
+  decltype(_rank_map) &rank_map() { return _rank_map; }
 };
 
 template<typename T>
@@ -23,6 +25,7 @@ class TaxonomyRecord
 private:
   uint64_t _num_input;
   T _num_nodes;
+  uint64_t _full_size;
   std::unordered_map<T, std::string> _tID_to_rank;
   std::unordered_map<tT, uint64_t> _tID_to_lsroot;
   std::unordered_map<T, uint64_t> _tID_to_taxID;
@@ -32,9 +35,10 @@ private:
   std::vector<T> _parent_vec;
   std::vector<uint8_t> _depth_vec;
   std::unordered_map<T, std::set<T>> _child_map;
+  std::unordered_map<uint64_t, uint64_t> _parent_inmap;
 
 public:
-  TaxonomyRecord(const char *input_filepath, TaxonomyNCBI taxonomy);
+  TaxonomyRecord(const char *input_filepath, TaxonomyInput taxonomy);
   void printTaxonomyRecord();
   T getLowestCommonAncestor(T a, T b);
   uint64_t changeIDtax(T tID);

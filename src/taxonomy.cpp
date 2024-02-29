@@ -1,6 +1,6 @@
 #include "taxonomy.h"
 
-TaxonomyNCBI::TaxonomyNCBI(const char *nodes_filepath)
+TaxonomyInput::TaxonomyInput(const char *nodes_filepath)
 {
   std::ifstream nodes_file(nodes_filepath);
   if (!nodes_file.good()) {
@@ -53,13 +53,16 @@ TaxonomyNCBI::TaxonomyNCBI(const char *nodes_filepath)
   nodes_file.close();
 }
 
-uint64_t TaxonomyNCBI::getParent(uint64_t taxID) { return _parent_map[taxID]; }
+uint64_t TaxonomyInput::getParent(uint64_t taxID) { return _parent_map[taxID]; }
 
-std::string TaxonomyNCBI::getRank(uint64_t taxID) { return _rank_map[taxID]; }
+std::string TaxonomyInput::getRank(uint64_t taxID) { return _rank_map[taxID]; }
 
 template<typename T>
-TaxonomyRecord<T>::TaxonomyRecord(const char *input_filepath, TaxonomyNCBI taxonomy)
+TaxonomyRecord<T>::TaxonomyRecord(const char *input_filepath, TaxonomyInput taxonomy)
 {
+  _parent_inmap = taxonomy.parent_map();
+  _full_size = _parent_inmap.size();
+
   std::map<std::string, uint64_t> input_to_taxID;
   std::ifstream input_file(input_filepath);
   if (!input_file.good()) {
@@ -163,7 +166,7 @@ TaxonomyRecord<T>::TaxonomyRecord(const char *input_filepath, TaxonomyNCBI taxon
   }
 }
 
-void TaxonomyNCBI::printTaxonomyNCBI()
+void TaxonomyInput::printTaxonomyInput()
 {
   std::cout << "Child : Parent" << std::endl;
   for (auto &kv : _parent_map) {
@@ -226,26 +229,29 @@ bool TaxonomyRecord<T>::saveTaxonomyRecord(const char *library_dirpath)
   bool is_ok = true;
   std::string save_filepath(library_dirpath);
   std::vector<std::pair<T, uint64_t>> tIDs_taxIDs(_tID_to_taxID.begin(), _tID_to_taxID.end());
+  std::vector<std::pair<uint64_t, uint64_t>> taxIDs_parents(_parent_inmap.begin(), _parent_inmap.end());
 
-  FILE *taxonomyf = IO::open_file((save_filepath + "/taxonomy").c_str(), is_ok, "wb");
-  std::fwrite(&_num_input, sizeof(uint64_t), 1, taxonomyf);
-  std::fwrite(&_num_nodes, sizeof(T), 1, taxonomyf);
-  std::fwrite(tIDs_taxIDs.data(), sizeof(std::pair<T, uint64_t>), _num_nodes, taxonomyf);
-  std::fwrite(_parent_vec.data(), sizeof(T), _num_nodes, taxonomyf);
-  std::fwrite(_depth_vec.data(), sizeof(uint8_t), _num_nodes, taxonomyf);
+  FILE *taxonomy_f = IO::open_file((save_filepath + "/taxonomy").c_str(), is_ok, "wb");
+  std::fwrite(&_num_input, sizeof(uint64_t), 1, taxonomy_f);
+  std::fwrite(&_num_nodes, sizeof(T), 1, taxonomy_f);
+  std::fwrite(&_full_size, sizeof(T), 1, taxonomy_f);
+  std::fwrite(_parent_vec.data(), sizeof(T), _num_nodes, taxonomy_f);
+  std::fwrite(_depth_vec.data(), sizeof(uint8_t), _num_nodes, taxonomy_f);
+  std::fwrite(tIDs_taxIDs.data(), sizeof(std::pair<T, uint64_t>), _num_nodes, taxonomy_f);
+  std::fwrite(taxIDs_parents.data(), sizeof(std::pair<uint64_t, uint64_t>), _full_size, taxonomy_f);
 
-  if (std::ferror(taxonomyf)) {
+  if (std::ferror(taxonomy_f)) {
     std::puts("I/O error when writing taxonomy-record file to the library.\n");
     is_ok = false;
   }
-  std::fclose(taxonomyf);
+  std::fclose(taxonomy_f);
 
   return is_ok;
 }
 
-template TaxonomyRecord<uint32_t>::TaxonomyRecord(const char *input_filepath, TaxonomyNCBI taxonomy);
+template TaxonomyRecord<uint32_t>::TaxonomyRecord(const char *input_filepath, TaxonomyInput taxonomy);
 
-template TaxonomyRecord<uint16_t>::TaxonomyRecord(const char *input_filepath, TaxonomyNCBI taxonomy);
+template TaxonomyRecord<uint16_t>::TaxonomyRecord(const char *input_filepath, TaxonomyInput taxonomy);
 
 template void TaxonomyRecord<uint32_t>::printTaxonomyRecord();
 

@@ -30,7 +30,7 @@ public:
           bool log = true);
 
 private:
-  TaxonomyNCBI _taxonomy_ncbi;
+  TaxonomyInput _taxonomy_input;
   TaxonomyRecord<tT> _taxonomy_record;
   const char *_library_dirpath;
   const char *_nodes_filepath;
