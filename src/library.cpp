@@ -149,9 +149,7 @@ void Library::processLeaf(tT tID_key)
   std::vector<std::string> &filepath_v = _taxonomy_record.tID_to_input()[tID_key];
   if (_log) {
 #pragma omp critical
-    {
-      LOG(INFO) << "Processing k-mer set for taxon " << _taxonomy_record.changeIDtax(tID_key) << std::endl;
-    }
+    LOG(INFO) << "Processing k-mer set for taxon " << _taxonomy_record.changeIDtax(tID_key) << std::endl;
   }
   uint64_t size_basis = 0;
   inputHandler<encT> pI(filepath_v, _k, _w, _h, &_lsh_vg, &_npositions);
@@ -166,10 +164,7 @@ void Library::processLeaf(tT tID_key)
       size_basis = pI.lsh_enc_vec.size();
       if (_log) {
 #pragma omp critical
-        {
-          LOG(NOTICE) << "Encodings and hash values already exist for " << _taxonomy_record.changeIDtax(tID_key)
-                      << std::endl;
-        }
+        LOG(NOTICE) << "Encodings and hash values already exist for " << _taxonomy_record.changeIDtax(tID_key) << std::endl;
       }
     }
 #pragma omp critical
@@ -190,10 +185,7 @@ void Library::processLeaf(tT tID_key)
     }
     if (_log) {
 #pragma omp critical
-      {
-        LOG(INFO) << "LSH-value and encoding pairs has been saved for " << _taxonomy_record.changeIDtax(tID_key)
-                  << std::endl;
-      }
+      LOG(INFO) << "LSH-value and encoding pairs has been saved for " << _taxonomy_record.changeIDtax(tID_key) << std::endl;
     }
   } else {
 #pragma omp critical
@@ -402,9 +394,12 @@ void Library::getBatchHTd(HTd<encT> *td, unsigned int curr_batch)
     td->initBasis(td->tID);
     /* td->makeUnique(true); */
     if (_log) {
-      LOG(INFO) << "The dynamic hash table has been constructed for the leaf " << curr_taxID << std::endl;
-      LOG(INFO) << "The number of k-mers read for this batch is " << num_batch_kmers << "/" << _basis_to_size[td->tID]
-                << std::endl;
+#pragma omp critical
+      {
+        LOG(INFO) << "The dynamic hash table has been constructed for the leaf " << curr_taxID << std::endl;
+        LOG(INFO) << "The number of k-mers read for this batch is " << num_batch_kmers << "/" << _basis_to_size[td->tID]
+                  << std::endl;
+      }
     }
   } else {
     std::set<tT> &children_set = _taxonomy_record.child_map()[td->tID];
@@ -414,6 +409,7 @@ void Library::getBatchHTd(HTd<encT> *td, unsigned int curr_batch)
     td->childrenHT.assign(num_child, HTd<encT>(0, td->k, td->h, td->num_rows, td->ptr_lsh_vg, td->ranking_method));
     for (unsigned int ti = 0; ti < num_child; ++ti) {
       if (_log)
+#pragma omp critical
         LOG(INFO) << "Building for the child " << _taxonomy_record.changeIDtax(children[ti]) << " of " << curr_taxID
                   << std::endl;
       td->childrenHT[ti].tID = children[ti];
@@ -453,6 +449,7 @@ void Library::getBatchHTd(HTd<encT> *td, unsigned int curr_batch)
       int64_t num_rm = static_cast<int64_t>(td->num_kmers) - static_cast<int64_t>(constraint_size);
       if ((num_rm > 0) && _adaptive_size) {
         if (_log)
+#pragma omp critical
           LOG(INFO) << curr_taxID << " has " << num_rm << " k-mers above the constraint" << std::endl;
         td->shrinkHT(static_cast<uint64_t>(num_rm), _b);
       }
@@ -460,6 +457,7 @@ void Library::getBatchHTd(HTd<encT> *td, unsigned int curr_batch)
 
     td->childrenHT.clear();
     if (_log)
+#pragma omp critical
       LOG(INFO) << "The dynamic hash table has been constructed for " << curr_taxID << std::endl;
   }
   if (_log) {

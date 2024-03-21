@@ -415,9 +415,9 @@ bool Query::QLibrary::loadTaxonomy()
   std::vector<std::pair<uint64_t, uint64_t>> taxIDs_parents;
 
   FILE *taxonomy_f = IO::open_file((load_dirpath + "/taxonomy").c_str(), is_ok, "rb");
-  std::fread(&_tax_num_input, sizeof(uint64_t), 1, taxonomy_f);
   std::fread(&_tax_num_nodes, sizeof(tT), 1, taxonomy_f);
   std::fread(&_tax_full_size, sizeof(uint64_t), 1, taxonomy_f);
+  std::fread(&_tax_num_input, sizeof(uint64_t), 1, taxonomy_f);
 
   tIDs_taxIDs.resize(_tax_num_nodes);
   _tax_parent_vec.resize(_tax_num_nodes);

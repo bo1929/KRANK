@@ -91,7 +91,7 @@ bool inputHandler<encT>::loadInput(const char *dirpath, tT tID_key, uint16_t tot
     vec_ifs.rdbuf()->pubsetbuf(buf, bufsize);
     size_t sr = ghc::filesystem::file_size(disk_path) / sizeof(std::pair<uint32_t, encT>);
     if (vec_ifs.good() && sr > 0) {
-      auto rd = reinterpret_cast<char *>(lsh_enc_vec.data() + lsh_enc_vec.size());
+      auto rd = reinterpret_cast<char *>(lsh_enc_vec.data() + lsh_enc_vec.size()); // TODO: Check if this is bug-free
       lsh_enc_vec.resize(lsh_enc_vec.size() + sr);
       vec_ifs.read(rd, sr * sizeof(std::pair<uint32_t, encT>));
     }
