@@ -46,6 +46,7 @@
 #include <vector>
 #include <zlib.h>
 #include "aixlog.hpp"
+#include "beta_distribution.hpp"
 
 #ifdef _OPENMP
   #include <omp.h>

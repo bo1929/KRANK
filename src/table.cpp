@@ -283,16 +283,20 @@ void HTd<encT>::trimColumns(size_t b_max)
 template<typename encT>
 void HTd<encT>::getScores(std::vector<float> &scores_vec, uint32_t rix)
 {
-  /* min_size; */
-  for (auto &ht : childrenHT) {}
+  std::beta_distribution<double> beta_dist(1.0 / childrenHT.size(), 1.0 / childrenHT.size());
+  uint64_t msnorm = 0;
+  for (auto &ht : childrenHT) {
+    if (ht.num_kmers > msnorm)
+      msnorm = ht.num_kmers;
+  }
   std::unordered_map<encT, float> values_map{};
   for (auto &ht : childrenHT) {
     /* auto sum_scount = std::accumulate(ht.scount_vvec[rix].begin(), ht.scount_vvec[rix].end(), 0); */
-    size_t row_size = ht.enc_vvec[rix].size();
+    uint64_t row_weight = 1 + 16 - std::min(static_cast<int>(ht.enc_vvec[rix].size()), 16);
     for (unsigned int i = 0; i < ht.scount_vvec[rix].size(); ++i) {
-      /* std::beta_distribution beta_dist(1 / childrenHT.size(), 1 / childrenHT.size()); */
-      /* std::binomial_distribution<> d(4, beta_dist(gen)); */
-      values_map[ht.enc_vvec[rix][i]] += static_cast<float>(ht.scount_vvec[rix][i]) / row_size;
+      std::binomial_distribution<> d(16 * (ht.num_kmers + msnorm - 1) / msnorm, beta_dist(gen));
+      values_map[ht.enc_vvec[rix][i]] += (d(gen) + 1.0) * ht.scount_vvec[rix][i] * row_weight;
+      /* values_map[ht.enc_vvec[rix][i]] += static_cast<float>((d(gen) + 1.0) * ht.scount_vvec[rix][i]); */
     }
   }
   scores_vec.resize(enc_vvec[rix].size());

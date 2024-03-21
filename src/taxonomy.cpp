@@ -232,9 +232,9 @@ bool TaxonomyRecord<T>::saveTaxonomyRecord(const char *library_dirpath)
   std::vector<std::pair<uint64_t, uint64_t>> taxIDs_parents(_parent_inmap.begin(), _parent_inmap.end());
 
   FILE *taxonomy_f = IO::open_file((save_filepath + "/taxonomy").c_str(), is_ok, "wb");
-  std::fwrite(&_num_input, sizeof(uint64_t), 1, taxonomy_f);
   std::fwrite(&_num_nodes, sizeof(T), 1, taxonomy_f);
-  std::fwrite(&_full_size, sizeof(T), 1, taxonomy_f);
+  std::fwrite(&_full_size, sizeof(uint64_t), 1, taxonomy_f);
+  std::fwrite(&_num_input, sizeof(uint64_t), 1, taxonomy_f);
   std::fwrite(_parent_vec.data(), sizeof(T), _num_nodes, taxonomy_f);
   std::fwrite(_depth_vec.data(), sizeof(uint8_t), _num_nodes, taxonomy_f);
   std::fwrite(tIDs_taxIDs.data(), sizeof(std::pair<T, uint64_t>), _num_nodes, taxonomy_f);
