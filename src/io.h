@@ -62,8 +62,7 @@ struct inputHandler
     , w(w)
     , ptr_lsh_vg(ptr_lsh_vg)
     , ptr_npositions(ptr_npositions)
-  {
-  }
+  {}
   uint64_t readInput(uint64_t rbatch_size);
   uint64_t extractInput(uint64_t rbatch_size);
   bool saveInput(const char *dirpath, tT tID_key, uint16_t total_batches, uint32_t tbatch_size);
@@ -84,8 +83,7 @@ struct inputStream
   inputStream(std::string dirpath, tT tID_key)
     : dirpath(dirpath)
     , tID_key(tID_key)
-  {
-  }
+  {}
   void loadBatch(std::vector<std::pair<uint32_t, encT>> &lsh_enc_vec, unsigned int curr_batch);
   void loadCounts(std::unordered_map<encT, uint64_t> &rcounts);
   uint64_t retrieveBatch(vvec<encT> &btable, uint32_t tbatch_size, unsigned int curr_batch);

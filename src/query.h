@@ -20,12 +20,12 @@ public:
         bool verbose = false,
         bool log = false);
   void perform(uint64_t rbatch_size = DEFAULT_BATCH_SIZE);
-  void processBatch(std::vector<sseq_t> seqBatch,
-                    vvec_string names_vec,
-                    vvec_uint64 tlca_vec_or,
-                    vvec_uint64 tlca_vec_rc,
-                    vvec_uint8 hdist_vec_or,
-                    vvec_uint8 hdist_vec_rc);
+  void processBatch(std::vector<sseq_t> &seqBatch,
+                    vvec_string &names_vec,
+                    vvec_uint64 &tlca_vec_or,
+                    vvec_uint64 &tlca_vec_rc,
+                    vvec_uint8 &hdist_vec_or,
+                    vvec_uint8 &hdist_vec_rc);
   uint64_t getLowestCommonAncestor(uint64_t a, uint64_t b)
   {
     if (!a || !b) // LCA(x,0) = LCA(0,x) = x
@@ -37,6 +37,15 @@ public:
         a = _parent_inmap[a];
     }
     return a;
+  }
+  ~Query(void)
+  {
+    for (unsigned int i = 0; i < _num_libraries; ++i) {
+      delete[] _slib_ptr_v[i]->_enc_arr;
+      /* delete[] _slib_ptr_v[i]->_scount_arr; */
+      delete[] _slib_ptr_v[i]->_tlca_arr;
+      delete[] _slib_ptr_v[i]->_ind_arr;
+    }
   }
 
 private:
@@ -60,7 +69,7 @@ private:
     std::vector<uint8_t> _npositions;
     std::unordered_map<tT, uint64_t> _tID_to_taxID;
     std::unordered_map<uint64_t, uint64_t> _parent_inmap;
-    tT _tax_num_input;
+    uint64_t _tax_num_input;
     tT _tax_num_nodes;
     uint64_t _tax_full_size;
     std::vector<tT> _tax_parent_vec;
@@ -77,6 +86,13 @@ private:
     decltype(_npositions) &npositions() { return _npositions; }
     decltype(_positions) &positions() { return _positions; }
     decltype(_lsh_vg) &lsh_vg() { return _lsh_vg; }
+    /* ~QLibrary(void) */
+    /* { */
+    /*   delete[] _enc_arr; */
+    /*   /1* delete[] _scount_arr; *1/ */
+    /*   delete[] _tlca_arr; */
+    /*   delete[] _ind_arr; */
+    /* } */
   };
   bool _log;
   std::vector<std::string> _library_dirpaths;
