@@ -254,7 +254,7 @@ void Library::softLCA(HTs<encT> &ts, unsigned int curr_batch)
           std::bernoulli_distribution bt(p_update);
 #pragma omp critical
           {
-            if (bt(gen)) {
+            if ((p_update == 1.0) || bt(gen)) {
               ts.tlca_arr[rix * _b + j] = _taxonomy_record.getLowestCommonAncestor(ts.tlca_arr[rix * _b + j], tID_key);
             }
           }
@@ -276,7 +276,8 @@ void Library::annotateInfo()
       HTs<encT> ts_root(1, _k, _h, _b, _tbatch_size, &_lsh_vg, _ranking_method);
       Library::loadBatchHTs(ts_root, curr_batch);
       if (_log)
-        LOG(INFO) << "The table has been loaded" << std::endl;
+        LOG(INFO) << "The table has been loaded and contains " << ts_root.num_kmers << "/" << ts_root.num_rows * ts_root.b
+                  << " k-mers" << std::endl;
       Library::resetInfo(ts_root, true, true);
       Library::countBasis(ts_root, curr_batch);
       Library::softLCA(ts_root, curr_batch);
@@ -299,7 +300,8 @@ void Library::build()
       HTs<encT> ts_root(1, _k, _h, _b, _tbatch_size, &_lsh_vg, _ranking_method);
       Library::getBatchHTs(&ts_root, curr_batch);
       if (_log)
-        LOG(INFO) << "The table has been built" << std::endl;
+        LOG(INFO) << "The table has been built and contains " << ts_root.num_kmers << "/" << ts_root.num_rows * ts_root.b
+                  << " k-mers" << std::endl;
       Library::resetInfo(ts_root, true, true);
       Library::countBasis(ts_root, curr_batch);
       Library::softLCA(ts_root, curr_batch);

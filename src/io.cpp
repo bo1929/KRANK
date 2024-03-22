@@ -1,5 +1,7 @@
 #include "io.h"
 
+#define BUFF_SIZE 2 * 1024 * 1024
+
 struct vhash
 {
   inline std::size_t operator()(const std::pair<int, int> &v) const { return v.second; }
@@ -31,12 +33,13 @@ bool inputHandler<encT>::saveInput(const char *dirpath, tT tID_key, uint16_t tot
       std::upper_bound(vec_begin, vec_end, i * tbatch_size - 1, [](uint32_t value, const std::pair<uint32_t, encT> &p) {
         return p.first > value;
       });
-    if (vec_p != lsh_enc_vec.end()) {
+    if (vec_begin != lsh_enc_vec.end()) {
       uint64_t num_elements = std::distance(vec_begin, vec_p);
       std::fwrite(&(*vec_begin), sizeof(std::pair<uint32_t, encT>), num_elements, vec_f);
       if (std::ferror(vec_f)) {
-        std::puts("I/O error when writing LSH-value and encoding pairs in the below function.\n");
+        std::puts("I/O error when writing LSH-value and encoding pairs in the below function.");
         std::cout << __PRETTY_FUNCTION__ << std::endl;
+        std::cerr << "Error: " << strerror(errno);
         std::fclose(vec_f);
         is_ok = false;
         break;
@@ -48,14 +51,17 @@ bool inputHandler<encT>::saveInput(const char *dirpath, tT tID_key, uint16_t tot
 
   std::string rcounts_dirpath = dirpath;
   rcounts_dirpath += "/rcounts";
-  std::vector<std::pair<encT, uint64_t>> rcounts_vec(rcounts.begin(), rcounts.end());
-  FILE *rcounts_f = IO::open_file((rcounts_dirpath + "/" + std::to_string(tID_key)).c_str(), is_ok, "wb");
-  std::fwrite(rcounts_vec.data(), sizeof(std::pair<encT, uint64_t>), rcounts_vec.size(), rcounts_f);
-  if (std::ferror(rcounts_f)) {
-    std::puts("I/O error when writing the genome counts for the shared k-mers.\n");
-    is_ok = false;
+  std::string rcounts_fpath = (rcounts_dirpath + "/" + std::to_string(tID_key));
+  if (!ghc::filesystem::exists(rcounts_fpath)) {
+    std::vector<std::pair<encT, uint64_t>> rcounts_vec(rcounts.begin(), rcounts.end());
+    FILE *rcounts_f = IO::open_file(rcounts_fpath.c_str(), is_ok, "wb");
+    std::fwrite(rcounts_vec.data(), sizeof(std::pair<encT, uint64_t>), rcounts_vec.size(), rcounts_f);
+    if (std::ferror(rcounts_f)) {
+      std::puts("I/O error when writing the genome counts for the shared k-mers.\n");
+      is_ok = false;
+    }
+    std::fclose(rcounts_f);
   }
-  std::fclose(rcounts_f);
 
   return is_ok;
 }
@@ -86,18 +92,18 @@ bool inputHandler<encT>::loadInput(const char *dirpath, tT tID_key, uint16_t tot
     batch_dirpath += +"/batch" + std::to_string(i);
     std::string disk_path = batch_dirpath + "/lsh_enc_vec-" + std::to_string(tID_key);
     std::ifstream vec_ifs = IO::open_ifstream(disk_path.c_str(), is_ok);
-    const size_t bufsize = 1024 * 1024;
-    char buf[bufsize];
-    vec_ifs.rdbuf()->pubsetbuf(buf, bufsize);
+    char buf[BUFF_SIZE];
+    vec_ifs.rdbuf()->pubsetbuf(buf, BUFF_SIZE);
     size_t sr = ghc::filesystem::file_size(disk_path) / sizeof(std::pair<uint32_t, encT>);
     if (vec_ifs.good() && sr > 0) {
-      auto rd = reinterpret_cast<char *>(lsh_enc_vec.data() + lsh_enc_vec.size()); // TODO: Check if this is bug-free
-      lsh_enc_vec.resize(lsh_enc_vec.size() + sr);
-      vec_ifs.read(rd, sr * sizeof(std::pair<uint32_t, encT>));
+      size_t lsize = lsh_enc_vec.size();
+      lsh_enc_vec.resize(lsize + sr);
+      vec_ifs.read(reinterpret_cast<char *>(&(*(lsh_enc_vec.begin() + lsize))), sr * sizeof(std::pair<uint32_t, encT>));
     }
-    if (vec_ifs.fail() || (vec_ifs.peek() != EOF)) {
-      std::puts("I/O error when reading LSH-value and encoding pairs in the below function.\n");
+    if ((sr > 0) && (vec_ifs.fail() || (vec_ifs.peek() != EOF))) {
+      std::puts("I/O error when reading LSH-value and encoding pairs in the below function.");
       std::cout << __PRETTY_FUNCTION__ << std::endl;
+      std::cerr << "Error: " << strerror(errno);
       break;
     } else if (vec_ifs.eof()) {
       is_ok = true;
@@ -132,16 +138,16 @@ void inputStream<encT>::loadBatch(std::vector<std::pair<uint32_t, encT>> &lsh_en
   std::ifstream batch_ifs = IO::open_ifstream(disk_path.c_str(), is_ok);
   if (!is_ok)
     exit(EXIT_FAILURE);
-  const size_t bufsize = 1024 * 1024;
-  char buf[bufsize];
-  batch_ifs.rdbuf()->pubsetbuf(buf, bufsize);
+  char buf[BUFF_SIZE];
+  batch_ifs.rdbuf()->pubsetbuf(buf, BUFF_SIZE);
   if (batch_ifs.good()) {
     lsh_enc_vec.resize(ghc::filesystem::file_size(disk_path) / sizeof(std::pair<uint32_t, encT>));
     batch_ifs.read(reinterpret_cast<char *>(lsh_enc_vec.data()), lsh_enc_vec.size() * sizeof(std::pair<uint32_t, encT>));
   }
   if (batch_ifs.fail() || (batch_ifs.peek() != EOF)) {
-    std::cout << __PRETTY_FUNCTION__ << std::endl;
     std::puts("I/O eror when reading LSH-value and encoding pairs.\n");
+    std::cout << __PRETTY_FUNCTION__ << std::endl;
+    std::cerr << "Error: " << strerror(errno);
   }
   batch_ifs.close();
 }
@@ -154,13 +160,18 @@ void inputStream<encT>::loadCounts(std::unordered_map<encT, uint64_t> &rcounts)
   rcounts_path += "/rcounts/" + std::to_string(tID_key);
   std::vector<std::pair<encT, uint64_t>> rcounts_vec;
   uint64_t num_kmers = ghc::filesystem::file_size(rcounts_path) / sizeof(std::pair<encT, uint64_t>);
-  FILE *rcounts_f = IO::open_file((rcounts_path).c_str(), is_ok, "rb");
-  std::fread(rcounts_vec.data(), sizeof(std::pair<encT, uint64_t>), num_kmers, rcounts_f);
-  if (std::ferror(rcounts_f)) {
-    std::puts("I/O error when reading the genome counts for the shared k-mers.\n");
-    is_ok = false;
+  if (num_kmers > 0) {
+    FILE *rcounts_f = IO::open_file((rcounts_path).c_str(), is_ok, "rb");
+    rcounts_vec.resize(num_kmers);
+    std::fread(rcounts_vec.data(), sizeof(std::pair<encT, uint64_t>), num_kmers, rcounts_f);
+    if (std::ferror(rcounts_f)) {
+      std::puts("I/O error when reading the genome counts for the shared k-mers.\n");
+      std::cout << __PRETTY_FUNCTION__ << std::endl;
+      std::cerr << "Error: " << strerror(errno);
+      is_ok = false;
+    }
+    std::fclose(rcounts_f);
   }
-  std::fclose(rcounts_f);
   std::copy(rcounts_vec.begin(), rcounts_vec.end(), std::inserter(rcounts, rcounts.begin()));
 }
 
@@ -179,9 +190,8 @@ uint64_t inputStream<encT>::retrieveBatch(vvec<encT> &btable, uint32_t tbatch_si
   std::ifstream batch_ifs = IO::open_ifstream(disk_path.c_str(), is_ok);
   if (!is_ok)
     exit(EXIT_FAILURE);
-  const size_t bufsize = 1024 * 1024;
-  char buf[bufsize];
-  batch_ifs.rdbuf()->pubsetbuf(buf, bufsize);
+  char buf[BUFF_SIZE];
+  batch_ifs.rdbuf()->pubsetbuf(buf, BUFF_SIZE);
   uint64_t num_retrieved = 0;
   while (!batch_ifs.eof() && batch_ifs.good()) {
     std::pair<uint32_t, encT> lsh_enc;
@@ -194,8 +204,9 @@ uint64_t inputStream<encT>::retrieveBatch(vvec<encT> &btable, uint32_t tbatch_si
       break;
   }
   if (batch_ifs.fail() && !batch_ifs.eof()) {
-    std::cout << __PRETTY_FUNCTION__ << std::endl;
     std::puts("I/O eror when reading LSH-value and encoding pairs.\n");
+    std::cout << __PRETTY_FUNCTION__ << std::endl;
+    std::cerr << "Error: " << strerror(errno);
   }
   assert(num_retrieved == num_kmers);
   batch_ifs.close();
@@ -298,20 +309,23 @@ uint64_t inputHandler<encT>::extractInput(uint64_t rbatch_size)
     kseq_destroy(reader);
     gzclose(reader->f->f);
     lsh_enc_vec_f.shrink_to_fit();
+    std::sort(lsh_enc_vec_f.begin(),
+              lsh_enc_vec_f.end(),
+              [](const std::pair<uint32_t, encT> &l, const std::pair<uint32_t, encT> &r) {
+                return (l.first == r.first) ? l.second < r.second : l.first < r.first;
+              });
+    auto rone_it = std::unique(lsh_enc_vec_f.begin(), lsh_enc_vec_f.end());
+    lsh_enc_vec_f.erase(rone_it, lsh_enc_vec_f.end());
     lsh_enc_vec.insert(lsh_enc_vec.end(), lsh_enc_vec_f.begin(), lsh_enc_vec_f.end());
     if (((fix % GENOME_BATCH_SIZE) == 0) || (fix == (filepath_v.size() - 1))) {
       std::sort(lsh_enc_vec.begin() + last_ix,
                 lsh_enc_vec.end(),
                 [](const std::pair<uint32_t, encT> &l, const std::pair<uint32_t, encT> &r) {
-                  if (l.first == r.first)
-                    return l.second < r.second;
-                  else
-                    return l.first < r.first;
+                  return (l.first == r.first) ? l.second < r.second : l.first < r.first;
                 });
       std::inplace_merge(lsh_enc_vec.begin(), lsh_enc_vec.begin() + last_ix, lsh_enc_vec.end());
       auto nuniq_it = std::unique(lsh_enc_vec.begin(), lsh_enc_vec.end());
-      auto rone_it = std::unique(nuniq_it, lsh_enc_vec.end());
-      for (auto it = nuniq_it; it != rone_it; ++it) {
+      for (auto it = nuniq_it; it != lsh_enc_vec.end(); ++it) {
         rcounts[it->second]++;
       }
       lsh_enc_vec.erase(nuniq_it, lsh_enc_vec.end());
@@ -332,16 +346,19 @@ uint64_t inputHandler<encT>::readInput(uint64_t rbatch_size)
   uint64_t mask_bp = u64m >> (32 - k) * 2;
   uint64_t mask_lr = ((u64m >> (64 - k)) << 32) + ((u64m << 32) >> (64 - k));
   rbatch_size = IO::adjustBatchSize(rbatch_size, num_threads);
-  for (std::string &filepath : filepath_v) {
+  size_t last_ix = lsh_enc_vec.size();
+  for (unsigned int fix = 0; fix < filepath_v.size(); ++fix) {
+    std::string &filepath = filepath_v[fix];
     kseq_t *reader = IO::getReader(filepath.c_str());
     std::vector<sseq_t> seqBatch;
     IO::readBatch(seqBatch, reader, rbatch_size);
+    std::vector<std::pair<uint32_t, encT>> lsh_enc_vec_f;
     while (!(seqBatch.empty())) {
       uint8_t ldiff = w - k + 1;
       uint8_t kix = 0;
       std::vector<std::pair<uint32_t, encT>> lsh_enc_win(ldiff);
-      uint32_t wix = lsh_enc_vec.size();
-      lsh_enc_vec.resize(wix + seqBatch.size());
+      uint32_t wix = lsh_enc_vec_f.size();
+      lsh_enc_vec_f.resize(wix + seqBatch.size());
       for (uint32_t ix = 0; ix < seqBatch.size(); ++ix) {
         uint64_t enc64_bp;
         uint64_t enc64_lr;
@@ -373,20 +390,20 @@ uint64_t inputHandler<encT>::readInput(uint64_t rbatch_size)
             if (ldiff > 1)
               lsh_enc_win[kix] = std::make_pair(rix, cenc64_lr);
             else
-              lsh_enc_vec[wix + ix] = std::make_pair(rix, cenc64_lr);
+              lsh_enc_vec_f[wix + ix] = std::make_pair(rix, cenc64_lr);
           } else if (std::is_same<encT, uint32_t>::value) {
             drop64Encoding32(*ptr_npositions, cenc64_bp, cenc64_lr, cenc32_bp, cenc32_lr);
             if (ldiff > 1)
               lsh_enc_win[kix] = std::make_pair(rix, cenc32_lr);
             else
-              lsh_enc_vec[wix + ix] = std::make_pair(rix, cenc32_lr);
+              lsh_enc_vec_f[wix + ix] = std::make_pair(rix, cenc32_lr);
           } else {
             std::puts("Available encoding types are 'uint64_t' and 'uint32_t'.\n");
             exit(EXIT_FAILURE);
           }
         }
         if (ldiff > 1)
-          lsh_enc_vec[wix + ix] = *std::min_element(
+          lsh_enc_vec_f[wix + ix] = *std::min_element(
             lsh_enc_win.begin(), lsh_enc_win.end(), [](std::pair<uint32_t, encT> lhs, std::pair<uint32_t, encT> rhs) {
               return murmur64(lhs.second) < murmur64(rhs.second);
               /* return lhs.second < rhs.second; */
@@ -397,25 +414,31 @@ uint64_t inputHandler<encT>::readInput(uint64_t rbatch_size)
     }
     kseq_destroy(reader);
     gzclose(reader->f->f);
+    lsh_enc_vec_f.shrink_to_fit();
+    std::sort(lsh_enc_vec_f.begin(),
+              lsh_enc_vec_f.end(),
+              [](const std::pair<uint32_t, encT> &l, const std::pair<uint32_t, encT> &r) {
+                return (l.first == r.first) ? l.second < r.second : l.first < r.first;
+              });
+    auto rone_it = std::unique(lsh_enc_vec_f.begin(), lsh_enc_vec_f.end());
+    lsh_enc_vec_f.erase(rone_it, lsh_enc_vec_f.end());
+    lsh_enc_vec.insert(lsh_enc_vec.end(), lsh_enc_vec_f.begin(), lsh_enc_vec_f.end());
+    if (((fix % GENOME_BATCH_SIZE) == 0) || (fix == (filepath_v.size() - 1))) {
+      std::sort(lsh_enc_vec.begin() + last_ix,
+                lsh_enc_vec.end(),
+                [](const std::pair<uint32_t, encT> &l, const std::pair<uint32_t, encT> &r) {
+                  return (l.first == r.first) ? l.second < r.second : l.first < r.first;
+                });
+      std::inplace_merge(lsh_enc_vec.begin(), lsh_enc_vec.begin() + last_ix, lsh_enc_vec.end());
+      auto nuniq_it = std::unique(lsh_enc_vec.begin(), lsh_enc_vec.end());
+      for (auto it = nuniq_it; it != lsh_enc_vec.end(); ++it) {
+        rcounts[it->second]++;
+      }
+      lsh_enc_vec.erase(nuniq_it, lsh_enc_vec.end());
+      last_ix = lsh_enc_vec.size();
+    }
   }
-  lsh_enc_vec.shrink_to_fit();
-  std::sort(lsh_enc_vec.begin(),
-            lsh_enc_vec.end(),
-            [](const std::pair<uint32_t, uint64_t> &l, const std::pair<uint32_t, uint64_t> &r) {
-              if (l.first == r.first)
-                return l.second < r.second;
-              else
-                return l.first < r.first;
-            });
-  auto nuniq_it = std::unique(lsh_enc_vec.begin(), lsh_enc_vec.end());
-  auto rone_it = std::unique(nuniq_it, lsh_enc_vec.end());
-  for (auto it = nuniq_it; it != rone_it; ++it) {
-    rcounts[it->second]++;
-  }
-  lsh_enc_vec.erase(nuniq_it, lsh_enc_vec.end());
   tnum_kmers = lsh_enc_vec.size();
-  if (tnum_kmers_sum != tnum_kmers)
-    std::puts("Duplicate k-mers exist in the given input k-mer set!");
   return tnum_kmers;
 }
 

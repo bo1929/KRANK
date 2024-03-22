@@ -16,10 +16,9 @@ Query::Query(std::vector<std::string> library_dirpaths,
   , _log(log)
 {
   _num_libraries = _library_dirpaths.size();
-  _slib_ptr_v.resize(_num_libraries);
 
   for (unsigned int i = 0; i < _num_libraries; ++i) {
-    _slib_ptr_v[i] = std::make_unique<QLibrary>(_library_dirpaths[i].c_str(), _log);
+    _slib_ptr_v.push_back(std::make_unique<QLibrary>(_library_dirpaths[i].c_str(), _log));
     if (i == 0) {
       _k = _slib_ptr_v[i]->_k;
       _parent_inmap = _slib_ptr_v[i]->_parent_inmap;
@@ -71,12 +70,12 @@ Query::Query(std::vector<std::string> library_dirpaths,
   }
 }
 
-void Query::processBatch(std::vector<sseq_t> seqBatch,
-                         vvec_string names_vec,
-                         vvec_uint64 tlca_vec_or,
-                         vvec_uint64 tlca_vec_rc,
-                         vvec_uint8 hdist_vec_or,
-                         vvec_uint8 hdist_vec_rc)
+void Query::processBatch(std::vector<sseq_t> &seqBatch,
+                         vvec_string &names_vec,
+                         vvec_uint64 &tlca_vec_or,
+                         vvec_uint64 &tlca_vec_rc,
+                         vvec_uint8 &hdist_vec_or,
+                         vvec_uint8 &hdist_vec_rc)
 {
 #pragma omp parallel for num_threads(num_threads), schedule(static)
   for (uint32_t ix = 0; ix < seqBatch.size(); ++ix) {
@@ -429,9 +428,9 @@ bool Query::QLibrary::loadTaxonomy()
   std::fread(tIDs_taxIDs.data(), sizeof(std::pair<tT, uint64_t>), _tax_num_nodes, taxonomy_f);
   std::fread(taxIDs_parents.data(), sizeof(std::pair<uint64_t, uint64_t>), _tax_full_size, taxonomy_f);
 
-  for (auto &kv : tIDs_taxIDs)
+  for (auto kv : tIDs_taxIDs)
     _tID_to_taxID[kv.first] = kv.second;
-  for (auto &kv : taxIDs_parents)
+  for (auto kv : taxIDs_parents)
     _parent_inmap[kv.first] = kv.second;
 
   if (std::ferror(taxonomy_f)) {
