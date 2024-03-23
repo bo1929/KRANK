@@ -3,6 +3,7 @@
 
 #include "assess.h"
 #include "common.h"
+#include "taxonomy.h"
 #include "encode.h"
 #include "io.h"
 #include "lsh.h"
@@ -28,10 +29,18 @@ struct HTs
   tT *tlca_arr;
   uint8_t *ind_arr;
   RankingMethod ranking_method;
+  TaxonomyRecord<tT> *taxonomy_record;
   std::vector<HTs<encT>> childrenHT;
   std::set<tT> tIDsBasis;
 
-  HTs(tT tID, uint8_t k, uint8_t h, uint8_t b, uint32_t num_rows, maskLSH *ptr_lsh_vg, RankingMethod ranking_method)
+  HTs(tT tID,
+      uint8_t k,
+      uint8_t h,
+      uint8_t b,
+      uint32_t num_rows,
+      maskLSH *ptr_lsh_vg,
+      RankingMethod ranking_method,
+      TaxonomyRecord<tT> *taxonomy_record)
     : tID(tID)
     , k(k)
     , h(h)
@@ -41,6 +50,7 @@ struct HTs
     , num_basis(0)
     , ptr_lsh_vg(ptr_lsh_vg)
     , ranking_method(ranking_method)
+    , taxonomy_record(taxonomy_record)
   {
     enc_arr = new encT[num_rows * b];
     std::fill(enc_arr, enc_arr + num_rows * b, 0);
@@ -135,10 +145,17 @@ struct HTd
   vvec<scT> scount_vvec;
   vvec<tT> tlca_vvec;
   RankingMethod ranking_method;
+  TaxonomyRecord<tT> *taxonomy_record;
   std::vector<HTd<encT>> childrenHT;
   std::set<tT> tIDsBasis;
 
-  HTd(tT tID, uint8_t k, uint8_t h, uint32_t num_rows, maskLSH *ptr_lsh_vg, RankingMethod ranking_method)
+  HTd(tT tID,
+      uint8_t k,
+      uint8_t h,
+      uint32_t num_rows,
+      maskLSH *ptr_lsh_vg,
+      RankingMethod ranking_method,
+      TaxonomyRecord<tT> *taxonomy_record)
     : tID(tID)
     , k(k)
     , h(h)
@@ -147,6 +164,7 @@ struct HTd
     , num_basis(0)
     , ptr_lsh_vg(ptr_lsh_vg)
     , ranking_method(ranking_method)
+    , taxonomy_record(taxonomy_record)
   {
     enc_vvec.resize(num_rows);
     scount_vvec.resize(num_rows);
@@ -163,6 +181,7 @@ struct HTd
   void updateAfter(std::unordered_map<encT, scT> &scount_map, std::unordered_map<encT, tT> &tlca_map, uint32_t rix);
   void accumulateCounts(std::unordered_map<encT, scT> &scount_map, HTd<encT> &child, uint32_t rix);
   void getScores(std::vector<float> &scores_vec, uint32_t rix);
+  void selectCoverage(std::vector<size_t> &ixs, uint32_t rix, size_t b_max);
   void unionRows(HTd<encT> &child, bool update_size = true);
   void makeUnique(bool update_size = true);
   void trimColumns(size_t b_max);
