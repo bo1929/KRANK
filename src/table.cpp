@@ -1,4 +1,5 @@
 #include "table.h"
+/* #include "beta_distribution.hpp" */
 
 /* #undef DEBUG */
 #define FL false
@@ -189,7 +190,7 @@ void HTd<encT>::clearRows()
   enc_vvec.resize(num_rows);
   scount_vvec.clear();
   scount_vvec.resize(num_rows);
-  tlca_vvec.clear();
+  /* tlca_vvec.clear(); */
   /* tlca_vvec.resize(num_rows); */
   HTd<encT>::updateSize();
   HTd<encT>::num_basis = 0;
@@ -283,26 +284,86 @@ void HTd<encT>::trimColumns(size_t b_max)
 template<typename encT>
 void HTd<encT>::getScores(std::vector<float> &scores_vec, uint32_t rix)
 {
-  std::beta_distribution<double> beta_dist(1.0 / childrenHT.size(), 1.0 / childrenHT.size());
-  uint64_t msnorm = 0;
-  for (auto &ht : childrenHT) {
-    if (ht.num_kmers > msnorm)
-      msnorm = ht.num_kmers;
-  }
+  /* std::random_device rd_; */
+  /* std::mt19937 gen_(rd_()); */
+  /* std::beta_distribution<> beta_dist(1.0 / childrenHT.size(), 1.0 / childrenHT.size()); */
+  /* float tsnorm = 0; */
+  /* float rsnorm = 0; */
+  /* float nbnorm = 0; */
+  /* for (auto &ht : childrenHT) { */
+  /*   tsnorm += ht.num_kmers; */
+  /*   rsnorm += ht.scount_vvec[rix].size(); */
+  /*   nbnorm += ht.num_basis; */
+  /* } */
   std::unordered_map<encT, float> values_map{};
   for (auto &ht : childrenHT) {
-    /* auto sum_scount = std::accumulate(ht.scount_vvec[rix].begin(), ht.scount_vvec[rix].end(), 0); */
-    uint64_t row_weight = 1 + 16 - std::min(static_cast<int>(ht.enc_vvec[rix].size()), 16);
+    /* std::geometric_distribution<> rgdist(static_cast<float>(ht.enc_vvec[rix].size()) / rsnorm); */
+    /* std::geometric_distribution<> tgdist(static_cast<float>(ht.num_kmers) / tsnorm); */
+    /* std::geometric_distribution<> nbdist(static_cast<float>(ht.num_basis) / nbnorm); */
     for (unsigned int i = 0; i < ht.scount_vvec[rix].size(); ++i) {
-      std::binomial_distribution<> d(16 * (ht.num_kmers + msnorm - 1) / msnorm, beta_dist(gen));
-      values_map[ht.enc_vvec[rix][i]] += (d(gen) + 1.0) * ht.scount_vvec[rix][i] * row_weight;
-      /* values_map[ht.enc_vvec[rix][i]] += static_cast<float>((d(gen) + 1.0) * ht.scount_vvec[rix][i]); */
+      // Approach 1:
+      /* std::binomial_distribution<> d( */
+      /*   static_cast<unsigned int>(std::ceil(row_weight * (static_cast<float>(ht.num_kmers) / tsnorm))), beta_dist(gen_)); */
+      /* values_map[ht.enc_vvec[rix][i]] += (d(gen_) + 1) * ht.scount_vvec[rix][i]; */
+      // Approach 2:
+      /* values_map[ht.enc_vvec[rix][i]] += log2(nbdist(gen_) + 2) * ht.scount_vvec[rix][i]; */
+      // Approach 3:
+      values_map[ht.enc_vvec[rix][i]] +=
+        static_cast<float>(ht.scount_vvec[rix][i]) / static_cast<float>(ht.scount_vvec[rix].size());
     }
   }
   scores_vec.resize(enc_vvec[rix].size());
   for (unsigned int i = 0; i < enc_vvec[rix].size(); ++i) {
     scores_vec[i] = values_map[enc_vvec[rix][i]];
   }
+}
+
+template<typename encT>
+void HTd<encT>::selectCoverage(std::vector<size_t> &ixs_r, uint32_t rix, size_t b_max)
+{
+  std::vector<size_t> ixs, ixs_k, ixs_a;
+  ixs.resize(enc_vvec[rix].size());
+  assert((ixs.size() > 0) && (b_max > 0));
+  std::iota(ixs.begin(), ixs.end(), 0);
+  std::random_shuffle(ixs.begin(), ixs.end());
+  unsigned int nrm = (ixs.size() - b_max);
+  auto &v = scount_vvec[rix];
+  if (FL)
+    std::sort(ixs.begin(), ixs.end(), [&v](size_t i1, size_t i2) { return v[i1] > v[i2]; });
+  else
+    std::sort(ixs.begin(), ixs.end(), [&v](size_t i1, size_t i2) { return v[i1] < v[i2]; });
+  ixs_k.push_back(ixs.back());
+
+  for (unsigned int j = ixs.size() - 1; j-- != 0 && ixs_r.size() < nrm;) {
+    bool uc = ixs_k.size() < b_max;
+    bool am = false;
+    for (unsigned int k = 0; k < ixs_k.size() && uc; ++k) {
+      tT c_lca = taxonomy_record->getLowestCommonAncestor(tlca_vvec[rix][ixs[j]], tlca_vvec[rix][ixs_k[k]]);
+      if ((c_lca == tlca_vvec[rix][ixs[j]])) {
+        // Has lower score and someones parent (or the same taxon).
+        uc = false;
+      } else if (c_lca == tlca_vvec[rix][ixs_k[k]]) {
+        // Ambiguous, k has higher score but up in the tree or they are coming from the same child.
+        am = true;
+      } else { // ((c_lca != tlca_vvec[rix][ixs_k[k]]) && (c_lca != tlca_vvec[rix][ixs[j]]))
+        // We don't know, keep it. They are not coming from the same child.
+        uc = true;
+      }
+    }
+    if (uc && !am)
+      ixs_k.push_back(ixs[j]);
+    else if (am)
+      ixs_a.push_back(ixs[j]);
+    else
+      ixs_r.push_back(ixs[j]);
+  }
+  for (unsigned int j = ixs_a.size(); j-- != 0 && ixs_r.size() < nrm;) {
+    ixs_r.push_back(ixs_a[j]);
+  }
+  for (unsigned int j = ixs_k.size(); j-- != 0 && ixs_r.size() < nrm;) {
+    ixs_r.push_back(ixs_k[j]);
+  }
+  std::sort(ixs_r.begin(), ixs_r.end());
 }
 
 template<typename encT>
@@ -314,22 +375,23 @@ void HTd<encT>::pruneColumns(size_t b_max)
 #pragma omp parallel for schedule(dynamic)
   for (uint32_t rix = 0; rix < num_rows; ++rix) {
     if (enc_vvec[rix].size() > b_max) {
-      std::vector<size_t> ixs;
+      std::vector<size_t> ixs_r;
       switch (ranking_method) {
         case random_kmer: {
-          getIxsRandom(ixs, enc_vvec[rix].size(), enc_vvec[rix].size() - b_max);
+          getIxsRandom(ixs_r, enc_vvec[rix].size(), enc_vvec[rix].size() - b_max);
           break;
         }
         case representative_kmer: {
           std::vector<float> scores_vec;
           HTd<encT>::getScores(scores_vec, rix);
-          getIxsArgsort(ixs, scores_vec, enc_vvec[rix].size() - b_max, FL);
+          getIxsArgsort(ixs_r, scores_vec, enc_vvec[rix].size() - b_max, FL);
+          /* HTd<encT>::selectCoverage(ixs_r, rix, b_max); */
           break;
         }
       }
-      vecRemoveIxs(enc_vvec[rix], ixs);
-      vecRemoveIxs(scount_vvec[rix], ixs);
-      /* vecRemoveIxs(tlca_vvec[rix], ixs); */
+      vecRemoveIxs(enc_vvec[rix], ixs_r);
+      vecRemoveIxs(scount_vvec[rix], ixs_r);
+      /* vecRemoveIxs(tlca_vvec[rix], ixs_r); */
     }
   }
   HTd<encT>::updateSize();
@@ -462,20 +524,20 @@ void HTs<encT>::unionRows(HTs<encT> &child, bool update_size)
                      child.enc_arr + (ix + child.ind_arr[rix]),
                      std::back_inserter(n_enc_arr));
       if (n_enc_arr.size() > b) {
-        std::vector<size_t> ixs;
+        std::vector<size_t> ixs_r;
         switch (ranking_method) {
           case random_kmer: {
-            getIxsRandom(ixs, n_enc_arr.size(), n_enc_arr.size() - b);
+            getIxsRandom(ixs_r, n_enc_arr.size(), n_enc_arr.size() - b);
             break;
           }
           case representative_kmer: {
             std::vector<float> scores_vec;
             HTs<encT>::getScores(scores_vec, rix);
-            getIxsArgsort(ixs, scores_vec, n_enc_arr.size() - b, FL);
+            getIxsArgsort(ixs_r, scores_vec, n_enc_arr.size() - b, FL);
             break;
           }
         }
-        vecRemoveIxs(n_enc_arr, ixs);
+        vecRemoveIxs(n_enc_arr, ixs_r);
       }
       std::copy(n_enc_arr.begin(), n_enc_arr.end(), enc_arr + ix);
       ind_arr[rix] = n_enc_arr.size();
@@ -538,24 +600,29 @@ void HTd<encT>::shrinkHT(uint64_t num_rm, size_t b_max)
 #pragma omp atomic read
         r_to_rm = to_rm;
         if (r_to_rm > 0) {
-          std::vector<size_t> ixs;
+          std::vector<size_t> ixs_r;
           switch (ranking_method) {
             case random_kmer: {
-              getIxsRandom(ixs, enc_vvec[rix].size(), n);
+              getIxsRandom(ixs_r, enc_vvec[rix].size(), n);
               break;
             }
             case representative_kmer: {
               std::vector<float> scores_vec;
               HTd<encT>::getScores(scores_vec, rix);
-              getIxsArgsort(ixs, scores_vec, n, FL);
+              getIxsArgsort(ixs_r, scores_vec, n, FL);
+              /* if (enc_vvec[rix].size() == n) { */
+              /*   ixs_r.resize(n); */
+              /*   std::iota(ixs_r.begin(), ixs_r.end(), 0); */
+              /* } else */
+              /*   HTd<encT>::selectCoverage(ixs_r, rix, enc_vvec[rix].size() - n); */
               break;
             }
           }
-          vecRemoveIxs(scount_vvec[rix], ixs);
-          vecRemoveIxs(enc_vvec[rix], ixs);
-          /* vecRemoveIxs(tlca_vvec[rix], ixs); */
+          vecRemoveIxs(scount_vvec[rix], ixs_r);
+          vecRemoveIxs(enc_vvec[rix], ixs_r);
+          /* vecRemoveIxs(tlca_vvec[rix], ixs_r); */
 #pragma omp atomic update
-          to_rm = to_rm - ixs.size();
+          to_rm = to_rm - ixs_r.size();
         }
       }
     }
@@ -608,25 +675,25 @@ void HTs<encT>::shrinkHT(uint64_t num_rm)
 #pragma omp atomic read
         r_to_rm = to_rm;
         if (r_to_rm > 0) {
-          std::vector<size_t> ixs;
+          std::vector<size_t> ixs_r;
           switch (ranking_method) {
             case random_kmer: {
-              getIxsRandom(ixs, ind_arr[rix], n);
+              getIxsRandom(ixs_r, ind_arr[rix], n);
               break;
             }
             case representative_kmer: {
               std::vector<float> scores_vec;
               HTs<encT>::getScores(scores_vec, rix);
-              getIxsArgsort(ixs, scores_vec, n, FL);
+              getIxsArgsort(ixs_r, scores_vec, n, FL);
               break;
             }
           }
-          arrRemoveIxs(enc_arr + (rix * b), ind_arr[rix], ixs);
-          arrRemoveIxs(scount_arr + (rix * b), ind_arr[rix], ixs);
-          /* arrRemoveIxs(tlca_arr + (rix * b), ind_arr[rix], ixs); */
-          ind_arr[rix] = ind_arr[rix] - ixs.size();
+          arrRemoveIxs(enc_arr + (rix * b), ind_arr[rix], ixs_r);
+          arrRemoveIxs(scount_arr + (rix * b), ind_arr[rix], ixs_r);
+          arrRemoveIxs(tlca_arr + (rix * b), ind_arr[rix], ixs_r);
+          ind_arr[rix] = ind_arr[rix] - ixs_r.size();
 #pragma omp atomic update
-          to_rm = to_rm - ixs.size();
+          to_rm = to_rm - ixs_r.size();
         }
       }
     }
@@ -729,14 +796,14 @@ void HTd<encT>::filterLSR(std::vector<uint8_t> &depth_vec, uint8_t slr_depth)
 #pragma omp parallel for schedule(dynamic)
   for (uint32_t rix = 0; rix < num_rows; ++rix) {
     if (tlca_vvec[rix].size() >= 1) {
-      std::vector<size_t> ixs;
+      std::vector<size_t> ixs_r;
       for (unsigned int j = 0; j < tlca_vvec[rix].size(); ++j) {
         if (depth_vec[tlca_vvec[rix][j]] <= slr_depth)
-          ixs.push_back(j);
+          ixs_r.push_back(j);
       }
-      vecRemoveIxs(scount_vvec[rix], ixs);
-      vecRemoveIxs(enc_vvec[rix], ixs);
-      vecRemoveIxs(tlca_vvec[rix], ixs);
+      vecRemoveIxs(scount_vvec[rix], ixs_r);
+      vecRemoveIxs(enc_vvec[rix], ixs_r);
+      vecRemoveIxs(tlca_vvec[rix], ixs_r);
     }
   }
   HTd<encT>::updateSize();

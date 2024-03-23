@@ -273,7 +273,7 @@ void Library::annotateInfo()
     curr_batch++;
     if ((_target_batch == 0) || (_target_batch == curr_batch)) {
       std::cout << "Annotating k-mners in the library for batch " << curr_batch << "..." << std::endl;
-      HTs<encT> ts_root(1, _k, _h, _b, _tbatch_size, &_lsh_vg, _ranking_method);
+      HTs<encT> ts_root(1, _k, _h, _b, _tbatch_size, &_lsh_vg, _ranking_method, &_taxonomy_record);
       Library::loadBatchHTs(ts_root, curr_batch);
       if (_log)
         LOG(INFO) << "The table has been loaded and contains " << ts_root.num_kmers << "/" << ts_root.num_rows * ts_root.b
@@ -297,7 +297,7 @@ void Library::build()
     curr_batch++;
     if ((_target_batch == 0) || (_target_batch == curr_batch)) {
       std::cout << "Building the library for batch " << curr_batch << "..." << std::endl;
-      HTs<encT> ts_root(1, _k, _h, _b, _tbatch_size, &_lsh_vg, _ranking_method);
+      HTs<encT> ts_root(1, _k, _h, _b, _tbatch_size, &_lsh_vg, _ranking_method, &_taxonomy_record);
       Library::getBatchHTs(&ts_root, curr_batch);
       if (_log)
         LOG(INFO) << "The table has been built and contains " << ts_root.num_kmers << "/" << ts_root.num_rows * ts_root.b
@@ -360,7 +360,7 @@ void Library::getBatchHTs(HTs<encT> *ts, unsigned int curr_batch)
 {
   if (_verbose)
     std::cout << "Constructing the table for " << _taxonomy_record.changeIDtax(ts->tID) << std::endl;
-  HTd<encT> td(ts->tID, ts->k, ts->h, ts->num_rows, ts->ptr_lsh_vg, _ranking_method);
+  HTd<encT> td(ts->tID, ts->k, ts->h, ts->num_rows, ts->ptr_lsh_vg, _ranking_method, &_taxonomy_record);
   omp_set_nested(1);
   num_tasks = static_cast<unsigned int>(sqrt(2 * num_threads));
   if (num_tasks < LNUM_TASKS)
@@ -408,7 +408,8 @@ void Library::getBatchHTd(HTd<encT> *td, unsigned int curr_batch)
     size_t num_child = children_set.size();
     std::vector<tT> children(num_child);
     std::copy(children_set.begin(), children_set.end(), children.begin());
-    td->childrenHT.assign(num_child, HTd<encT>(0, td->k, td->h, td->num_rows, td->ptr_lsh_vg, td->ranking_method));
+    td->childrenHT.assign(num_child,
+                          HTd<encT>(0, td->k, td->h, td->num_rows, td->ptr_lsh_vg, td->ranking_method, td->taxonomy_record));
     for (unsigned int ti = 0; ti < num_child; ++ti) {
       if (_log)
 #pragma omp critical
