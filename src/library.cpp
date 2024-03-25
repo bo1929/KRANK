@@ -1,8 +1,7 @@
 #include "library.h"
-#include "common.h"
 
 Library::Library(const char *library_dirpath,
-                 const char *nodes_filepath,
+                 const char *taxonomy_dirpath,
                  const char *input_filepath,
                  uint8_t k,
                  uint8_t w,
@@ -19,9 +18,9 @@ Library::Library(const char *library_dirpath,
                  bool verbose,
                  bool log)
   : _library_dirpath(library_dirpath)
-  , _taxonomy_input(nodes_filepath)
+  , _taxonomy_dirpath(taxonomy_dirpath)
+  , _taxonomy_input(taxonomy_dirpath)
   , _taxonomy_record(input_filepath, _taxonomy_input)
-  , _nodes_filepath(nodes_filepath)
   , _input_filepath(input_filepath)
   , _k(k)
   , _w(w)

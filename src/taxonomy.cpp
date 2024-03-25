@@ -1,10 +1,13 @@
 #include "taxonomy.h"
 
-TaxonomyInput::TaxonomyInput(const char *nodes_filepath)
+TaxonomyInput::TaxonomyInput(const char *taxonomy_dirpath)
 {
-  std::ifstream nodes_file(nodes_filepath);
-  if (!nodes_file.good()) {
-    std::cerr << "Error opening " << nodes_filepath << std::endl;
+  std::string main_dir = taxonomy_dirpath;
+  std::ifstream nodes_file(main_dir + "/nodes.dmp");
+  std::ifstream names_file(main_dir + "/names.dmp");
+
+  if (!nodes_file.good() || !names_file.good()) {
+    std::cerr << "Error opening taxonomy files in the given directory" << main_dir << std::endl;
     exit(EXIT_FAILURE);
   }
 
@@ -32,13 +35,13 @@ TaxonomyInput::TaxonomyInput(const char *nodes_filepath)
       }
       switch (field_ct) {
         case 1:
-          node_id = (uint64_t)stoul(token);
+          node_id = static_cast<uint64_t>(stoul(token));
           if (node_id == 0) {
             std::cerr << "Attempt to create taxonomy w/ node ID == 0" << std::endl;
             exit(EXIT_FAILURE);
           }
           break;
-        case 2: parent_id = (uint64_t)stoul(token); break;
+        case 2: parent_id = static_cast<uint64_t>(stoul(token)); break;
         case 3:
           trank = token;
           finished = true;
@@ -50,7 +53,60 @@ TaxonomyInput::TaxonomyInput(const char *nodes_filepath)
     _parent_map[node_id] = parent_id;
     _rank_map[node_id] = trank;
   }
+
+  while (getline(names_file, line)) {
+    line.pop_back();
+    line.pop_back();
+    size_t pos1, pos2;
+    pos1 = 0;
+    int field_ct = 0;
+    bool finished = false;
+    while (field_ct++ < 10 && !finished) {
+      pos2 = line.find(delim, pos1);
+      std::string token;
+      if (pos2 == std::string::npos) {
+        token = line.substr(pos1);
+        finished = true;
+      } else {
+        token = line.substr(pos1, pos2 - pos1);
+        pos1 = pos2 + delim.size();
+      }
+      switch (field_ct) {
+        case 1:
+          node_id = static_cast<uint64_t>(stoul(token));
+          if (node_id == 0) {
+            std::cerr << "Attempt to create taxonomy w/ node ID == 0" << std::endl;
+            exit(EXIT_FAILURE);
+          }
+          break;
+        case 2: // name
+          name = token;
+          break;
+        case 4:
+          if (token == "scientific name")
+            _name_map[node_id] = name;
+          finished = true;
+          break;
+      }
+    }
+  }
+
+  uint64_t tmp_taxID;
+  uint8_t depth;
+  for (auto &kv : _parent_map) {
+    depth = 0;
+    tmp_taxID = kv.first;
+    while (_parent_map[tmp_taxID] != 0) {
+      tmp_taxID = _parent_map[tmp_taxID];
+      depth++;
+    }
+    if (tmp_taxID == 1)
+      depth++;
+    _depth_map[kv.first] = depth;
+  }
+
   nodes_file.close();
+  names_file.close();
 }
 
 uint64_t TaxonomyInput::getParent(uint64_t taxID) { return _parent_map[taxID]; }
@@ -61,6 +117,9 @@ template<typename T>
 TaxonomyRecord<T>::TaxonomyRecord(const char *input_filepath, TaxonomyInput taxonomy)
 {
   _parent_inmap = taxonomy.parent_map();
+  _depth_inmap = taxonomy.depth_map();
+  _rank_inmap = taxonomy.rank_map();
+  _name_inmap = taxonomy.name_map();
   _full_size = _parent_inmap.size();
 
   std::map<std::string, uint64_t> input_to_taxID;
@@ -185,7 +244,7 @@ void TaxonomyRecord<T>::printTaxonomyRecord()
   for (auto &kv : _tID_to_taxID) {
     std::cout << kv.first << " " << kv.second << std::endl;
   }
-  std::cout << "Genomes name : Taxonomy-record ID : Taxon ID" << std::endl;
+  std::cout << "Genome path : Taxonomy-record ID : Taxon ID" << std::endl;
   for (auto &kv : _input_to_tID) {
     std::cout << kv.first << " " << kv.second << " " << _tID_to_taxID[kv.second] << std::endl;
   }
@@ -230,6 +289,7 @@ bool TaxonomyRecord<T>::saveTaxonomyRecord(const char *library_dirpath)
   std::string save_filepath(library_dirpath);
   std::vector<std::pair<T, uint64_t>> tIDs_taxIDs(_tID_to_taxID.begin(), _tID_to_taxID.end());
   std::vector<std::pair<uint64_t, uint64_t>> taxIDs_parents(_parent_inmap.begin(), _parent_inmap.end());
+  std::vector<std::pair<uint64_t, uint8_t>> taxIDs_depths(_depth_inmap.begin(), _depth_inmap.end());
 
   FILE *taxonomy_f = IO::open_file((save_filepath + "/taxonomy").c_str(), is_ok, "wb");
   std::fwrite(&_num_nodes, sizeof(T), 1, taxonomy_f);
@@ -239,6 +299,20 @@ bool TaxonomyRecord<T>::saveTaxonomyRecord(const char *library_dirpath)
   std::fwrite(_depth_vec.data(), sizeof(uint8_t), _num_nodes, taxonomy_f);
   std::fwrite(tIDs_taxIDs.data(), sizeof(std::pair<T, uint64_t>), _num_nodes, taxonomy_f);
   std::fwrite(taxIDs_parents.data(), sizeof(std::pair<uint64_t, uint64_t>), _full_size, taxonomy_f);
+  std::fwrite(taxIDs_depths.data(), sizeof(std::pair<uint64_t, uint8_t>), _full_size, taxonomy_f);
+
+  for (auto &kv : _rank_inmap) {
+    size_t size_str = kv.second.size();
+    std::fwrite(&kv.first, sizeof(uint64_t), 1, taxonomy_f);
+    std::fwrite(&size_str, sizeof(size_t), 1, taxonomy_f);
+    std::fwrite(&kv.second[0], sizeof(char), size_str, taxonomy_f);
+  }
+  for (auto &kv : _name_inmap) {
+    size_t size_str = kv.second.size();
+    std::fwrite(&kv.first, sizeof(uint64_t), 1, taxonomy_f);
+    std::fwrite(&size_str, sizeof(size_t), 1, taxonomy_f);
+    std::fwrite(&kv.second[0], sizeof(char), size_str, taxonomy_f);
+  }
 
   if (std::ferror(taxonomy_f)) {
     std::puts("I/O error when writing taxonomy-record file to the library.\n");

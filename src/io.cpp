@@ -232,12 +232,8 @@ uint64_t inputHandler<encT>::extractInput(uint64_t rbatch_size)
     while (!(seqBatch.empty())) {
       for (uint32_t ix = 0; ix < seqBatch.size(); ++ix) {
         if (seqBatch[ix].len >= k) {
-          uint64_t enc64_bp;
-          uint64_t enc64_lr;
-          uint64_t cenc64_bp;
-          uint64_t cenc64_lr;
-          uint32_t cenc32_lr;
-          uint32_t cenc32_bp;
+          uint64_t enc64_bp, enc64_lr, cenc64_bp, cenc64_lr;
+          uint32_t cenc32_lr, cenc32_bp;
           uint32_t rix;
           uint8_t ldiff = w - k + 1;
           std::string kmer_seq;

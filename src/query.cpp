@@ -1,9 +1,11 @@
 #include "query.h"
-#include "common.h"
+
+#define ROOT 1
 
 Query::Query(std::vector<std::string> library_dirpaths,
              const char *output_dirpath,
              const char *query_filepath,
+             float tvote_threshold,
              uint8_t max_match_hdist,
              bool save_match_info,
              bool verbose,
@@ -11,6 +13,7 @@ Query::Query(std::vector<std::string> library_dirpaths,
   : _library_dirpaths(library_dirpaths)
   , _output_dirpath(output_dirpath)
   , _query_filepath(query_filepath)
+  , _tvote_threshold(tvote_threshold)
   , _max_match_hdist(max_match_hdist)
   , _save_match_info(save_match_info)
   , _log(log)
@@ -22,29 +25,20 @@ Query::Query(std::vector<std::string> library_dirpaths,
     if (i == 0) {
       _k = _slib_ptr_v[i]->_k;
       _parent_inmap = _slib_ptr_v[i]->_parent_inmap;
+      _depth_inmap = _slib_ptr_v[i]->_depth_inmap;
+      _rank_inmap = _slib_ptr_v[i]->_rank_inmap;
+      _name_inmap = _slib_ptr_v[i]->_name_inmap;
     } else {
       if (!(_k == _slib_ptr_v[i]->_k)) {
         std::cerr << "All libraries to search in must have the same k-mer length" << std::endl;
         exit(EXIT_FAILURE);
       }
-      if (!(_parent_inmap == _slib_ptr_v[i]->_parent_inmap)) {
+      if (!(_parent_inmap == _slib_ptr_v[i]->_parent_inmap) || !(_depth_inmap == _slib_ptr_v[i]->_depth_inmap) ||
+          !(_rank_inmap == _slib_ptr_v[i]->_rank_inmap) || !(_name_inmap == _slib_ptr_v[i]->_name_inmap)) {
         std::cerr << "All libraries must share the same taxonomy" << std::endl;
         exit(EXIT_FAILURE);
       }
     }
-  }
-  uint64_t tmp_taxID;
-  uint8_t depth;
-  for (auto &kv : _parent_inmap) {
-    depth = 0;
-    tmp_taxID = kv.first;
-    while (_parent_inmap[tmp_taxID] != 0) {
-      tmp_taxID = _parent_inmap[tmp_taxID];
-      depth++;
-    }
-    if (tmp_taxID == 1)
-      depth++;
-    _depth_inmap[kv.first] = depth;
   }
   if (IO::ensureDirectory(_output_dirpath)) {
     std::cout << "Results will be written to " << _output_dirpath << std::endl;
@@ -70,120 +64,160 @@ Query::Query(std::vector<std::string> library_dirpaths,
   }
 }
 
+void Query::classifyBatch(vec_clsinfo &clsinfo_vec,
+                          vec_str &names_vec,
+                          vvec_uint64 &tlca_vec_or,
+                          vvec_uint64 &tlca_vec_rc,
+                          vvec_uint8 &hdist_vec_or,
+                          vvec_uint8 &hdist_vec_rc)
+{
+#pragma omp parallel for num_threads(num_threads), schedule(static)
+  for (std::size_t ix = 0; ix < names_vec.size(); ++ix) {
+    std::unordered_map<uint64_t, float> tvotes_map_or, tvotes_map_rc;
+    uint64_t curr_tID;
+    for (std::size_t j = 0; j < tlca_vec_or[ix].size(); ++j) {
+      float vote = pow((1 - static_cast<float>(hdist_vec_or[ix][j]) / static_cast<float>(_k)), _k);
+      curr_tID = tlca_vec_or[ix][j];
+      tvotes_map_or[curr_tID] += vote;
+      while (curr_tID != 0) {
+        curr_tID = _parent_inmap[curr_tID];
+        tvotes_map_or[curr_tID] += vote;
+      }
+    }
+    for (std::size_t j = 0; j < tlca_vec_rc[ix].size(); ++j) {
+      float vote = pow((1 - static_cast<float>(hdist_vec_rc[ix][j]) / static_cast<float>(_k)), _k);
+      curr_tID = tlca_vec_rc[ix][j];
+      tvotes_map_rc[curr_tID] += vote;
+      while (curr_tID != 0) {
+        curr_tID = _parent_inmap[curr_tID];
+        tvotes_map_rc[curr_tID] += vote;
+      }
+    }
+    clsinfo_vec[ix] = {0, 0.0, 0.0};
+    if ((tlca_vec_rc[ix].size() + tlca_vec_rc[ix].size()) > 0) {
+      std::unordered_map<uint64_t, float> &tvotes_map =
+        (tvotes_map_rc[ROOT] > tvotes_map_or[ROOT]) ? tvotes_map_rc : tvotes_map_or;
+      float majority_th = tvotes_map[ROOT] / 2;
+      for (auto &kv : tvotes_map) {
+        if ((kv.second > majority_th) && (_depth_inmap[kv.first] > _depth_inmap[std::get<0>(clsinfo_vec[ix])])) {
+          clsinfo_vec[ix] = {kv.first, kv.second, tvotes_map[ROOT]};
+        }
+      }
+    }
+  }
+}
+
 void Query::processBatch(std::vector<sseq_t> &seqBatch,
-                         vvec_string &names_vec,
+                         vec_str &names_vec,
                          vvec_uint64 &tlca_vec_or,
                          vvec_uint64 &tlca_vec_rc,
                          vvec_uint8 &hdist_vec_or,
                          vvec_uint8 &hdist_vec_rc)
 {
 #pragma omp parallel for num_threads(num_threads), schedule(static)
-  for (uint32_t ix = 0; ix < seqBatch.size(); ++ix) {
+  for (std::size_t ix = 0; ix < seqBatch.size(); ++ix) {
     std::vector<uint8_t> hdist_vor;
     std::vector<uint8_t> hdist_vrc;
     std::vector<uint64_t> tlca_vor;
     std::vector<uint64_t> tlca_vrc;
     names_vec[ix] = seqBatch[ix].name;
-    std::string or_read(seqBatch[ix].nseq.begin(), seqBatch[ix].nseq.end());
-    std::string rc_read(seqBatch[ix].nseq.rbegin(), seqBatch[ix].nseq.rend());
-    for (bool r : {false, true}) {
-      std::istringstream iss_read;
-      if (r)
-        iss_read.str(rc_read);
-      else
-        iss_read.str(or_read);
-      std::string curr_cont_read;
-      while (getline(iss_read, curr_cont_read, 'N')) {
-        if (curr_cont_read.length() < _k) {
-          break;
-        }
-        std::string kmer_seq;
-        uint32_t rix;
-        uint32_t enc32_lr, enc32_bp;
-        uint64_t enc64_bp, enc64_lr;
-        uint8_t min_dist, closest_di;
-        for (unsigned int kix = 0; kix < curr_cont_read.length(); kix++) {
-          if (kix == 0) {
-            kmer_seq = curr_cont_read.substr(kix, _k);
-            if (r)
-              kmerEncodingComputeC(kmer_seq.c_str(), enc64_lr, enc64_bp);
-            else
-              kmerEncodingCompute(kmer_seq.c_str(), enc64_lr, enc64_bp);
-            kix = _k - 1;
-          } else {
-            kmer_seq = curr_cont_read.substr(kix, 1);
-            if (r)
-              kmerEncodingUpdateC(kmer_seq.c_str(), enc64_lr, enc64_bp);
-            else
-              kmerEncodingUpdate(kmer_seq.c_str(), enc64_lr, enc64_bp);
+    std::string kmer_seq;
+    unsigned int kix, mi, cc;
+    uint32_t rix;
+    uint32_t enc32_lr, enc32_bp;
+    uint64_t enc64_bp, enc64_lr, cenc64_bp, cenc64_lr;
+    ;
+    uint8_t min_dist, closest_di;
+    if (seqBatch[ix].len > _k) {
+      for (kix = mi = 0; kix < seqBatch[ix].len; ++kix) {
+        cc = seq_nt4_table[static_cast<uint8_t>(seqBatch[ix].nseq[kix])];
+        if (cc < 4) { // not an "N" base
+          mi++;
+          if (mi == _k) { // we find a k-mer
+            kmer_seq = seqBatch[ix].nseq.substr(kix - (_k - 1), _k);
+            kmerEncodingCompute(kmer_seq.c_str(), enc64_lr, enc64_bp);
+          } else if (mi > _k) // updates
+          {
+            kmer_seq = seqBatch[ix].nseq[kix];
+            kmerEncodingUpdate(kmer_seq.c_str(), enc64_lr, enc64_bp);
           }
-          enc64_bp = enc64_bp & _mask_bp;
-          enc64_lr = enc64_lr & _mask_lr;
-          bool pm = false;
-          uint8_t pm_ix;
-          for (unsigned int lix = 0; lix < _num_libraries; ++lix) {
-            min_dist = _k;
-            closest_di = 0;
-            uint32_t max_rix = std::numeric_limits<uint32_t>::max();
-            max_rix = max_rix >> (32 - 2 * _slib_ptr_v[lix]->_h);
-            rix = computeValueLSH(enc64_bp, _slib_ptr_v[lix]->_lsh_vg);
-            assert(rix <= max_rix);
-            for (uint8_t di = 0; di < _slib_ptr_v[lix]->_ind_arr[rix]; ++di) {
-              uint8_t dist;
-              if (std::is_same<encT, uint64_t>::value) {
-                dist = computeHammingDistance64(enc64_lr, _slib_ptr_v[lix]->_enc_arr[rix * _slib_ptr_v[lix]->_b + di]);
-              } else if (std::is_same<encT, uint32_t>::value) {
-                drop64Encoding32(_slib_ptr_v[lix]->_npositions, enc64_bp, enc64_lr, enc32_bp, enc32_lr);
-                dist = computeHammingDistance32(enc32_lr, _slib_ptr_v[lix]->_enc_arr[rix * _slib_ptr_v[lix]->_b + di]);
-              } else {
-                std::puts("Available encoding types are 'uint64_t' and 'uint32_t'\n.");
-                exit(EXIT_FAILURE);
-              }
-              if (dist <= min_dist) {
-                min_dist = dist;
-                closest_di = di;
-              }
-              if (dist == 0)
-                break;
+          cenc64_bp = enc64_bp & _mask_bp;
+          cenc64_lr = enc64_lr & _mask_lr;
+          for (bool r : {false, true}) {
+            if (r) {
+              cenc64_bp = revcomp64bp(cenc64_bp, _k);
+              cenc64_lr = conv64bp2lr(cenc64_bp, _k);
             }
-            if (min_dist <= _max_match_hdist) {
-              if (!pm) {
-                if (r) {
-                  hdist_vrc.push_back(min_dist);
-                  tlca_vrc.push_back(
-                    (_slib_ptr_v[lix]->_tID_to_taxID)[_slib_ptr_v[lix]->_tlca_arr[rix * _slib_ptr_v[lix]->_b + closest_di]]);
+            bool pm = false;
+            for (unsigned int lix = 0; lix < _num_libraries && (mi >= _k); ++lix) {
+              min_dist = _k;
+              closest_di = 0;
+              uint32_t max_rix = std::numeric_limits<uint32_t>::max();
+              max_rix = max_rix >> (32 - 2 * _slib_ptr_v[lix]->_h);
+              rix = computeValueLSH(cenc64_bp, _slib_ptr_v[lix]->_lsh_vg);
+              assert(rix <= max_rix);
+              for (uint8_t di = 0; di < _slib_ptr_v[lix]->_ind_arr[rix]; ++di) {
+                uint8_t dist;
+                if (std::is_same<encT, uint64_t>::value) {
+                  dist = computeHammingDistance64(cenc64_lr, _slib_ptr_v[lix]->_enc_arr[rix * _slib_ptr_v[lix]->_b + di]);
+                } else if (std::is_same<encT, uint32_t>::value) {
+                  drop64Encoding32(_slib_ptr_v[lix]->_npositions, cenc64_bp, cenc64_lr, enc32_bp, enc32_lr);
+                  dist = computeHammingDistance32(enc32_lr, _slib_ptr_v[lix]->_enc_arr[rix * _slib_ptr_v[lix]->_b + di]);
                 } else {
-                  hdist_vor.push_back(min_dist);
-                  tlca_vor.push_back(
-                    (_slib_ptr_v[lix]->_tID_to_taxID)[_slib_ptr_v[lix]->_tlca_arr[rix * _slib_ptr_v[lix]->_b + closest_di]]);
+                  std::puts("Available encoding types are 'uint64_t' and 'uint32_t'\n.");
+                  exit(EXIT_FAILURE);
                 }
-                pm = true;
-              } else {
-                if (r) {
-                  if (hdist_vrc.back() == min_dist) {
-                    tlca_vrc.back() = getLowestCommonAncestor(
-                      tlca_vrc.back(),
-                      _slib_ptr_v[lix]->_tID_to_taxID[_slib_ptr_v[lix]->_tlca_arr[rix * _slib_ptr_v[lix]->_b + closest_di]]);
-                  } else if (hdist_vrc.back() > min_dist) {
-                    hdist_vrc.back() = min_dist;
-                    tlca_vrc.back() =
-                      (_slib_ptr_v[lix]->_tID_to_taxID)[_slib_ptr_v[lix]->_tlca_arr[rix * _slib_ptr_v[lix]->_b + closest_di]];
+                if (dist <= min_dist) {
+                  min_dist = dist;
+                  closest_di = di;
+                }
+                if (dist == 0)
+                  break;
+              }
+              if (min_dist <= _max_match_hdist) {
+                if (!pm) {
+                  if (r) {
+                    hdist_vrc.push_back(min_dist);
+                    tlca_vrc.push_back((
+                      _slib_ptr_v[lix]->_tID_to_taxID)[_slib_ptr_v[lix]->_tlca_arr[rix * _slib_ptr_v[lix]->_b + closest_di]]);
+                  } else {
+                    hdist_vor.push_back(min_dist);
+                    tlca_vor.push_back((
+                      _slib_ptr_v[lix]->_tID_to_taxID)[_slib_ptr_v[lix]->_tlca_arr[rix * _slib_ptr_v[lix]->_b + closest_di]]);
                   }
+                  pm = true;
                 } else {
-                  if (hdist_vor.back() == min_dist) {
-                    tlca_vor.back() = getLowestCommonAncestor(
-                      tlca_vor.back(),
-                      _slib_ptr_v[lix]->_tID_to_taxID[_slib_ptr_v[lix]->_tlca_arr[rix * _slib_ptr_v[lix]->_b + closest_di]]);
-                  } else if (hdist_vor.back() > min_dist) {
-                    hdist_vor.back() = min_dist;
-                    tlca_vor.back() =
-                      (_slib_ptr_v[lix]->_tID_to_taxID)[_slib_ptr_v[lix]->_tlca_arr[rix * _slib_ptr_v[lix]->_b + closest_di]];
+                  if (r) {
+                    if (hdist_vrc.back() == min_dist) {
+                      tlca_vrc.back() = getLowestCommonAncestor(
+                        tlca_vrc.back(),
+                        _slib_ptr_v[lix]
+                          ->_tID_to_taxID[_slib_ptr_v[lix]->_tlca_arr[rix * _slib_ptr_v[lix]->_b + closest_di]]);
+                    } else if (hdist_vrc.back() > min_dist) {
+                      hdist_vrc.back() = min_dist;
+                      tlca_vrc.back() =
+                        (_slib_ptr_v[lix]
+                           ->_tID_to_taxID)[_slib_ptr_v[lix]->_tlca_arr[rix * _slib_ptr_v[lix]->_b + closest_di]];
+                    }
+                  } else {
+                    if (hdist_vor.back() == min_dist) {
+                      tlca_vor.back() = getLowestCommonAncestor(
+                        tlca_vor.back(),
+                        _slib_ptr_v[lix]
+                          ->_tID_to_taxID[_slib_ptr_v[lix]->_tlca_arr[rix * _slib_ptr_v[lix]->_b + closest_di]]);
+                    } else if (hdist_vor.back() > min_dist) {
+                      hdist_vor.back() = min_dist;
+                      tlca_vor.back() =
+                        (_slib_ptr_v[lix]
+                           ->_tID_to_taxID)[_slib_ptr_v[lix]->_tlca_arr[rix * _slib_ptr_v[lix]->_b + closest_di]];
+                    }
                   }
                 }
               }
-              pm_ix = lix;
             }
           }
+        } else {
+          mi = 0;
         }
       }
     }
@@ -210,15 +244,15 @@ void Query::perform(uint64_t rbatch_size)
     std::string queryID = keys[i];
     if (_log)
       LOG(NOTICE) << "Searching for k-mer matches for the query " << queryID << std::endl;
-    std::fstream ofs_match_info;
+    std::fstream ofs_minfo, ofs_clsinfo;
     if (_save_match_info) {
       if (_log)
         LOG(INFO) << "Opening file to output match information" << std::endl;
       std::string output_file(_output_dirpath);
-      output_file = output_file + "/match_info-" + queryID;
-      ofs_match_info.open(output_file, std::fstream::out);
-      if (!ofs_match_info.is_open())
-        std::cerr << "Failed to open " << output_file << std::endl;
+      ofs_minfo.open(output_file + "/match_info-" + queryID, std::fstream::out);
+      ofs_clsinfo.open(output_file + "/classification_info-" + queryID, std::fstream::out);
+      if (!ofs_minfo.is_open() || !ofs_clsinfo.is_open())
+        std::cerr << "Failed to open output file in " << output_file << std::endl;
     }
     kseq_t *reader = IO::getReader(_queryID_to_path[queryID].c_str());
     rbatch_size = IO::adjustBatchSize(rbatch_size, num_threads);
@@ -228,25 +262,44 @@ void Query::perform(uint64_t rbatch_size)
     if (_log)
       LOG(INFO) << "Batch size for the query reads in the current query file is " << seqBatch.size() << std::endl;
     while (!(seqBatch.empty())) {
-      vvec_string names_vec(seqBatch.size());
+      vec_clsinfo clsinfo_vec(seqBatch.size());
+      vec_str names_vec(seqBatch.size());
       vvec_uint8 hdist_vec_or(seqBatch.size());
       vvec_uint8 hdist_vec_rc(seqBatch.size());
       vvec_uint64 tlca_vec_or(seqBatch.size());
       vvec_uint64 tlca_vec_rc(seqBatch.size());
       Query::processBatch(seqBatch, names_vec, tlca_vec_or, tlca_vec_rc, hdist_vec_or, hdist_vec_rc);
+      Query::classifyBatch(clsinfo_vec, names_vec, tlca_vec_or, tlca_vec_rc, hdist_vec_or, hdist_vec_rc);
       if (_save_match_info) {
         for (uint32_t ix = 0; ix < seqBatch.size(); ++ix) {
-          ofs_match_info << names_vec[ix] << std::endl;
-          ofs_match_info << "or";
+          ofs_minfo << names_vec[ix] << std::endl;
+          ofs_minfo << "or";
           for (unsigned int mi = 0; mi < tlca_vec_or[ix].size(); ++mi) {
-            ofs_match_info << " " << tlca_vec_or[ix][mi] << ":" << std::to_string(hdist_vec_or[ix][mi]);
+            ofs_minfo << " " << tlca_vec_or[ix][mi] << ":" << std::to_string(hdist_vec_or[ix][mi]);
           }
-          ofs_match_info << std::endl;
-          ofs_match_info << "rc";
+          ofs_minfo << std::endl;
+          ofs_minfo << "rc";
           for (unsigned int mi = 0; mi < tlca_vec_rc[ix].size(); ++mi) {
-            ofs_match_info << " " << tlca_vec_rc[ix][mi] << ":" << std::to_string(hdist_vec_rc[ix][mi]);
+            ofs_minfo << " " << tlca_vec_rc[ix][mi] << ":" << std::to_string(hdist_vec_rc[ix][mi]);
           }
-          ofs_match_info << std::endl;
+          ofs_minfo << std::endl;
+        }
+      }
+      uint64_t curr_taxID;
+      float th_ratio, tvote_val;
+      std::string curr_rank, curr_name;
+      ofs_clsinfo << "SEQ_ID\tRANK\tTAXON_ID\tTAXON_NAME\tPREDICTION_SCORE\tMATCH_SCORE" << std::endl;
+      for (uint32_t ix = 0; ix < seqBatch.size(); ++ix) {
+        curr_taxID = std::get<0>(clsinfo_vec[ix]);
+        tvote_val = std::get<1>(clsinfo_vec[ix]);
+        if ((curr_taxID != 0) && (tvote_val > _tvote_threshold)) {
+          curr_rank = _rank_inmap[curr_taxID];
+          curr_name = _name_inmap[curr_taxID];
+          th_ratio = tvote_val / std::get<2>(clsinfo_vec[ix]);
+          ofs_clsinfo << names_vec[ix] << "\t" << curr_rank << "\t" << curr_taxID << "\t" << curr_name << "\t";
+          ofs_clsinfo << std::setprecision(3) << th_ratio << "\t" << std::get<1>(clsinfo_vec[ix]) << std::endl;
+        } else {
+          ofs_clsinfo << names_vec[ix] << "\tU\tNA\tNA\tNA\t" << tvote_val << std::endl;
         }
       }
       tnum_reads += seqBatch.size();
@@ -255,10 +308,9 @@ void Query::perform(uint64_t rbatch_size)
     kseq_destroy(reader);
     gzclose(reader->f->f);
     if (_save_match_info) {
-      if (_log)
-        LOG(INFO) << "Closing match information output file" << std::endl;
-      ofs_match_info.close();
+      ofs_minfo.close();
     }
+    ofs_clsinfo.close();
   }
 }
 
@@ -412,6 +464,7 @@ bool Query::QLibrary::loadTaxonomy()
   std::string load_dirpath(_library_dirpath);
   std::vector<std::pair<tT, uint64_t>> tIDs_taxIDs;
   std::vector<std::pair<uint64_t, uint64_t>> taxIDs_parents;
+  std::vector<std::pair<uint64_t, uint8_t>> taxIDs_depths;
 
   FILE *taxonomy_f = IO::open_file((load_dirpath + "/taxonomy").c_str(), is_ok, "rb");
   std::fread(&_tax_num_nodes, sizeof(tT), 1, taxonomy_f);
@@ -422,16 +475,38 @@ bool Query::QLibrary::loadTaxonomy()
   _tax_parent_vec.resize(_tax_num_nodes);
   _tax_depth_vec.resize(_tax_num_nodes);
   taxIDs_parents.resize(_tax_full_size);
+  taxIDs_depths.resize(_tax_full_size);
 
   std::fread(_tax_parent_vec.data(), sizeof(tT), _tax_num_nodes, taxonomy_f);
   std::fread(_tax_depth_vec.data(), sizeof(uint8_t), _tax_num_nodes, taxonomy_f);
   std::fread(tIDs_taxIDs.data(), sizeof(std::pair<tT, uint64_t>), _tax_num_nodes, taxonomy_f);
   std::fread(taxIDs_parents.data(), sizeof(std::pair<uint64_t, uint64_t>), _tax_full_size, taxonomy_f);
+  std::fread(taxIDs_depths.data(), sizeof(std::pair<uint64_t, uint8_t>), _tax_full_size, taxonomy_f);
 
   for (auto kv : tIDs_taxIDs)
     _tID_to_taxID[kv.first] = kv.second;
   for (auto kv : taxIDs_parents)
     _parent_inmap[kv.first] = kv.second;
+  for (auto kv : taxIDs_depths)
+    _depth_inmap[kv.first] = kv.second;
+
+  uint64_t curr_taxID;
+  size_t curr_size_str;
+  std::string curr_name, curr_rank;
+  for (unsigned int i = 0; i < _tax_full_size; ++i) {
+    std::fread(&curr_taxID, sizeof(uint64_t), 1, taxonomy_f);
+    std::fread(&curr_size_str, sizeof(size_t), 1, taxonomy_f);
+    curr_rank.resize(curr_size_str);
+    std::fread(&curr_rank[0], sizeof(char), curr_size_str, taxonomy_f);
+    _rank_inmap[curr_taxID] = curr_rank;
+  }
+  for (unsigned int i = 0; i < _tax_full_size; ++i) {
+    std::fread(&curr_taxID, sizeof(uint64_t), 1, taxonomy_f);
+    std::fread(&curr_size_str, sizeof(size_t), 1, taxonomy_f);
+    curr_name.resize(curr_size_str);
+    std::fread(&curr_name[0], sizeof(char), curr_size_str, taxonomy_f);
+    _name_inmap[curr_taxID] = curr_name;
+  }
 
   if (std::ferror(taxonomy_f)) {
     std::puts("I/O error when reading taxonomy-record file from the library.\n");

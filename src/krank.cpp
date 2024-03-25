@@ -24,10 +24,10 @@ int main(int argc, char **argv)
   sub_build->add_option("-l,--library-dir", library_dir, "Path to the directory containing the library.")
     ->required()
     ->check(CLI::ExistingDirectory);
-  std::string taxonomy_dmp;
-  sub_build->add_option("-t,--taxonomy-dmp", taxonomy_dmp, "Path to the file containing the taxonomy dmp.")
+  std::string taxonomy_dir;
+  sub_build->add_option("-t,--taxonomy-dmp", taxonomy_dir, "Path to the file containing the taxonomy files.")
     ->required()
-    ->check(CLI::ExistingFile);
+    ->check(CLI::ExistingDirectory);
   std::string input_file;
   sub_build
     ->add_option("-i,--input-file", input_file, "Path to the file containing paths and taxon IDs of reference k-mer sets.")
@@ -100,6 +100,10 @@ int main(int argc, char **argv)
       "-q,--query-file", query_file, "Path to the tab-seperated file containing paths and IDs of query FASTA/FASTQ files.")
     ->required()
     ->check(CLI::ExistingFile);
+  float tvote_threshold = 0.03;
+  sub_query->add_option("--total-vote-threshold,--tvote-threshold",
+                        tvote_threshold,
+                        "The minimum total vote to classify, can be considered as a confidence threshold. Default: 0.03.");
   uint8_t max_match_hdist = 5;
   sub_query->add_option("--max-match-distance,--max-match-hdist",
                         max_match_hdist,
@@ -144,7 +148,7 @@ int main(int argc, char **argv)
   if (sub_build->parsed()) {
     std::cout << "Building the library..." << std::endl;
     Library l(library_dir.c_str(),
-              taxonomy_dmp.c_str(),
+              taxonomy_dir.c_str(),
               input_file.c_str(),
               k,
               w,
@@ -165,7 +169,8 @@ int main(int argc, char **argv)
 
   if (sub_query->parsed()) {
     std::cout << "Querying the given sequences..." << std::endl;
-    Query q(library_dir_v, output_dir.c_str(), query_file.c_str(), max_match_hdist, save_match_info, verbose, log);
+    Query q(
+      library_dir_v, output_dir.c_str(), query_file.c_str(), tvote_threshold, max_match_hdist, save_match_info, verbose, log);
     q.perform(DEFAULT_BATCH_SIZE);
     std::cout << "Results for the input queries have been saved" << std::endl;
   }

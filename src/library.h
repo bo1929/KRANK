@@ -12,7 +12,7 @@ class Library
 {
 public:
   Library(const char *library_dirpath,
-          const char *nodes_filepath,
+          const char *taxonomy_dirpath,
           const char *input_filepath,
           uint8_t k,
           uint8_t w,
@@ -33,7 +33,7 @@ private:
   TaxonomyInput _taxonomy_input;
   TaxonomyRecord<tT> _taxonomy_record;
   const char *_library_dirpath;
-  const char *_nodes_filepath;
+  const char *_taxonomy_dirpath;
   const char *_input_filepath;
   uint8_t _k;
   uint8_t _w;

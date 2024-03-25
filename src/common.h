@@ -1,14 +1,10 @@
 #ifndef _COMMON_H
 #define _COMMON_H
 
+#include "aixlog.hpp"
 #include <algorithm>
 #include <assert.h>
 #include <bitset>
-#include <numeric>
-#include <sys/stat.h>
-#include <unordered_map>
-#include <unordered_set>
-#include <ostream>
 #include <chrono>
 #include <cmath>
 #include <cstddef>
@@ -17,18 +13,17 @@
 #include <cstdlib>
 #include <cstring>
 #include <ctype.h>
-#include <type_traits>
 #include <dirent.h>
 #include <fstream>
 #include <getopt.h>
 #include <iomanip>
-#include <cstdlib>
 #include <iostream>
 #include <limits>
 #include <list>
 #include <map>
 #include <memory>
 #include <new>
+#include <numeric>
 #include <ostream>
 #include <random>
 #include <set>
@@ -40,13 +35,13 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <type_traits>
+#include <type_traits>
 #include <unistd.h>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 #include <zlib.h>
-#include "aixlog.hpp"
-#include "beta_distribution.hpp"
 
 #ifdef _OPENMP
   #include <omp.h>
@@ -54,7 +49,7 @@
   #warning "OpenMP not found, multi-threading will be DISABLED and --num-threads option will be ignored!"
 #endif
 
-#define VERSION "v0.2.0"
+#define VERSION "v0.2.2"
 #define PRINT_VERSION printf("KRANK version: " VERSION "\n");
 
 #define LNUM_TASKS 8
@@ -83,7 +78,7 @@ typedef uint32_t encT;
 template<typename T>
 using vvec = std::vector<std::vector<T>>;
 
-typedef std::vector<std::string> vvec_string;
+typedef std::vector<std::string> vec_str;
 typedef std::vector<std::vector<uint8_t>> vvec_uint8;
 typedef std::vector<std::vector<uint64_t>> vvec_uint64;
 

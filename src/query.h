@@ -9,19 +9,28 @@
 #include "table.h"
 #include "taxonomy.h"
 
+typedef std::vector<std::tuple<uint64_t, float, float>> vec_clsinfo;
+
 class Query
 {
 public:
   Query(std::vector<std::string> library_dirpaths,
         const char *output_dirpath,
         const char *query_filepath,
+        float tvote_threshold = 0.03,
         uint8_t max_match_hdist = 5,
         bool save_match_info = true,
         bool verbose = false,
         bool log = false);
   void perform(uint64_t rbatch_size = DEFAULT_BATCH_SIZE);
+  void classifyBatch(vec_clsinfo &clsinfo_vec,
+                     vec_str &names_vec,
+                     vvec_uint64 &tlca_vec_or,
+                     vvec_uint64 &tlca_vec_rc,
+                     vvec_uint8 &hdist_vec_or,
+                     vvec_uint8 &hdist_vec_rc);
   void processBatch(std::vector<sseq_t> &seqBatch,
-                    vvec_string &names_vec,
+                    vec_str &names_vec,
                     vvec_uint64 &tlca_vec_or,
                     vvec_uint64 &tlca_vec_rc,
                     vvec_uint8 &hdist_vec_or,
@@ -69,6 +78,9 @@ private:
     std::vector<uint8_t> _npositions;
     std::unordered_map<tT, uint64_t> _tID_to_taxID;
     std::unordered_map<uint64_t, uint64_t> _parent_inmap;
+    std::unordered_map<uint64_t, uint8_t> _depth_inmap;
+    std::unordered_map<uint64_t, std::string> _rank_inmap;
+    std::unordered_map<uint64_t, std::string> _name_inmap;
     uint64_t _tax_num_input;
     tT _tax_num_nodes;
     uint64_t _tax_full_size;
@@ -86,13 +98,6 @@ private:
     decltype(_npositions) &npositions() { return _npositions; }
     decltype(_positions) &positions() { return _positions; }
     decltype(_lsh_vg) &lsh_vg() { return _lsh_vg; }
-    /* ~QLibrary(void) */
-    /* { */
-    /*   delete[] _enc_arr; */
-    /*   /1* delete[] _scount_arr; *1/ */
-    /*   delete[] _tlca_arr; */
-    /*   delete[] _ind_arr; */
-    /* } */
   };
   bool _log;
   std::vector<std::string> _library_dirpaths;
@@ -101,6 +106,7 @@ private:
   uint8_t _k;
   uint8_t _num_libraries;
   uint8_t _max_match_hdist;
+  float _tvote_threshold;
   uint8_t _save_match_info;
   uint64_t _mask_bp;
   uint64_t _mask_lr;
@@ -108,6 +114,8 @@ private:
   std::unordered_map<std::string, std::string> _queryID_to_path;
   std::unordered_map<uint64_t, uint64_t> _parent_inmap;
   std::unordered_map<uint64_t, uint8_t> _depth_inmap;
+  std::unordered_map<uint64_t, std::string> _rank_inmap;
+  std::unordered_map<uint64_t, std::string> _name_inmap;
 };
 
 #endif

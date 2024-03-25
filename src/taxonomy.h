@@ -8,15 +8,19 @@ class TaxonomyInput
 {
 private:
   std::unordered_map<uint64_t, uint64_t> _parent_map;
+  std::unordered_map<uint64_t, uint8_t> _depth_map;
   std::unordered_map<uint64_t, std::string> _rank_map;
+  std::unordered_map<uint64_t, std::string> _name_map;
 
 public:
-  TaxonomyInput(const char *nodes_filepath);
+  TaxonomyInput(const char *taxonomy_dirpath);
   uint64_t getParent(uint64_t taxID);
   std::string getRank(uint64_t taxID);
   void printTaxonomyInput();
   decltype(_parent_map) &parent_map() { return _parent_map; }
   decltype(_rank_map) &rank_map() { return _rank_map; }
+  decltype(_depth_map) &depth_map() { return _depth_map; }
+  decltype(_name_map) &name_map() { return _name_map; }
 };
 
 template<typename T>
@@ -36,6 +40,9 @@ private:
   std::vector<uint8_t> _depth_vec;
   std::unordered_map<T, std::set<T>> _child_map;
   std::unordered_map<uint64_t, uint64_t> _parent_inmap;
+  std::unordered_map<uint64_t, uint8_t> _depth_inmap;
+  std::unordered_map<uint64_t, std::string> _rank_inmap;
+  std::unordered_map<uint64_t, std::string> _name_inmap;
 
 public:
   TaxonomyRecord(const char *input_filepath, TaxonomyInput taxonomy);
