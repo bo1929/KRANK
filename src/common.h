@@ -49,7 +49,7 @@
   #warning "OpenMP not found, multi-threading will be DISABLED and --num-threads option will be ignored!"
 #endif
 
-#define VERSION "v0.2.2"
+#define VERSION "v0.2.9"
 #define PRINT_VERSION printf("KRANK version: " VERSION "\n");
 
 #define LNUM_TASKS 8
@@ -80,6 +80,7 @@ using vvec = std::vector<std::vector<T>>;
 
 typedef std::vector<std::string> vec_str;
 typedef std::vector<std::vector<uint8_t>> vvec_uint8;
+typedef std::vector<std::vector<uint64_t>> vvec_uint64;
 typedef std::vector<std::vector<uint64_t>> vvec_uint64;
 
 namespace std {

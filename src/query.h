@@ -9,7 +9,12 @@
 #include "table.h"
 #include "taxonomy.h"
 
-typedef std::vector<std::tuple<uint64_t, float, float>> vec_clsinfo;
+struct tvote_info_t
+{
+  uint64_t pred_taxID = 0;
+  float tvote_n = 0.0;
+  float tvote_r = 0.0;
+};
 
 class Query
 {
@@ -23,7 +28,10 @@ public:
         bool verbose = false,
         bool log = false);
   void perform(uint64_t rbatch_size = DEFAULT_BATCH_SIZE);
-  void classifyBatch(vec_clsinfo &clsinfo_vec,
+  void postprocessProfile(std::unordered_map<uint64_t, float> &query_corrected_profile,
+                          std::unordered_map<uint64_t, float> &query_acc_profile);
+  void profileBatch(std::unordered_map<uint64_t, float> &query_acc_profile, std::vector<tvote_info_t> &tvinfo_vec);
+  void classifyBatch(std::vector<tvote_info_t> &tvinfo_vec,
                      vec_str &names_vec,
                      vvec_uint64 &tlca_vec_or,
                      vvec_uint64 &tlca_vec_rc,
@@ -81,13 +89,12 @@ private:
     std::unordered_map<uint64_t, uint8_t> _depth_inmap;
     std::unordered_map<uint64_t, std::string> _rank_inmap;
     std::unordered_map<uint64_t, std::string> _name_inmap;
+    std::unordered_map<tT, float> _tID_to_length;
     uint64_t _tax_num_input;
     tT _tax_num_nodes;
     uint64_t _tax_full_size;
     std::vector<tT> _tax_parent_vec;
     std::vector<uint8_t> _tax_depth_vec;
-    std::vector<std::pair<tT, uint64_t>> _bases_sizes;
-    std::vector<std::pair<tT, uint64_t>> _tIDs_sizes;
     encT *_enc_arr;
     tT *_tlca_arr;
     // scT* _scount_ar;
@@ -116,6 +123,7 @@ private:
   std::unordered_map<uint64_t, uint8_t> _depth_inmap;
   std::unordered_map<uint64_t, std::string> _rank_inmap;
   std::unordered_map<uint64_t, std::string> _name_inmap;
+  std::unordered_map<uint64_t, float> _taxID_to_length;
 };
 
 #endif

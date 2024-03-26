@@ -1,4 +1,6 @@
 #include "query.h"
+#include "common.h"
+#include <unordered_set>
 
 #define ROOT 1
 
@@ -40,6 +42,18 @@ Query::Query(std::vector<std::string> library_dirpaths,
       }
     }
   }
+
+  std::unordered_map<uint64_t, uint64_t> taxIDs_to_libcounts;
+  for (unsigned int i = 0; i < _num_libraries; ++i) {
+    for (auto &kv : _slib_ptr_v[i]->_tID_to_length) {
+      taxIDs_to_libcounts[_slib_ptr_v[i]->_tID_to_taxID[kv.first]]++;
+      _taxID_to_length[_slib_ptr_v[i]->_tID_to_taxID[kv.first]] += kv.second;
+    }
+  }
+  for (auto &kv : _taxID_to_length) {
+    _taxID_to_length[kv.first] /= taxIDs_to_libcounts[kv.first];
+  }
+
   if (IO::ensureDirectory(_output_dirpath)) {
     std::cout << "Results will be written to " << _output_dirpath << std::endl;
   } else {
@@ -64,7 +78,40 @@ Query::Query(std::vector<std::string> library_dirpaths,
   }
 }
 
-void Query::classifyBatch(vec_clsinfo &clsinfo_vec,
+void Query::postprocessProfile(std::unordered_map<uint64_t, float> &query_corrected_profile,
+                               std::unordered_map<uint64_t, float> &query_acc_profile)
+{
+  std::unordered_map<std::string, float> rank_sum, rank_crsum;
+  for (auto &kv : query_acc_profile) {
+    std::string tmp_rank = _rank_inmap[kv.first];
+    tmp_rank = tmp_rank == "no rank" ? tmp_rank + std::to_string(_depth_inmap[kv.first]) : tmp_rank;
+    rank_sum[tmp_rank] += kv.second;
+    rank_crsum[tmp_rank] += kv.second * _taxID_to_length[kv.first];
+  }
+  for (auto &kv : query_acc_profile) {
+    std::string tmp_rank = _rank_inmap[kv.first];
+    tmp_rank = tmp_rank == "no rank" ? tmp_rank + std::to_string(_depth_inmap[kv.first]) : tmp_rank;
+    query_corrected_profile[kv.first] +=
+      kv.second * _taxID_to_length[kv.first] / rank_crsum[tmp_rank] * rank_sum[tmp_rank];
+  }
+}
+
+void Query::profileBatch(std::unordered_map<uint64_t, float> &query_acc_profile, std::vector<tvote_info_t> &tvinfo_vec)
+{
+  uint64_t curr_taxID;
+  std::string curr_rank, curr_name;
+  for (auto &vi : tvinfo_vec) {
+    curr_taxID = vi.pred_taxID;
+    if ((curr_taxID != 0) && (vi.tvote_n > _tvote_threshold)) {
+      while (curr_taxID != 0) {
+        query_acc_profile[curr_taxID] += 1.0;
+        curr_taxID = _parent_inmap[curr_taxID];
+      }
+    }
+  }
+}
+
+void Query::classifyBatch(std::vector<tvote_info_t> &tvinfo_vec,
                           vec_str &names_vec,
                           vvec_uint64 &tlca_vec_or,
                           vvec_uint64 &tlca_vec_rc,
@@ -93,14 +140,15 @@ void Query::classifyBatch(vec_clsinfo &clsinfo_vec,
         tvotes_map_rc[curr_tID] += vote;
       }
     }
-    clsinfo_vec[ix] = {0, 0.0, 0.0};
     if ((tlca_vec_rc[ix].size() + tlca_vec_rc[ix].size()) > 0) {
-      std::unordered_map<uint64_t, float> &tvotes_map =
+      std::unordered_map<uint64_t, float> tvotes_map =
         (tvotes_map_rc[ROOT] > tvotes_map_or[ROOT]) ? tvotes_map_rc : tvotes_map_or;
       float majority_th = tvotes_map[ROOT] / 2;
       for (auto &kv : tvotes_map) {
-        if ((kv.second > majority_th) && (_depth_inmap[kv.first] > _depth_inmap[std::get<0>(clsinfo_vec[ix])])) {
-          clsinfo_vec[ix] = {kv.first, kv.second, tvotes_map[ROOT]};
+        if ((kv.second > majority_th) && (_depth_inmap[kv.first] > _depth_inmap[tvinfo_vec[ix].pred_taxID])) {
+          tvinfo_vec[ix].pred_taxID = kv.first;
+          tvinfo_vec[ix].tvote_n = kv.second;
+          tvinfo_vec[ix].tvote_r = tvotes_map[ROOT];
         }
       }
     }
@@ -244,32 +292,35 @@ void Query::perform(uint64_t rbatch_size)
     std::string queryID = keys[i];
     if (_log)
       LOG(NOTICE) << "Searching for k-mer matches for the query " << queryID << std::endl;
-    std::fstream ofs_minfo, ofs_clsinfo;
+    std::fstream ofs_minfo, ofs_clsinfo, ofs_aprofile;
     if (_save_match_info) {
       if (_log)
         LOG(INFO) << "Opening file to output match information" << std::endl;
       std::string output_file(_output_dirpath);
       ofs_minfo.open(output_file + "/match_info-" + queryID, std::fstream::out);
       ofs_clsinfo.open(output_file + "/classification_info-" + queryID, std::fstream::out);
+      ofs_aprofile.open(output_file + "/abundance_profile-" + queryID, std::fstream::out);
       if (!ofs_minfo.is_open() || !ofs_clsinfo.is_open())
         std::cerr << "Failed to open output file in " << output_file << std::endl;
     }
     kseq_t *reader = IO::getReader(_queryID_to_path[queryID].c_str());
     rbatch_size = IO::adjustBatchSize(rbatch_size, num_threads);
     std::vector<sseq_t> seqBatch;
+    std::unordered_map<uint64_t, float> query_acc_profile;
     IO::readBatch(seqBatch, reader, rbatch_size);
     uint64_t tnum_reads = 0;
     if (_log)
       LOG(INFO) << "Batch size for the query reads in the current query file is " << seqBatch.size() << std::endl;
     while (!(seqBatch.empty())) {
-      vec_clsinfo clsinfo_vec(seqBatch.size());
+      std::vector<tvote_info_t> tvinfo_vec(seqBatch.size());
       vec_str names_vec(seqBatch.size());
       vvec_uint8 hdist_vec_or(seqBatch.size());
       vvec_uint8 hdist_vec_rc(seqBatch.size());
       vvec_uint64 tlca_vec_or(seqBatch.size());
       vvec_uint64 tlca_vec_rc(seqBatch.size());
       Query::processBatch(seqBatch, names_vec, tlca_vec_or, tlca_vec_rc, hdist_vec_or, hdist_vec_rc);
-      Query::classifyBatch(clsinfo_vec, names_vec, tlca_vec_or, tlca_vec_rc, hdist_vec_or, hdist_vec_rc);
+      Query::classifyBatch(tvinfo_vec, names_vec, tlca_vec_or, tlca_vec_rc, hdist_vec_or, hdist_vec_rc);
+      Query::profileBatch(query_acc_profile, tvinfo_vec);
       if (_save_match_info) {
         for (uint32_t ix = 0; ix < seqBatch.size(); ++ix) {
           ofs_minfo << names_vec[ix] << std::endl;
@@ -285,21 +336,19 @@ void Query::perform(uint64_t rbatch_size)
           ofs_minfo << std::endl;
         }
       }
-      uint64_t curr_taxID;
-      float th_ratio, tvote_val;
+      float th_ratio;
       std::string curr_rank, curr_name;
       ofs_clsinfo << "SEQ_ID\tRANK\tTAXON_ID\tTAXON_NAME\tPREDICTION_SCORE\tMATCH_SCORE" << std::endl;
       for (uint32_t ix = 0; ix < seqBatch.size(); ++ix) {
-        curr_taxID = std::get<0>(clsinfo_vec[ix]);
-        tvote_val = std::get<1>(clsinfo_vec[ix]);
-        if ((curr_taxID != 0) && (tvote_val > _tvote_threshold)) {
-          curr_rank = _rank_inmap[curr_taxID];
-          curr_name = _name_inmap[curr_taxID];
-          th_ratio = tvote_val / std::get<2>(clsinfo_vec[ix]);
-          ofs_clsinfo << names_vec[ix] << "\t" << curr_rank << "\t" << curr_taxID << "\t" << curr_name << "\t";
-          ofs_clsinfo << std::setprecision(3) << th_ratio << "\t" << std::get<1>(clsinfo_vec[ix]) << std::endl;
+        if ((tvinfo_vec[ix].pred_taxID != 0) && (tvinfo_vec[ix].tvote_n > _tvote_threshold)) {
+          curr_rank = _rank_inmap[tvinfo_vec[ix].pred_taxID];
+          curr_name = _name_inmap[tvinfo_vec[ix].pred_taxID];
+          th_ratio = tvinfo_vec[ix].tvote_n / tvinfo_vec[ix].tvote_r;
+          ofs_clsinfo << names_vec[ix];
+          ofs_clsinfo << "\t" << curr_rank << "\t" << tvinfo_vec[ix].pred_taxID << "\t" << curr_name;
+          ofs_clsinfo << "\t" << std::setprecision(3) << th_ratio << "\t" << tvinfo_vec[ix].tvote_n << std::endl;
         } else {
-          ofs_clsinfo << names_vec[ix] << "\tU\tNA\tNA\tNA\t" << tvote_val << std::endl;
+          ofs_clsinfo << names_vec[ix] << "\tU\tNA\tNA\tNA\t" << tvinfo_vec[ix].tvote_n << std::endl;
         }
       }
       tnum_reads += seqBatch.size();
@@ -307,10 +356,29 @@ void Query::perform(uint64_t rbatch_size)
     }
     kseq_destroy(reader);
     gzclose(reader->f->f);
+
+    std::string curr_rank, curr_name;
+    ofs_aprofile << "RANK\tTAXON_ID\tTAXON_NAME\tREAD_COUNT\tREAD_ABUNDANCE\tCELL_ABUNDANCE" << std::endl;
+    std::vector<std::pair<uint64_t, float>> query_profile(query_acc_profile.begin(), query_acc_profile.end());
+    std::sort(query_profile.begin(),
+              query_profile.end(),
+              [](const std::pair<uint64_t, float> &l, const std::pair<uint64_t, float> &r) { return l.second < r.second; });
+    for (auto &kv : query_acc_profile) {
+      query_acc_profile[kv.first] = kv.second / tnum_reads;
+    }
+    std::unordered_map<uint64_t, float> query_corrected_profile;
+    postprocessProfile(query_corrected_profile, query_acc_profile);
+    for (auto &tc : query_profile) {
+      ofs_aprofile << _rank_inmap[tc.first] << "\t" << tc.first << "\t" << _name_inmap[tc.first];
+      ofs_aprofile << "\t" << std::setprecision(6) << tc.second << "\t" << query_acc_profile[tc.first] << "\t"
+                   << query_corrected_profile[tc.first] << std::endl;
+    }
+
     if (_save_match_info) {
       ofs_minfo.close();
     }
     ofs_clsinfo.close();
+    ofs_aprofile.close();
   }
 }
 
@@ -418,6 +486,11 @@ bool Query::QLibrary::loadMetadata()
     LOG(INFO) << "Loading metadata of the library" << std::endl;
   std::string load_dirpath(_library_dirpath);
 
+  std::vector<std::pair<tT, uint64_t>> bases_sizes;
+  std::vector<std::pair<tT, uint64_t>> tIDs_sizes;
+  std::vector<std::pair<tT, uint64_t>> tIDs_ngenomes;
+  std::vector<std::pair<tT, float>> tIDs_lengths;
+
   FILE *metadata_f = IO::open_file((load_dirpath + "/metadata").c_str(), is_ok, "rb");
   std::fread(&_k, sizeof(uint16_t), 1, metadata_f);
   std::fread(&_h, sizeof(uint16_t), 1, metadata_f);
@@ -430,13 +503,17 @@ bool Query::QLibrary::loadMetadata()
   std::fread(&_num_nodes, sizeof(uint64_t), 1, metadata_f);
   std::fread(&_root_size, sizeof(uint64_t), 1, metadata_f);
 
-  _bases_sizes.resize(_num_species);
-  _tIDs_sizes.resize(_num_nodes);
+  bases_sizes.resize(_num_species);
+  tIDs_sizes.resize(_num_nodes);
+  tIDs_ngenomes.resize(_num_nodes);
+  tIDs_lengths.resize(_num_nodes);
   _positions.resize(_h);
   _npositions.resize(_k - _h);
 
-  std::fread(_bases_sizes.data(), sizeof(std::pair<tT, uint64_t>), _num_species, metadata_f);
-  std::fread(_tIDs_sizes.data(), sizeof(std::pair<tT, uint64_t>), _num_nodes, metadata_f);
+  std::fread(bases_sizes.data(), sizeof(std::pair<tT, uint64_t>), _num_species, metadata_f);
+  std::fread(tIDs_sizes.data(), sizeof(std::pair<tT, uint64_t>), _num_nodes, metadata_f);
+  std::fread(tIDs_ngenomes.data(), sizeof(std::pair<tT, uint64_t>), _num_nodes, metadata_f);
+  std::fread(tIDs_lengths.data(), sizeof(std::pair<tT, float>), _num_nodes, metadata_f);
   std::fread(_positions.data(), sizeof(uint8_t), _positions.size(), metadata_f);
   std::fread(_npositions.data(), sizeof(uint8_t), _npositions.size(), metadata_f);
 
@@ -445,6 +522,19 @@ bool Query::QLibrary::loadMetadata()
     is_ok = false;
   }
   std::fclose(metadata_f);
+
+  /* for (auto kv : bases_sizes) { */
+  /*   _basis_to_size[kv.first] = kv.second; */
+  /* } */
+  /* for (auto kv : tIDs_sizes) { */
+  /*   _tID_to_size[kv.first] = kv.second; */
+  /* } */
+  /* for (auto kv : tIDs_ngenomes) { */
+  /*   _tID_to_ngenomes[kv.first] = kv.second; */
+  /* } */
+  for (auto kv : tIDs_lengths) {
+    _tID_to_length[kv.first] = kv.second;
+  }
 
   if (_log) {
     if (is_ok)

@@ -51,8 +51,10 @@ private:
   std::vector<uint8_t> _npositions;
   std::unordered_map<tT, inputStream<encT>> _inputStream_map;
   std::unordered_map<tT, uint64_t> _basis_to_size;
-  std::unordered_map<tT, uint64_t> _tID_to_size;
   std::unordered_map<tT, size_t> _basis_to_ninput;
+  std::unordered_map<tT, uint64_t> _tID_to_size;
+  std::unordered_map<tT, float> _tID_to_length;
+  std::unordered_map<tT, uint64_t> _tID_to_ngenomes;
   std::vector<tT> _tID_vec;
   uint64_t _num_species;
   uint64_t _num_nodes;

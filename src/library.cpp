@@ -1,4 +1,5 @@
 #include "library.h"
+#include <cstdio>
 
 Library::Library(const char *library_dirpath,
                  const char *taxonomy_dirpath,
@@ -41,7 +42,7 @@ Library::Library(const char *library_dirpath,
   _num_species = _taxonomy_record.tID_to_input().size();
   _num_nodes = _taxonomy_record.get_num_nodes();
   if (!_from_library) {
-    if (IO::ensureDirectory(_library_dirpath)) {
+    if (ghc::filesystem::exists(_library_dirpath)) {
       std::cout << "Library directory exists, current files will be overwritten " << _library_dirpath << std::endl;
     } else if (ghc::filesystem::create_directories(_library_dirpath)) {
       std::cout << "Library directory has been created at the given path " << _library_dirpath << std::endl;
@@ -67,9 +68,15 @@ Library::Library(const char *library_dirpath,
   }
 
   _tID_vec.reserve(_num_species);
+  tT tmp_tID;
   for (auto const &kv : _taxonomy_record.tID_to_input()) {
     _tID_vec.push_back(kv.first);
     _basis_to_ninput[kv.first] = kv.second.size();
+    tmp_tID = kv.first;
+    while (tmp_tID != 0) {
+      _tID_to_ngenomes[tmp_tID] += kv.second.size();
+      tmp_tID = _taxonomy_record.parent_vec()[tmp_tID];
+    }
   }
   std::sort(_tID_vec.begin(), _tID_vec.end(), [&](const tT &x, const tT &y) {
     return _taxonomy_record.tID_to_input()[x].size() > _taxonomy_record.tID_to_input()[y].size();
@@ -150,32 +157,32 @@ void Library::processLeaf(tT tID_key)
 #pragma omp critical
     LOG(INFO) << "Processing k-mer set for taxon " << _taxonomy_record.changeIDtax(tID_key) << std::endl;
   }
-  uint64_t size_basis = 0;
   inputHandler<encT> pI(filepath_v, _k, _w, _h, &_lsh_vg, &_npositions);
   if (!_from_library) {
+    float total_genome_len;
     if (!pI.checkInput(_library_dirpath, tID_key, _total_batches)) {
       if (_input_kmers)
-        size_basis = pI.readInput(static_cast<uint64_t>(DEFAULT_BATCH_SIZE));
+        total_genome_len = pI.readInput(static_cast<uint64_t>(DEFAULT_BATCH_SIZE));
       else
-        size_basis = pI.extractInput(1);
+        total_genome_len = pI.extractInput(1);
     } else {
       bool is_ok = pI.loadInput(_library_dirpath, tID_key, _total_batches);
-      size_basis = pI.lsh_enc_vec.size();
       if (_log) {
 #pragma omp critical
         LOG(NOTICE) << "Encodings and hash values already exist for " << _taxonomy_record.changeIDtax(tID_key) << std::endl;
       }
     }
+    uint64_t size_basis = pI.lsh_enc_vec.size();
 #pragma omp critical
     {
       _basis_to_size[tID_key] = size_basis;
       tT tmp_tID = tID_key;
-      while (_taxonomy_record.parent_vec()[tmp_tID] != 0) {
+      while (tmp_tID != 0) {
         _tID_to_size[tmp_tID] += size_basis;
+        _tID_to_length[tmp_tID] += total_genome_len / _tID_to_ngenomes[tmp_tID];
         tmp_tID = _taxonomy_record.parent_vec()[tmp_tID];
       }
       _root_size += size_basis;
-      _tID_to_size[1] += size_basis;
     }
     bool is_ok = pI.saveInput(_library_dirpath, tID_key, _total_batches, _tbatch_size);
     if (!is_ok) {
@@ -357,8 +364,6 @@ uint64_t Library::getConstrainedSizeSC(uint64_t num_basis)
 
 void Library::getBatchHTs(HTs<encT> *ts, unsigned int curr_batch)
 {
-  if (_verbose)
-    std::cout << "Constructing the table for " << _taxonomy_record.changeIDtax(ts->tID) << std::endl;
   HTd<encT> td(ts->tID, ts->k, ts->h, ts->num_rows, ts->ptr_lsh_vg, _ranking_method, &_taxonomy_record);
   omp_set_nested(1);
   num_tasks = static_cast<unsigned int>(sqrt(2 * num_threads));
@@ -389,6 +394,7 @@ void Library::getBatchHTd(HTd<encT> *td, unsigned int curr_batch)
   uint64_t curr_taxID = _taxonomy_record.changeIDtax(td->tID);
   uint64_t num_batch_kmers;
   if (_verbose)
+#pragma omp critical
     std::cout << "Constructing the table for " << curr_taxID << std::endl;
   if (_taxonomy_record.isBasis(td->tID)) {
     num_batch_kmers = _inputStream_map.at(td->tID).retrieveBatch(td->enc_vvec, _tbatch_size, curr_batch);
@@ -586,6 +592,8 @@ bool Library::loadMetadata()
   std::string save_dirpath(_library_dirpath);
   std::vector<std::pair<tT, uint64_t>> bases_sizes;
   std::vector<std::pair<tT, uint64_t>> tIDs_sizes;
+  std::vector<std::pair<tT, uint64_t>> tIDs_ngenomes;
+  std::vector<std::pair<tT, float>> tIDs_lengths;
 
   FILE *metadata_f = IO::open_file((save_dirpath + "/metadata").c_str(), is_ok, "rb");
   std::fread(&_k, sizeof(uint16_t), 1, metadata_f);
@@ -601,11 +609,15 @@ bool Library::loadMetadata()
 
   bases_sizes.resize(_num_species);
   tIDs_sizes.resize(_num_nodes);
+  tIDs_ngenomes.resize(_num_nodes);
+  tIDs_lengths.resize(_num_nodes);
   _positions.resize(_h);
   _npositions.resize(_k - _h);
 
   std::fread(bases_sizes.data(), sizeof(std::pair<tT, uint64_t>), _num_species, metadata_f);
   std::fread(tIDs_sizes.data(), sizeof(std::pair<tT, uint64_t>), _num_nodes, metadata_f);
+  std::fread(tIDs_ngenomes.data(), sizeof(std::pair<tT, uint64_t>), _num_nodes, metadata_f);
+  std::fread(tIDs_lengths.data(), sizeof(std::pair<tT, float>), _num_nodes, metadata_f);
   std::fread(_positions.data(), sizeof(uint8_t), _positions.size(), metadata_f);
   std::fread(_npositions.data(), sizeof(uint8_t), _npositions.size(), metadata_f);
 
@@ -620,6 +632,12 @@ bool Library::loadMetadata()
   }
   for (auto kv : tIDs_sizes) {
     _tID_to_size[kv.first] = kv.second;
+  }
+  for (auto kv : tIDs_ngenomes) {
+    _tID_to_ngenomes[kv.first] = kv.second;
+  }
+  for (auto kv : tIDs_lengths) {
+    _tID_to_length[kv.first] = kv.second;
   }
 
   if (_log) {
@@ -641,8 +659,13 @@ bool Library::saveMetadata()
 
   std::vector<std::pair<tT, uint64_t>> bases_sizes(_basis_to_size.begin(), _basis_to_size.end());
   std::vector<std::pair<tT, uint64_t>> tIDs_sizes(_tID_to_size.begin(), _tID_to_size.end());
+  std::vector<std::pair<tT, uint64_t>> tIDs_ngenomes(_tID_to_ngenomes.begin(), _tID_to_ngenomes.end());
+  std::vector<std::pair<tT, float>> tIDs_lengths(_tID_to_length.begin(), _tID_to_length.end());
+  
   assert(_basis_to_size.size() == _num_species);
   assert(_tID_to_size.size() == _num_nodes);
+  assert(tIDs_ngenomes.size() == _num_nodes);
+  assert(tIDs_lengths.size() == _num_nodes);
 
   FILE *metadata_f = IO::open_file((save_dirpath + "/metadata").c_str(), is_ok, "wb");
   std::fwrite(&_k, sizeof(uint16_t), 1, metadata_f);
@@ -657,6 +680,8 @@ bool Library::saveMetadata()
   std::fwrite(&_root_size, sizeof(uint64_t), 1, metadata_f);
   std::fwrite(bases_sizes.data(), sizeof(std::pair<tT, uint64_t>), bases_sizes.size(), metadata_f);
   std::fwrite(tIDs_sizes.data(), sizeof(std::pair<tT, uint64_t>), tIDs_sizes.size(), metadata_f);
+  std::fwrite(tIDs_ngenomes.data(), sizeof(std::pair<tT, uint64_t>), tIDs_ngenomes.size(), metadata_f);
+  std::fwrite(tIDs_lengths.data(), sizeof(std::pair<tT, float>), tIDs_lengths.size(), metadata_f);
   std::fwrite(_positions.data(), sizeof(uint8_t), _positions.size(), metadata_f);
   std::fwrite(_npositions.data(), sizeof(uint8_t), _npositions.size(), metadata_f);
 

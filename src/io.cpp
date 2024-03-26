@@ -124,6 +124,7 @@ template<typename encT>
 void inputHandler<encT>::clearInput()
 {
   lsh_enc_vec.clear();
+  rcounts.clear();
   l_rix = 0;
   curr_vix = 0;
 }
@@ -214,7 +215,7 @@ uint64_t inputStream<encT>::retrieveBatch(vvec<encT> &btable, uint32_t tbatch_si
 }
 
 template<typename encT>
-uint64_t inputHandler<encT>::extractInput(uint64_t rbatch_size)
+float inputHandler<encT>::extractInput(uint64_t rbatch_size)
 {
   uint32_t max_rix = std::numeric_limits<uint32_t>::max();
   max_rix = max_rix >> (32 - 2 * h);
@@ -222,6 +223,7 @@ uint64_t inputHandler<encT>::extractInput(uint64_t rbatch_size)
   uint64_t mask_bp = u64m >> (32 - k) * 2;
   uint64_t mask_lr = ((u64m >> (64 - k)) << 32) + ((u64m << 32) >> (64 - k));
   size_t last_ix = lsh_enc_vec.size();
+  float total_genome_len = 0.0;
   for (unsigned int fix = 0; fix < filepath_v.size(); ++fix) {
     unsigned int i, l, c;
     std::string &filepath = filepath_v[fix];
@@ -313,6 +315,7 @@ uint64_t inputHandler<encT>::extractInput(uint64_t rbatch_size)
     auto rone_it = std::unique(lsh_enc_vec_f.begin(), lsh_enc_vec_f.end());
     lsh_enc_vec_f.erase(rone_it, lsh_enc_vec_f.end());
     lsh_enc_vec.insert(lsh_enc_vec.end(), lsh_enc_vec_f.begin(), lsh_enc_vec_f.end());
+    total_genome_len += static_cast<float>(lsh_enc_vec_f.size());
     if (((fix % GENOME_BATCH_SIZE) == 0) || (fix == (filepath_v.size() - 1))) {
       std::sort(lsh_enc_vec.begin() + last_ix,
                 lsh_enc_vec.end(),
@@ -329,11 +332,11 @@ uint64_t inputHandler<encT>::extractInput(uint64_t rbatch_size)
     }
   }
   tnum_kmers = lsh_enc_vec.size();
-  return tnum_kmers;
+  return total_genome_len;
 }
 
 template<typename encT>
-uint64_t inputHandler<encT>::readInput(uint64_t rbatch_size)
+float inputHandler<encT>::readInput(uint64_t rbatch_size)
 {
   uint64_t tnum_kmers_sum = 0;
   uint32_t max_rix = std::numeric_limits<uint32_t>::max();
@@ -343,6 +346,7 @@ uint64_t inputHandler<encT>::readInput(uint64_t rbatch_size)
   uint64_t mask_lr = ((u64m >> (64 - k)) << 32) + ((u64m << 32) >> (64 - k));
   rbatch_size = IO::adjustBatchSize(rbatch_size, num_threads);
   size_t last_ix = lsh_enc_vec.size();
+  float total_genome_len = 0.0;
   for (unsigned int fix = 0; fix < filepath_v.size(); ++fix) {
     std::string &filepath = filepath_v[fix];
     kseq_t *reader = IO::getReader(filepath.c_str());
@@ -419,6 +423,7 @@ uint64_t inputHandler<encT>::readInput(uint64_t rbatch_size)
     auto rone_it = std::unique(lsh_enc_vec_f.begin(), lsh_enc_vec_f.end());
     lsh_enc_vec_f.erase(rone_it, lsh_enc_vec_f.end());
     lsh_enc_vec.insert(lsh_enc_vec.end(), lsh_enc_vec_f.begin(), lsh_enc_vec_f.end());
+    total_genome_len += static_cast<float>(lsh_enc_vec_f.size());
     if (((fix % GENOME_BATCH_SIZE) == 0) || (fix == (filepath_v.size() - 1))) {
       std::sort(lsh_enc_vec.begin() + last_ix,
                 lsh_enc_vec.end(),
@@ -435,7 +440,7 @@ uint64_t inputHandler<encT>::readInput(uint64_t rbatch_size)
     }
   }
   tnum_kmers = lsh_enc_vec.size();
-  return tnum_kmers;
+  return total_genome_len;
 }
 
 template<typename encT>
@@ -527,13 +532,13 @@ std::ifstream IO::open_ifstream(const char *filepath, bool is_ok)
   return ifs;
 }
 
-template uint64_t inputHandler<uint32_t>::readInput(uint64_t rbatch_size);
+template float inputHandler<uint32_t>::readInput(uint64_t rbatch_size);
 
-template uint64_t inputHandler<uint64_t>::readInput(uint64_t rbatch_size);
+template float inputHandler<uint64_t>::readInput(uint64_t rbatch_size);
 
-template uint64_t inputHandler<uint32_t>::extractInput(uint64_t rbatch_size);
+template float inputHandler<uint32_t>::extractInput(uint64_t rbatch_size);
 
-template uint64_t inputHandler<uint64_t>::extractInput(uint64_t rbatch_size);
+template float inputHandler<uint64_t>::extractInput(uint64_t rbatch_size);
 
 template bool
 inputHandler<uint64_t>::saveInput(const char *dirpath, tT tID_key, uint16_t total_batches, uint32_t tbatch_size);
