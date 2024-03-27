@@ -49,10 +49,6 @@ int main(int argc, char **argv)
   uint8_t w = k + 3;
   sub_build->add_option("-k,--kmer-length", k, "Length of k-mers. Default: 28.");
   sub_build->add_option("-w,--window-length", w, "Length of minimizer window. Default: k+3.");
-  sub_build->callback([&]() {
-    if (!(sub_build->count("-w") + sub_build->count("--window-length")))
-      w = k + 3;
-  });
   uint8_t h = 12;
   sub_build->add_option("-h,--num-positions", h, "Number of positions for the LSH. Default: 12.");
   uint8_t b = 16;
@@ -69,10 +65,6 @@ int main(int argc, char **argv)
                         "The specific library batch to be built. "
                         "If 0, all batches will be processed one by one. "
                         "If not given, library will only be initialized after reading the input data and encoding k-mers.");
-  sub_build->callback([&]() {
-    if (!sub_build->count("--target-batch"))
-      only_init = true;
-  });
   std::map<std::string, RankingMethod> map_ranking{{"random_kmer", random_kmer},
                                                    {"representative_kmer", representative_kmer}};
   RankingMethod ranking_method = representative_kmer;
@@ -84,6 +76,33 @@ int main(int argc, char **argv)
   sub_build->add_flag(
     "--adaptive-size,!--free-size", adaptive_size, "Use size constraint heuristic while gradually building the library.");
   sub_build->add_option("--num-threads", num_threads, "Number of threads to use for OpenMP based parallelism.");
+  bool fast_mode = false;
+  sub_build->add_flag(
+    "--fast-mode,!--selection-mode",
+    fast_mode,
+    "The default mode is --selection-mode which traverses the taxonomy, and selects k-mers accordingly. "
+    "When --fast-mode is given, tree traversal will be skipped, and the final library will be built at the root. "
+    "With --kmer-ranking random_kmer, this is equivalent to CONSULT-II. "
+    "If --fast-mode is given, --adaptive-size will be ignored and has no effect. "
+    "Note  --fast-mode is significantly faster.");
+   bool update_annotations = false;
+  sub_build->add_flag(
+    "--update-annotations,!--build-tables",
+    update_annotations,
+    "When --update-annotations is given, KRANK tries to update soft LCAs of k-mers by going over reference genomes. "
+    "This will be done without rebuilding the tables, hence it would be quite fast. "
+    "This might be particularly useful when parameters for soft LCA is changed. "
+    "Without a target batch given (using --target-batch), both options would be ignored. "
+    "Then, KRANK would only initialize the library. "
+    "Default --build-tables selects k-mers, builds tables, and also computes soft LCAs.");
+  sub_build->callback([&]() {
+    if (sub_build->count("--fast-mode"))
+      ranking_method = map_ranking["random_kmer"];
+    if (!sub_build->count("--target-batch"))
+      only_init = true;
+    if (!(sub_build->count("-w") + sub_build->count("--window-length")))
+      w = k + 3;
+  });
 
   CLI::App *sub_query = app.add_subcommand("query", "Performs query with respect to a given referenece library.");
   std::vector<std::string> library_dir_v;
@@ -144,6 +163,13 @@ int main(int argc, char **argv)
     exit(EXIT_FAILURE);
   }
 #endif
+  if (adaptive_size && fast_mode)
+    std::puts("Since flag --fast-mode has been given, --adaptive-size will be ignored, fast mode can not enforce a size constraint.");
+  if (sub_build->count("--kmer-ranking") && fast_mode)
+    std::puts("Since flag --fast-mode has been given, --kmer-ranking will be ignored, k-mer selection will be inherently random.");
+  if (only_init  &&
+      (sub_build->count("--update-annotations") || sub_build->count("--build-tables")))
+    std::puts("Since no target batch is given (using --target-batch), --build-tables/--update-annotations will be ignored.");
 
   if (sub_build->parsed()) {
     std::cout << "Building the library..." << std::endl;
@@ -162,9 +188,10 @@ int main(int argc, char **argv)
               input_kmers,
               target_batch,
               only_init,
+              update_annotations,
+              fast_mode,
               verbose,
               log);
-    std::cout << "Library has been built and saved" << std::endl;
   }
 
   if (sub_query->parsed()) {

@@ -26,6 +26,8 @@ public:
           bool from_kmers = false,
           uint16_t target_batch = 0,
           bool only_init = false,
+          bool update_annotations = false,
+          bool fast_mode = false,
           bool verbose = true,
           bool log = true);
 
@@ -62,9 +64,11 @@ private:
   bool _input_kmers;
   uint16_t _target_batch;
   bool _only_init;
+  bool _update_annotations;
+  bool _fast_mode;
   bool _log;
   bool _verbose;
-  const uint16_t _rootID = 1;
+  const tT _rootID = 1;
 
 public:
   uint64_t getConstrainedSizeKC(tT curr_tID);
@@ -77,7 +81,7 @@ public:
   bool loadMetadata();
   void getRandomPositions();
   void skipBatch();
-  void build();
+  void buildTables();
   void annotateInfo();
   void processLeaf(tT tID_key);
   void resetInfo(HTs<encT> &ts, bool reset_scount, bool reset_tlca);

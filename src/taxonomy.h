@@ -31,7 +31,7 @@ private:
   T _num_nodes;
   uint64_t _full_size;
   std::unordered_map<T, std::string> _tID_to_rank;
-  std::unordered_map<tT, uint64_t> _tID_to_lsroot;
+  std::unordered_map<tT, tT> _tID_to_lsroot;
   std::unordered_map<T, uint64_t> _tID_to_taxID;
   std::unordered_map<uint64_t, T> _taxID_to_tID;
   std::unordered_map<std::string, T> _input_to_tID;

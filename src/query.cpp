@@ -91,7 +91,7 @@ void Query::postprocessProfile(std::unordered_map<uint64_t, float> &query_correc
   for (auto &kv : query_acc_profile) {
     std::string tmp_rank = _rank_inmap[kv.first];
     tmp_rank = tmp_rank == "no rank" ? tmp_rank + std::to_string(_depth_inmap[kv.first]) : tmp_rank;
-    query_corrected_profile[kv.first] +=
+    query_corrected_profile[kv.first] =
       kv.second * _taxID_to_length[kv.first] / rank_crsum[tmp_rank] * rank_sum[tmp_rank];
   }
 }

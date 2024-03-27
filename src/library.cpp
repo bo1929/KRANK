@@ -1,5 +1,4 @@
 #include "library.h"
-#include <cstdio>
 
 Library::Library(const char *library_dirpath,
                  const char *taxonomy_dirpath,
@@ -16,6 +15,8 @@ Library::Library(const char *library_dirpath,
                  bool input_kmers,
                  uint16_t target_batch,
                  bool only_init,
+                 bool update_annotations,
+                 bool fast_mode,
                  bool verbose,
                  bool log)
   : _library_dirpath(library_dirpath)
@@ -35,6 +36,8 @@ Library::Library(const char *library_dirpath,
   , _input_kmers(input_kmers)
   , _target_batch(target_batch)
   , _only_init(only_init)
+  , _update_annotations(update_annotations)
+  , _fast_mode(fast_mode)
   , _verbose(verbose)
   , _log(log)
 {
@@ -145,9 +148,15 @@ Library::Library(const char *library_dirpath,
       LOG(INFO) << "Metadata has been read from the library, won't be saved again" << std::endl;
   }
 
-  if (!_only_init)
-    Library::build();
-  /* Library::annotateInfo(); */
+  if (!_only_init) {
+    if (_update_annotations)
+      Library::annotateInfo();
+    else
+      Library::buildTables();
+    std::cout << "Library has been built and saved" << std::endl;
+  } else {
+    std::cout << "Library has been successfully initialized" << std::endl;
+  }
 }
 
 void Library::processLeaf(tT tID_key)
@@ -160,18 +169,10 @@ void Library::processLeaf(tT tID_key)
   inputHandler<encT> pI(filepath_v, _k, _w, _h, &_lsh_vg, &_npositions);
   if (!_from_library) {
     float total_genome_len;
-    if (!pI.checkInput(_library_dirpath, tID_key, _total_batches)) {
-      if (_input_kmers)
-        total_genome_len = pI.readInput(static_cast<uint64_t>(DEFAULT_BATCH_SIZE));
-      else
-        total_genome_len = pI.extractInput(1);
-    } else {
-      bool is_ok = pI.loadInput(_library_dirpath, tID_key, _total_batches);
-      if (_log) {
-#pragma omp critical
-        LOG(NOTICE) << "Encodings and hash values already exist for " << _taxonomy_record.changeIDtax(tID_key) << std::endl;
-      }
-    }
+    if (_input_kmers)
+      total_genome_len = pI.readInput(static_cast<uint64_t>(DEFAULT_BATCH_SIZE));
+    else
+      total_genome_len = pI.extractInput(1);
     uint64_t size_basis = pI.lsh_enc_vec.size();
 #pragma omp critical
     {
@@ -193,11 +194,10 @@ void Library::processLeaf(tT tID_key)
 #pragma omp critical
       LOG(INFO) << "LSH-value and encoding pairs has been saved for " << _taxonomy_record.changeIDtax(tID_key) << std::endl;
     }
-  } else {
+  }
 #pragma omp critical
-    {
-      _inputStream_map.emplace(std::make_pair(tID_key, inputStream<encT>(_library_dirpath, tID_key)));
-    }
+  {
+    _inputStream_map.emplace(std::make_pair(tID_key, inputStream<encT>(_library_dirpath, tID_key)));
   }
   pI.clearInput();
 }
@@ -275,15 +275,16 @@ void Library::annotateInfo()
   if (_verbose)
     std::cout << "Total number of batches is " << _total_batches << std::endl;
   unsigned int curr_batch = 0;
+  uint64_t tnmer_batch = _tbatch_size * _b;
   for (unsigned int i = 0; i < _total_batches; ++i) {
     curr_batch++;
     if ((_target_batch == 0) || (_target_batch == curr_batch)) {
       std::cout << "Annotating k-mners in the library for batch " << curr_batch << "..." << std::endl;
-      HTs<encT> ts_root(1, _k, _h, _b, _tbatch_size, &_lsh_vg, _ranking_method, &_taxonomy_record);
+      HTs<encT> ts_root(_rootID, _k, _h, _b, _tbatch_size, &_lsh_vg, _ranking_method, &_taxonomy_record);
       Library::loadBatchHTs(ts_root, curr_batch);
       if (_log)
-        LOG(INFO) << "The table has been loaded and contains " << ts_root.num_kmers << "/" << ts_root.num_rows * ts_root.b
-                  << " k-mers" << std::endl;
+        LOG(INFO) << "The table has been loaded and contains " << ts_root.num_kmers << "/" << tnmer_batch << " k-mers"
+                  << std::endl;
       Library::resetInfo(ts_root, true, true);
       Library::countBasis(ts_root, curr_batch);
       Library::softLCA(ts_root, curr_batch);
@@ -294,11 +295,12 @@ void Library::annotateInfo()
   }
 }
 
-void Library::build()
+void Library::buildTables()
 {
   if (_verbose)
     std::cout << "Total number of batches is " << _total_batches << std::endl;
   unsigned int curr_batch = 0;
+  uint64_t tnmer_batch = _tbatch_size * _b;
   for (unsigned int i = 0; i < _total_batches; ++i) {
     curr_batch++;
     if ((_target_batch == 0) || (_target_batch == curr_batch)) {
@@ -306,8 +308,8 @@ void Library::build()
       HTs<encT> ts_root(1, _k, _h, _b, _tbatch_size, &_lsh_vg, _ranking_method, &_taxonomy_record);
       Library::getBatchHTs(&ts_root, curr_batch);
       if (_log)
-        LOG(INFO) << "The table has been built and contains " << ts_root.num_kmers << "/" << ts_root.num_rows * ts_root.b
-                  << " k-mers" << std::endl;
+        LOG(INFO) << "The table has been built and contains " << ts_root.num_kmers << "/" << tnmer_batch << " k-mers"
+                  << std::endl;
       Library::resetInfo(ts_root, true, true);
       Library::countBasis(ts_root, curr_batch);
       Library::softLCA(ts_root, curr_batch);
@@ -365,19 +367,43 @@ uint64_t Library::getConstrainedSizeSC(uint64_t num_basis)
 void Library::getBatchHTs(HTs<encT> *ts, unsigned int curr_batch)
 {
   HTd<encT> td(ts->tID, ts->k, ts->h, ts->num_rows, ts->ptr_lsh_vg, _ranking_method, &_taxonomy_record);
-  omp_set_nested(1);
-  num_tasks = static_cast<unsigned int>(sqrt(2 * num_threads));
-  if (num_tasks < LNUM_TASKS)
-    num_tasks = std::min(static_cast<unsigned int>(LNUM_TASKS), num_threads);
-  omp_set_num_threads(num_tasks);
+  if (_fast_mode) {
+    uint64_t num_batch_kmers;
+    uint64_t constraint_size = getConstrainedSizeKC(td.tID);
+    for (auto kv_it = _inputStream_map.begin(); kv_it != _inputStream_map.end(); kv_it++) {
+      bool is_below = false;
+      tT tmp_tID = kv_it->first;
+      while ((tmp_tID != _rootID) || (td.tID != _rootID)) {
+        if (tmp_tID == ts->tID) {
+          is_below = true;
+          break;
+        } else {
+          tmp_tID = _taxonomy_record.parent_vec()[tmp_tID];
+        }
+      }
+      if (is_below || (td.tID == _rootID))
+        num_batch_kmers = (kv_it->second).retrieveBatch(td.enc_vvec, _tbatch_size, curr_batch);
+    }
+    omp_set_num_threads(num_threads);
+    td.initBasis(td.tID);
+    td.makeUnique();
+    int64_t num_rm = static_cast<int64_t>(td.num_kmers) - static_cast<int64_t>(constraint_size);
+    if (num_rm > 0)
+      td.shrinkHT(static_cast<uint64_t>(num_rm), _b);
+  } else {
+    omp_set_nested(1);
+    num_tasks = static_cast<unsigned int>(sqrt(2 * num_threads));
+    if (num_tasks < LNUM_TASKS)
+      num_tasks = std::min(static_cast<unsigned int>(LNUM_TASKS), num_threads);
+    omp_set_num_threads(num_tasks);
 #pragma omp parallel
-  {
-#pragma omp single
     {
-      getBatchHTd(&td, curr_batch);
+#pragma omp single
+      {
+        getBatchHTd(&td, curr_batch);
+      }
     }
   }
-#pragma omp taskwait
   if (_log)
     LOG(INFO) << "Converting from HTd to HTs for the taxon " << _taxonomy_record.changeIDtax(ts->tID) << std::endl;
   td.convertHTs(ts);
@@ -661,7 +687,7 @@ bool Library::saveMetadata()
   std::vector<std::pair<tT, uint64_t>> tIDs_sizes(_tID_to_size.begin(), _tID_to_size.end());
   std::vector<std::pair<tT, uint64_t>> tIDs_ngenomes(_tID_to_ngenomes.begin(), _tID_to_ngenomes.end());
   std::vector<std::pair<tT, float>> tIDs_lengths(_tID_to_length.begin(), _tID_to_length.end());
-  
+
   assert(_basis_to_size.size() == _num_species);
   assert(_tID_to_size.size() == _num_nodes);
   assert(tIDs_ngenomes.size() == _num_nodes);

@@ -177,12 +177,12 @@ void inputStream<encT>::loadCounts(std::unordered_map<encT, uint64_t> &rcounts)
 }
 
 template<typename encT>
-uint64_t inputStream<encT>::retrieveBatch(vvec<encT> &btable, uint32_t tbatch_size, unsigned int curr_batch)
+uint64_t inputStream<encT>::retrieveBatch(vvec<encT> &td, uint32_t tbatch_size, unsigned int curr_batch, bool shared_table)
 {
   uint32_t bix = (curr_batch - 1) * tbatch_size;
   uint32_t eix = curr_batch * tbatch_size;
   uint32_t toff_rix = (curr_batch - 1) * tbatch_size;
-  assert(btable.size() >= (eix - bix));
+  assert(td.size() >= (eix - bix));
   bool is_ok = true;
   std::string batch_dirpath = dirpath;
   batch_dirpath += +"/batch" + std::to_string(curr_batch);
@@ -198,7 +198,11 @@ uint64_t inputStream<encT>::retrieveBatch(vvec<encT> &btable, uint32_t tbatch_si
     std::pair<uint32_t, encT> lsh_enc;
     batch_ifs.read((char *)&lsh_enc, sizeof(std::pair<uint32_t, encT>));
     if ((lsh_enc.first >= bix) && (lsh_enc.first < eix) && !batch_ifs.eof()) {
-      btable[lsh_enc.first - toff_rix].push_back(lsh_enc.second);
+      if (shared_table)
+#pragma omp critical
+        td[lsh_enc.first - toff_rix].push_back(lsh_enc.second);
+      else
+        td[lsh_enc.first - toff_rix].push_back(lsh_enc.second);
       num_retrieved++;
     }
     if (lsh_enc.first >= eix)
@@ -572,11 +576,9 @@ template void inputStream<uint64_t>::loadCounts(std::unordered_map<uint64_t, uin
 
 template void inputStream<uint32_t>::loadCounts(std::unordered_map<uint32_t, uint64_t> &rcounts);
 
-template uint64_t
-inputStream<uint32_t>::retrieveBatch(vvec<uint32_t> &btable, uint32_t tbatch_size, unsigned int curr_batch);
+template uint64_t inputStream<uint32_t>::retrieveBatch(vvec<uint32_t> &td, uint32_t tbatch_size, unsigned int curr_batch, bool shared_table);
 
-template uint64_t
-inputStream<uint64_t>::retrieveBatch(vvec<uint64_t> &btable, uint32_t tbatch_size, unsigned int curr_batch);
+template uint64_t inputStream<uint64_t>::retrieveBatch(vvec<uint64_t> &td, uint32_t tbatch_size, unsigned int curr_batch, bool shared_table);
 
 template std::map<uint8_t, uint64_t> inputHandler<uint64_t>::histRowSizes();
 

@@ -1,5 +1,4 @@
 #include "table.h"
-/* #include "beta_distribution.hpp" */
 
 /* #undef DEBUG */
 #define FL false
@@ -103,7 +102,7 @@ void HTs<encT>::makeUnique(bool update_size)
     std::puts("HTs has unsorted columns before making rows unique.\n");
   }
 #endif
-#pragma omp parallel for schedule(dynamic)
+#pragma omp parallel for schedule(static)
   for (uint32_t rix = 0; rix < num_rows; ++rix) {
     if (ind_arr[rix] > 0) {
       std::unordered_map<encT, scT> scount_map{};
@@ -248,7 +247,7 @@ void HTd<encT>::initBasis(tT tID)
 #ifdef DEBUG
   LOG(INFO) << "The current size of the table is " << num_kmers << std::endl;
 #endif
-#pragma omp parallel for schedule(dynamic)
+#pragma omp parallel for schedule(static)
   for (uint32_t rix = 0; rix < num_rows; ++rix) {
     if (!enc_vvec[rix].empty()) {
       scount_vvec[rix].resize(enc_vvec[rix].size());
