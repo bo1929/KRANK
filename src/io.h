@@ -32,6 +32,10 @@ namespace IO {
   FILE *open_file(const char *filepath, bool &is_ok, const char *mode);
 
   std::ifstream open_ifstream(const char *filepath, bool is_ok);
+
+  size_t writeData(void *ptr, size_t size, size_t nmemb, FILE *stream);
+
+  std::string downloadURL(std::string url);
 } // namespace IO
 
 template<typename encT>

@@ -1,7 +1,7 @@
 # compiler options
 #--------------------------------------------
 COMPILER = g++
-LDLIBS = -lm -lz -lstdc++
+LDLIBS = -lm -lz -lstdc++ -lcurl
 CXXFLAGS = -g -std=c++11 -O3 -fopenmp
 WFLAGS = -Wno-unused-result -Wno-unused-command-line-argument
 
@@ -19,7 +19,7 @@ all: $(PROGRAM)
 # generic rule for compiling *.cpp -> *.o
 build/%.o: src/%.cpp
 	@mkdir -p build
-	$(COMPILER) $(WFLAGS) $(CXXFLAGS) $(CPPFLAGS) $(LDFLAGS) -c src/$*.cpp -o build/$*.o
+	$(COMPILER) $(WFLAGS) $(CXXFLAGS) $(CPPFLAGS) $(LDFLAGS) $(LDLIBS) -c src/$*.cpp -o build/$*.o
 
 $(PROGRAM): $(OBJECTS)
 	$(COMPILER) $(WFLAGS) $(CXXFLAGS) $+ $(LDLIBS) $(CPPFLAGS) $(LDFLAGS) -o $@

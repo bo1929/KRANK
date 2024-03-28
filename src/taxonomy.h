@@ -48,8 +48,8 @@ public:
   TaxonomyRecord(const char *input_filepath, TaxonomyInput taxonomy);
   void printTaxonomyRecord();
   T getLowestCommonAncestor(T a, T b);
-  uint64_t changeIDtax(T tID);
-  T changeIDt(uint64_t taxID);
+  uint64_t taxID_from_tID(T tID);
+  T tID_from_taxID(uint64_t taxID);
   bool isBasis(T tID);
   decltype(_tID_to_input) &tID_to_input() { return _tID_to_input; }
   decltype(_tID_to_lsroot) &tID_to_lsroot() { return _tID_to_lsroot; }

@@ -90,6 +90,8 @@ Library::Library(const char *library_dirpath,
       std::string batch_dirpath = _library_dirpath;
       batch_dirpath += +"/batch" + std::to_string(i);
       ghc::filesystem::create_directories(batch_dirpath);
+      // An alternative to this would be creating nested directories based on
+      // hash or modulo to prevent having too many files in a single directory.
     }
     std::string rcounts_dirpath = _library_dirpath;
     rcounts_dirpath += "/rcounts/";
@@ -164,7 +166,7 @@ void Library::processLeaf(tT tID_key)
   std::vector<std::string> &filepath_v = _taxonomy_record.tID_to_input()[tID_key];
   if (_log) {
 #pragma omp critical
-    LOG(INFO) << "Processing k-mer set for taxon " << _taxonomy_record.changeIDtax(tID_key) << std::endl;
+    LOG(INFO) << "Processing k-mer set for taxon " << _taxonomy_record.taxID_from_tID(tID_key) << std::endl;
   }
   inputHandler<encT> pI(filepath_v, _k, _w, _h, &_lsh_vg, &_npositions);
   if (!_from_library) {
@@ -187,12 +189,12 @@ void Library::processLeaf(tT tID_key)
     }
     bool is_ok = pI.saveInput(_library_dirpath, tID_key, _total_batches, _tbatch_size);
     if (!is_ok) {
-      std::cerr << "Error saving LSH-value and encoding pairs for " << _taxonomy_record.changeIDtax(tID_key) << std::endl;
+      std::cerr << "Error saving LSH-value and encoding pairs for " << _taxonomy_record.taxID_from_tID(tID_key) << std::endl;
       exit(EXIT_FAILURE);
     }
     if (_log) {
 #pragma omp critical
-      LOG(INFO) << "LSH-value and encoding pairs has been saved for " << _taxonomy_record.changeIDtax(tID_key) << std::endl;
+      LOG(INFO) << "LSH-value and encoding pairs has been saved for " << _taxonomy_record.taxID_from_tID(tID_key) << std::endl;
     }
   }
 #pragma omp critical
@@ -405,10 +407,10 @@ void Library::getBatchHTs(HTs<encT> *ts, unsigned int curr_batch)
     }
   }
   if (_log)
-    LOG(INFO) << "Converting from HTd to HTs for the taxon " << _taxonomy_record.changeIDtax(ts->tID) << std::endl;
+    LOG(INFO) << "Converting from HTd to HTs for the taxon " << _taxonomy_record.taxID_from_tID(ts->tID) << std::endl;
   td.convertHTs(ts);
   if (_log) {
-    LOG(INFO) << "The static hash table has been constructed for " << _taxonomy_record.changeIDtax(ts->tID) << std::endl;
+    LOG(INFO) << "The static hash table has been constructed for " << _taxonomy_record.taxID_from_tID(ts->tID) << std::endl;
     std::cout << "Histogram for # of table columns:" << std::endl;
     for (auto kv : ts->histRowSizes())
       std::cout << "\t" << static_cast<unsigned int>(kv.first) << " : " << kv.second << std::endl;
@@ -417,7 +419,7 @@ void Library::getBatchHTs(HTs<encT> *ts, unsigned int curr_batch)
 
 void Library::getBatchHTd(HTd<encT> *td, unsigned int curr_batch)
 {
-  uint64_t curr_taxID = _taxonomy_record.changeIDtax(td->tID);
+  uint64_t curr_taxID = _taxonomy_record.taxID_from_tID(td->tID);
   uint64_t num_batch_kmers;
   if (_verbose)
 #pragma omp critical
@@ -444,7 +446,7 @@ void Library::getBatchHTd(HTd<encT> *td, unsigned int curr_batch)
     for (unsigned int ti = 0; ti < num_child; ++ti) {
       if (_log)
 #pragma omp critical
-        LOG(INFO) << "Building for the child " << _taxonomy_record.changeIDtax(children[ti]) << " of " << curr_taxID
+        LOG(INFO) << "Building for the child " << _taxonomy_record.taxID_from_tID(children[ti]) << " of " << curr_taxID
                   << std::endl;
       td->childrenHT[ti].tID = children[ti];
 #pragma omp task untied

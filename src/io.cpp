@@ -7,6 +7,19 @@ struct vhash
   inline std::size_t operator()(const std::pair<int, int> &v) const { return v.second; }
 };
 
+unsigned int gp_hash(const std::string &str)
+{
+  unsigned int b = 378551;
+  unsigned int a = 63689;
+  unsigned int hash = 0;
+
+  for (std::size_t i = 0; i < str.length(); i++) {
+    hash = hash * a + str[i];
+    a = a * b;
+  }
+  return (hash & 0x7FFFFFFF);
+}
+
 template<typename T>
 inline void sortColumns(vvec<T> &table)
 {
@@ -226,11 +239,20 @@ float inputHandler<encT>::extractInput(uint64_t rbatch_size)
   uint64_t u64m = std::numeric_limits<uint64_t>::max();
   uint64_t mask_bp = u64m >> (32 - k) * 2;
   uint64_t mask_lr = ((u64m >> (64 - k)) << 32) + ((u64m << 32) >> (64 - k));
+  auto url_regexp = std::regex(
+    R"(^(?:(?:https?|ftp)://)(?:\S+@)?(?:(?!10(?:\.\d{1,3}){3})(?!127(?:\.\d{1,3}){3})(?!169\.254(?:\.\d{1,3}){2})(?!192\.168(?:\.\d{1,3}){2})(?!172\.(?:1[6-9]|2\d|3[0-1])(?:\.\d{1,3}){2})(?:[1-9]\d?|1\d\d|2[01]\d|22[0-3])(?:\.(?:1?\d{1,2}|2[0-4]\d|25[0-5])){2}(?:\.(?:[1-9]\d?|1\d\d|2[0-4]\d|25[0-4]))|(?:[a-z\u00a1-\uffff0-9]+-)*[a-z\u00a1-\uffff0-9]+(?:\.(?:[a-z\u00a1-\uffff0-9]+-)*[a-z\u00a1-\uffff0-9]+)*(?:\.(?:[a-z\u00a1-\uffff]{2,})))(?::\d{2,5})?(?:/\S*)?$)");
   size_t last_ix = lsh_enc_vec.size();
   float total_genome_len = 0.0;
   for (unsigned int fix = 0; fix < filepath_v.size(); ++fix) {
     unsigned int i, l, c;
-    std::string &filepath = filepath_v[fix];
+    std::string filepath;
+    bool is_url = std::regex_match(filepath_v[fix], url_regexp);
+    if (is_url) {
+      std::cout << "Downloading: " << filepath_v[fix] << std::endl;
+      filepath = IO::downloadURL(filepath_v[fix]);
+    } else {
+      filepath = filepath_v[fix];
+    }
     kseq_t *reader = IO::getReader(filepath.c_str());
     std::vector<sseq_t> seqBatch;
     IO::readBatch(seqBatch, reader, rbatch_size);
@@ -334,6 +356,8 @@ float inputHandler<encT>::extractInput(uint64_t rbatch_size)
       lsh_enc_vec.erase(nuniq_it, lsh_enc_vec.end());
       last_ix = lsh_enc_vec.size();
     }
+    if (is_url)
+      std::remove(filepath.c_str());
   }
   tnum_kmers = lsh_enc_vec.size();
   return total_genome_len;
@@ -476,6 +500,40 @@ bool IO::ensureDirectory(const char *dirpath)
   }
   return is_ok;
 }
+#include <curl/curl.h>
+/* For older cURL versions you will also need 
+#include <curl/types.h>
+#include <curl/easy.h>
+*/
+#include <string>
+
+size_t IO::writeData(void *ptr, size_t size, size_t nmemb, FILE *stream)
+{
+  size_t written = fwrite(ptr, size, nmemb, stream);
+  return written;
+}
+
+std::string IO::downloadURL(std::string url)
+{
+  char tmp_input_path[FILENAME_MAX] = "/tmp/seq.XXXXXX";
+  const char *sx = std::to_string(gp_hash(url)).c_str();
+  strcat(tmp_input_path, sx);
+  int tmp_fd = mkstemp(tmp_input_path);
+  CURL *curl;
+  FILE *fp;
+  CURLcode resb;
+  curl = curl_easy_init();
+  if (curl) {
+    fp = fopen(tmp_input_path, "wb");
+    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, IO::writeData);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, fp);
+    resb = curl_easy_perform(curl);
+    curl_easy_cleanup(curl);
+    fclose(fp);
+  }
+  return tmp_input_path;
+}
 
 kseq_t *IO::getReader(const char *fpath)
 {
@@ -576,9 +634,11 @@ template void inputStream<uint64_t>::loadCounts(std::unordered_map<uint64_t, uin
 
 template void inputStream<uint32_t>::loadCounts(std::unordered_map<uint32_t, uint64_t> &rcounts);
 
-template uint64_t inputStream<uint32_t>::retrieveBatch(vvec<uint32_t> &td, uint32_t tbatch_size, unsigned int curr_batch, bool shared_table);
+template uint64_t
+inputStream<uint32_t>::retrieveBatch(vvec<uint32_t> &td, uint32_t tbatch_size, unsigned int curr_batch, bool shared_table);
 
-template uint64_t inputStream<uint64_t>::retrieveBatch(vvec<uint64_t> &td, uint32_t tbatch_size, unsigned int curr_batch, bool shared_table);
+template uint64_t
+inputStream<uint64_t>::retrieveBatch(vvec<uint64_t> &td, uint32_t tbatch_size, unsigned int curr_batch, bool shared_table);
 
 template std::map<uint8_t, uint64_t> inputHandler<uint64_t>::histRowSizes();
 

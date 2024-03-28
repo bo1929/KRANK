@@ -265,13 +265,13 @@ T TaxonomyRecord<T>::getLowestCommonAncestor(T a, T b)
 }
 
 template<typename T>
-T TaxonomyRecord<T>::changeIDt(uint64_t taxID)
+T TaxonomyRecord<T>::tID_from_taxID(uint64_t taxID)
 {
   return _taxID_to_tID[taxID];
 }
 
 template<typename T>
-uint64_t TaxonomyRecord<T>::changeIDtax(T tID)
+uint64_t TaxonomyRecord<T>::taxID_from_tID(T tID)
 {
   return _tID_to_taxID[tID];
 }
@@ -335,13 +335,13 @@ template uint32_t TaxonomyRecord<uint32_t>::getLowestCommonAncestor(uint32_t a, 
 
 template uint16_t TaxonomyRecord<uint16_t>::getLowestCommonAncestor(uint16_t a, uint16_t b);
 
-template uint64_t TaxonomyRecord<uint16_t>::changeIDtax(uint16_t tID);
+template uint64_t TaxonomyRecord<uint16_t>::taxID_from_tID(uint16_t tID);
 
-template uint64_t TaxonomyRecord<uint32_t>::changeIDtax(uint32_t tID);
+template uint64_t TaxonomyRecord<uint32_t>::taxID_from_tID(uint32_t tID);
 
-template uint16_t TaxonomyRecord<uint16_t>::changeIDt(uint64_t taxID);
+template uint16_t TaxonomyRecord<uint16_t>::tID_from_taxID(uint64_t taxID);
 
-template uint32_t TaxonomyRecord<uint32_t>::changeIDt(uint64_t taxID);
+template uint32_t TaxonomyRecord<uint32_t>::tID_from_taxID(uint64_t taxID);
 
 template bool TaxonomyRecord<uint16_t>::isBasis(uint16_t tID);
 
