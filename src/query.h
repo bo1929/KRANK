@@ -11,7 +11,7 @@
 
 struct tvote_info_t
 {
-  uint64_t pred_taxID = 0;
+  uint32_t pred_taxID = 0;
   float tvote_n = 0.0;
   float tvote_r = 0.0;
 };
@@ -28,22 +28,22 @@ public:
         bool verbose = false,
         bool log = false);
   void perform(uint64_t rbatch_size = DEFAULT_BATCH_SIZE);
-  void postprocessProfile(std::unordered_map<uint64_t, float> &query_corrected_profile,
-                          std::unordered_map<uint64_t, float> &query_acc_profile);
-  void profileBatch(std::unordered_map<uint64_t, float> &query_acc_profile, std::vector<tvote_info_t> &tvinfo_vec);
+  void postprocessProfile(std::unordered_map<uint32_t, float> &query_corrected_profile,
+                          std::unordered_map<uint32_t, float> &query_acc_profile);
+  void profileBatch(std::unordered_map<uint32_t, float> &query_acc_profile, std::vector<tvote_info_t> &tvinfo_vec);
   void classifyBatch(std::vector<tvote_info_t> &tvinfo_vec,
                      vec_str &names_vec,
-                     vvec_uint64 &tlca_vec_or,
-                     vvec_uint64 &tlca_vec_rc,
+                     vvec_uint32 &tlca_vec_or,
+                     vvec_uint32 &tlca_vec_rc,
                      vvec_uint8 &hdist_vec_or,
                      vvec_uint8 &hdist_vec_rc);
   void processBatch(std::vector<sseq_t> &seqBatch,
                     vec_str &names_vec,
-                    vvec_uint64 &tlca_vec_or,
-                    vvec_uint64 &tlca_vec_rc,
+                    vvec_uint32 &tlca_vec_or,
+                    vvec_uint32 &tlca_vec_rc,
                     vvec_uint8 &hdist_vec_or,
                     vvec_uint8 &hdist_vec_rc);
-  uint64_t getLowestCommonAncestor(uint64_t a, uint64_t b)
+  uint32_t getLowestCommonAncestor(uint32_t a, uint32_t b)
   {
     if (!a || !b) // LCA(x,0) = LCA(0,x) = x
       return a ? a : b;
@@ -78,21 +78,21 @@ private:
     uint64_t _capacity_size;
     uint32_t _tbatch_size;
     uint16_t _total_batches;
-    uint64_t _num_species;
-    uint64_t _num_nodes;
+    uint32_t _num_species;
+    uint32_t _num_nodes;
     uint64_t _root_size;
     maskLSH _lsh_vg;
     std::vector<uint8_t> _positions;
     std::vector<uint8_t> _npositions;
-    std::unordered_map<tT, uint64_t> _tID_to_taxID;
-    std::unordered_map<uint64_t, uint64_t> _parent_inmap;
-    std::unordered_map<uint64_t, uint8_t> _depth_inmap;
-    std::unordered_map<uint64_t, std::string> _rank_inmap;
-    std::unordered_map<uint64_t, std::string> _name_inmap;
+    std::unordered_map<tT, uint32_t> _tID_to_taxID;
+    std::unordered_map<uint32_t, uint32_t> _parent_inmap;
+    std::unordered_map<uint32_t, uint8_t> _depth_inmap;
+    std::unordered_map<uint32_t, std::string> _rank_inmap;
+    std::unordered_map<uint32_t, std::string> _name_inmap;
     std::unordered_map<tT, float> _tID_to_length;
-    uint64_t _tax_num_input;
+    uint32_t _tax_num_input;
     tT _tax_num_nodes;
-    uint64_t _tax_full_size;
+    uint32_t _tax_full_size;
     std::vector<tT> _tax_parent_vec;
     std::vector<uint8_t> _tax_depth_vec;
     encT *_enc_arr;
@@ -119,11 +119,11 @@ private:
   uint64_t _mask_lr;
   std::vector<std::unique_ptr<QLibrary>> _slib_ptr_v;
   std::unordered_map<std::string, std::string> _queryID_to_path;
-  std::unordered_map<uint64_t, uint64_t> _parent_inmap;
-  std::unordered_map<uint64_t, uint8_t> _depth_inmap;
-  std::unordered_map<uint64_t, std::string> _rank_inmap;
-  std::unordered_map<uint64_t, std::string> _name_inmap;
-  std::unordered_map<uint64_t, float> _taxID_to_length;
+  std::unordered_map<uint32_t, uint32_t> _parent_inmap;
+  std::unordered_map<uint32_t, uint8_t> _depth_inmap;
+  std::unordered_map<uint32_t, std::string> _rank_inmap;
+  std::unordered_map<uint32_t, std::string> _name_inmap;
+  std::unordered_map<uint32_t, float> _taxID_to_length;
 };
 
 #endif

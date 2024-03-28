@@ -85,7 +85,7 @@ int main(int argc, char **argv)
     "With --kmer-ranking random_kmer, this is equivalent to CONSULT-II. "
     "If --fast-mode is given, --adaptive-size will be ignored and has no effect. "
     "Note  --fast-mode is significantly faster.");
-   bool update_annotations = false;
+  bool update_annotations = false;
   sub_build->add_flag(
     "--update-annotations,!--build-tables",
     update_annotations,
@@ -147,8 +147,9 @@ int main(int argc, char **argv)
     std::cerr << "The maximum allowed k-mer length is 32." << std::endl;
   if (h >= k)
     std::cerr << "The number of positions for LSH, h, can not be greater than or equal to k-mer length." << std::endl;
-  if (batch_size > (2 * h - 1))
-    std::cerr << "The number of bits to determine the number of batches must be smaller than 2h." << std::endl;
+  if ((batch_size < 1) || (batch_size > (2 * h - 1)))
+    std::cerr << "The number of bits to determine the number of batches must be smaller than 2h and greater than 0."
+              << std::endl;
   if (target_batch > pow(2, batch_size))
     std::cerr << "The given target batch index (starts from 1) is greater than the number of batches." << std::endl;
   if (max_match_hdist > k)
@@ -164,15 +165,19 @@ int main(int argc, char **argv)
   }
 #endif
   if (adaptive_size && fast_mode)
-    std::puts("Since flag --fast-mode has been given, --adaptive-size will be ignored, fast mode can not enforce a size constraint.");
+    std::puts(
+      "Since flag --fast-mode has been given, --adaptive-size will be ignored, fast mode can not enforce a size constraint.");
   if (sub_build->count("--kmer-ranking") && fast_mode)
-    std::puts("Since flag --fast-mode has been given, --kmer-ranking will be ignored, k-mer selection will be inherently random.");
-  if (only_init  &&
-      (sub_build->count("--update-annotations") || sub_build->count("--build-tables")))
+    std::puts(
+      "Since flag --fast-mode has been given, --kmer-ranking will be ignored, k-mer selection will be inherently random.");
+  if (only_init && (sub_build->count("--update-annotations") || sub_build->count("--build-tables")))
     std::puts("Since no target batch is given (using --target-batch), --build-tables/--update-annotations will be ignored.");
 
   if (sub_build->parsed()) {
-    std::cout << "Building the library..." << std::endl;
+    if (only_init)
+      std::cout << "Initializing the library..." << std::endl;
+    else
+      std::cout << "Building the library..." << std::endl;
     Library l(library_dir.c_str(),
               taxonomy_dir.c_str(),
               input_file.c_str(),

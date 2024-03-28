@@ -167,17 +167,17 @@ void inputStream<encT>::loadBatch(std::vector<std::pair<uint32_t, encT>> &lsh_en
 }
 
 template<typename encT>
-void inputStream<encT>::loadCounts(std::unordered_map<encT, uint64_t> &rcounts)
+void inputStream<encT>::loadCounts(std::unordered_map<encT, uint32_t> &rcounts)
 {
   bool is_ok = true;
   std::string rcounts_path = dirpath;
   rcounts_path += "/rcounts/" + std::to_string(tID_key);
-  std::vector<std::pair<encT, uint64_t>> rcounts_vec;
-  uint64_t num_kmers = ghc::filesystem::file_size(rcounts_path) / sizeof(std::pair<encT, uint64_t>);
+  std::vector<std::pair<encT, uint32_t>> rcounts_vec;
+  uint64_t num_kmers = ghc::filesystem::file_size(rcounts_path) / sizeof(std::pair<encT, uint32_t>);
   if (num_kmers > 0) {
     FILE *rcounts_f = IO::open_file((rcounts_path).c_str(), is_ok, "rb");
     rcounts_vec.resize(num_kmers);
-    std::fread(rcounts_vec.data(), sizeof(std::pair<encT, uint64_t>), num_kmers, rcounts_f);
+    std::fread(rcounts_vec.data(), sizeof(std::pair<encT, uint32_t>), num_kmers, rcounts_f);
     if (std::ferror(rcounts_f)) {
       std::puts("I/O error when reading the genome counts for the shared k-mers.\n");
       std::cout << __PRETTY_FUNCTION__ << std::endl;
@@ -630,9 +630,9 @@ inputStream<uint32_t>::loadBatch(std::vector<std::pair<uint32_t, uint32_t>> &lsh
 template void
 inputStream<uint64_t>::loadBatch(std::vector<std::pair<uint32_t, uint64_t>> &lsh_enc_vec, unsigned int curr_batch);
 
-template void inputStream<uint64_t>::loadCounts(std::unordered_map<uint64_t, uint64_t> &rcounts);
+template void inputStream<uint64_t>::loadCounts(std::unordered_map<uint64_t, uint32_t> &rcounts);
 
-template void inputStream<uint32_t>::loadCounts(std::unordered_map<uint32_t, uint64_t> &rcounts);
+template void inputStream<uint32_t>::loadCounts(std::unordered_map<uint32_t, uint32_t> &rcounts);
 
 template uint64_t
 inputStream<uint32_t>::retrieveBatch(vvec<uint32_t> &td, uint32_t tbatch_size, unsigned int curr_batch, bool shared_table);

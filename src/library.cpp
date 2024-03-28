@@ -44,6 +44,7 @@ Library::Library(const char *library_dirpath,
   _root_size = 0;
   _num_species = _taxonomy_record.tID_to_input().size();
   _num_nodes = _taxonomy_record.get_num_nodes();
+
   if (!_from_library) {
     if (ghc::filesystem::exists(_library_dirpath)) {
       std::cout << "Library directory exists, current files will be overwritten " << _library_dirpath << std::endl;
@@ -58,7 +59,7 @@ Library::Library(const char *library_dirpath,
     std::cout << "Library has been found at the given path " << _library_dirpath << std::endl;
     Library::loadMetadata();
     if (_verbose)
-      std::puts("Given parameters will be ignored, parameters found in library metadata will be used.\n");
+      std::puts("Given parameters will be ignored, parameters found in library metadata will be used");
   }
 
   _lsh_vg = generateMaskLSH(_positions);
@@ -66,7 +67,8 @@ Library::Library(const char *library_dirpath,
   _total_batches = _num_rows / _tbatch_size;
 
   if (_target_batch > _total_batches) {
-    std::cerr << "Given target " << _target_batch << " can not be greater than # of batches " << _total_batches << std::endl;
+    std::cerr << "Given target batch " << _target_batch << " can not be greater than # of batches " << _total_batches
+              << std::endl;
     exit(EXIT_FAILURE);
   }
 
@@ -114,11 +116,11 @@ Library::Library(const char *library_dirpath,
     std::cout << std::endl;
   }
 
-  if (_log || _verbose)
+  if (_log)
     LOG(INFO) << "Total number of (non-distinct) k-mers under the root: " << _root_size << std::endl;
 
   if (_verbose) {
-    std::cout << "Library has been set and k-mers sets are ready to be streamed" << std::endl;
+    std::cout << "Input references has been successfully processed" << std::endl;
   }
 
   if (_verbose) {
@@ -134,11 +136,10 @@ Library::Library(const char *library_dirpath,
     std::cout << "\tNumber of species: " << _num_species << std::endl;
     std::cout << "\tNumber of nodes: " << _num_nodes << std::endl;
     std::cout << "\tTotal number of (non-distinct) kmers: " << _root_size << std::endl;
-    std::cout << std::endl;
   }
 
-  if (_log)
-    LOG(INFO) << "Specified batch is " << static_cast<uint16_t>(_target_batch) << std::endl;
+  if (_verbose && !_only_init)
+    std::cout << "Specified batch is " << static_cast<uint16_t>(_target_batch) << std::endl;
 
   if (_target_batch == 0 || !_from_library) {
     Library::saveMetadata();
@@ -151,11 +152,13 @@ Library::Library(const char *library_dirpath,
   }
 
   if (!_only_init) {
-    if (_update_annotations)
+    if (_update_annotations) {
       Library::annotateInfo();
-    else
+      std::cout << "LCA annotations of k-mers has been updated and saved" << std::endl;
+    } else {
       Library::buildTables();
-    std::cout << "Library has been built and saved" << std::endl;
+      std::cout << "Library has been built and saved" << std::endl;
+    }
   } else {
     std::cout << "Library has been successfully initialized" << std::endl;
   }
@@ -168,6 +171,7 @@ void Library::processLeaf(tT tID_key)
 #pragma omp critical
     LOG(INFO) << "Processing k-mer set for taxon " << _taxonomy_record.taxID_from_tID(tID_key) << std::endl;
   }
+
   inputHandler<encT> pI(filepath_v, _k, _w, _h, &_lsh_vg, &_npositions);
   if (!_from_library) {
     float total_genome_len;
@@ -175,6 +179,7 @@ void Library::processLeaf(tT tID_key)
       total_genome_len = pI.readInput(static_cast<uint64_t>(DEFAULT_BATCH_SIZE));
     else
       total_genome_len = pI.extractInput(1);
+
     uint64_t size_basis = pI.lsh_enc_vec.size();
 #pragma omp critical
     {
@@ -187,20 +192,20 @@ void Library::processLeaf(tT tID_key)
       }
       _root_size += size_basis;
     }
+
     bool is_ok = pI.saveInput(_library_dirpath, tID_key, _total_batches, _tbatch_size);
     if (!is_ok) {
       std::cerr << "Error saving LSH-value and encoding pairs for " << _taxonomy_record.taxID_from_tID(tID_key) << std::endl;
       exit(EXIT_FAILURE);
     }
-    if (_log) {
+
+    if (_log)
 #pragma omp critical
-      LOG(INFO) << "LSH-value and encoding pairs has been saved for " << _taxonomy_record.taxID_from_tID(tID_key) << std::endl;
-    }
+      LOG(INFO) << "LSH and encoding pairs has been saved for " << _taxonomy_record.taxID_from_tID(tID_key) << std::endl;
   }
+
 #pragma omp critical
-  {
-    _inputStream_map.emplace(std::make_pair(tID_key, inputStream<encT>(_library_dirpath, tID_key)));
-  }
+  _inputStream_map.emplace(std::make_pair(tID_key, inputStream<encT>(_library_dirpath, tID_key)));
   pI.clearInput();
 }
 
@@ -209,9 +214,9 @@ void Library::countBasis(HTs<encT> &ts, unsigned int curr_batch)
 #pragma omp parallel for schedule(dynamic), num_threads(num_threads)
   for (unsigned int i = 0; i < _tID_vec.size(); ++i) {
     tT tID_key = _tID_vec[i];
-    std::unordered_map<encT, uint64_t> rcounts;
-    _inputStream_map.at(tID_key).loadCounts(rcounts);
+    std::unordered_map<encT, uint32_t> rcounts;
     std::vector<std::pair<uint32_t, encT>> lsh_enc_vec;
+    _inputStream_map.at(tID_key).loadCounts(rcounts);
     _inputStream_map.at(tID_key).loadBatch(lsh_enc_vec, curr_batch);
     for (unsigned int i = 0; i < lsh_enc_vec.size(); ++i) {
       uint32_t rix = lsh_enc_vec[i].first - (curr_batch - 1) * _tbatch_size;
@@ -241,29 +246,29 @@ void Library::resetInfo(HTs<encT> &ts, bool reset_scount, bool reset_tlca)
 void Library::softLCA(HTs<encT> &ts, unsigned int curr_batch)
 {
   double w = 6.0;
-  unsigned int r = 5;
+  unsigned int r = 3;
 #pragma omp parallel for schedule(dynamic), num_threads(num_threads)
   for (unsigned int i = 0; i < _tID_vec.size(); ++i) {
     tT tID_key = _tID_vec[i];
-    std::unordered_map<encT, uint64_t> rcounts;
-    _inputStream_map.at(tID_key).loadCounts(rcounts);
+    std::unordered_map<encT, uint32_t> rcounts;
     std::vector<std::pair<uint32_t, encT>> lsh_enc_vec;
+    _inputStream_map.at(tID_key).loadCounts(rcounts);
     _inputStream_map.at(tID_key).loadBatch(lsh_enc_vec, curr_batch);
     double p_update, sc;
     for (unsigned int i = 0; i < lsh_enc_vec.size(); ++i) {
       uint32_t rix = lsh_enc_vec[i].first - (curr_batch - 1) * _tbatch_size;
       for (unsigned int j = 0; j < ts.ind_arr[rix]; ++j) {
-        if ((ts.enc_arr[rix * _b + j] == lsh_enc_vec[i].second)) { // && nseen[rix * _b + j]
+        if ((ts.enc_arr[rix * _b + j] == lsh_enc_vec[i].second)) {
           sc = static_cast<double>(rcounts[lsh_enc_vec[i].second]) + 1.0;
-          if (ts.scount_arr[rix * _b + j] <= r)
-            p_update = 1.0;
-          else
+          if (ts.scount_arr[rix * _b + j] <= r) {
+            ts.tlca_arr[rix * _b + j] = _taxonomy_record.getLowestCommonAncestor(ts.tlca_arr[rix * _b + j], tID_key);
+          } else {
             p_update = 1 - pow((1 - 1 / log2(pow((ts.scount_arr[rix * _b + j] - 1) / w, 2) + 2.0)), sc);
-          std::bernoulli_distribution bt(p_update);
+            std::bernoulli_distribution bt(p_update);
 #pragma omp critical
-          {
-            if ((p_update == 1.0) || bt(gen)) {
-              ts.tlca_arr[rix * _b + j] = _taxonomy_record.getLowestCommonAncestor(ts.tlca_arr[rix * _b + j], tID_key);
+            {
+              if (bt(gen))
+                ts.tlca_arr[rix * _b + j] = _taxonomy_record.getLowestCommonAncestor(ts.tlca_arr[rix * _b + j], tID_key);
             }
           }
         }
@@ -291,7 +296,7 @@ void Library::annotateInfo()
       Library::countBasis(ts_root, curr_batch);
       Library::softLCA(ts_root, curr_batch);
       if (_log)
-        LOG(INFO) << "Leaves are counted and k-mers are labeled with soft-LCA" << std::endl;
+        LOG(INFO) << "Leaves are counted and k-mers are annotated with soft-LCA" << std::endl;
       Library::saveBatchHTs(ts_root, curr_batch);
     }
   }
@@ -316,7 +321,7 @@ void Library::buildTables()
       Library::countBasis(ts_root, curr_batch);
       Library::softLCA(ts_root, curr_batch);
       if (_log)
-        LOG(INFO) << "Leaves are counted and k-mers are labeled with soft-LCA" << std::endl;
+        LOG(INFO) << "Leaves are counted and k-mers are annotated with soft-LCA" << std::endl;
       Library::saveBatchHTs(ts_root, curr_batch);
     }
   }
@@ -419,7 +424,7 @@ void Library::getBatchHTs(HTs<encT> *ts, unsigned int curr_batch)
 
 void Library::getBatchHTd(HTd<encT> *td, unsigned int curr_batch)
 {
-  uint64_t curr_taxID = _taxonomy_record.taxID_from_tID(td->tID);
+  uint32_t curr_taxID = _taxonomy_record.taxID_from_tID(td->tID);
   uint64_t num_batch_kmers;
   if (_verbose)
 #pragma omp critical
@@ -513,7 +518,7 @@ bool Library::loadBatchHTs(HTs<encT> &ts, unsigned int curr_batch)
 
   FILE *encf = IO::open_file((load_dirpath + "/enc_arr-" + std::to_string(curr_batch)).c_str(), is_ok, "rb");
   if (std::ferror(encf)) {
-    std::puts("I/O error when reading encoding array from the library\n");
+    std::puts("I/O error when reading encoding array from the library");
     is_ok = false;
   } else
     std::fread(ts.enc_arr, sizeof(encT), _tbatch_size * _b, encf);
@@ -521,7 +526,7 @@ bool Library::loadBatchHTs(HTs<encT> &ts, unsigned int curr_batch)
 
   FILE *indf = IO::open_file((load_dirpath + "/ind_arr-" + std::to_string(curr_batch)).c_str(), is_ok, "rb");
   if (std::ferror(indf)) {
-    std::puts("I/O error when reading indicator array from the library\n");
+    std::puts("I/O error when reading indicator array from the library");
     is_ok = false;
   } else
     std::fread(ts.ind_arr, sizeof(uint8_t), _tbatch_size, indf);
@@ -529,7 +534,7 @@ bool Library::loadBatchHTs(HTs<encT> &ts, unsigned int curr_batch)
 
   FILE *tlcaf = IO::open_file((load_dirpath + "/tlca_arr-" + std::to_string(curr_batch)).c_str(), is_ok, "rb");
   if (std::ferror(tlcaf)) {
-    std::puts("I/O error when reading taxon-LCA array from the library\n");
+    std::puts("I/O error when reading taxon-LCA array from the library");
     is_ok = false;
   } else
     std::fread(ts.tlca_arr, sizeof(tT), _tbatch_size * _b, tlcaf);
@@ -537,7 +542,7 @@ bool Library::loadBatchHTs(HTs<encT> &ts, unsigned int curr_batch)
 
   FILE *scountf = IO::open_file((load_dirpath + "/scount_arr-" + std::to_string(curr_batch)).c_str(), is_ok, "rb");
   if (std::ferror(scountf)) {
-    std::puts("I/O error when reading species-count array from the library\n");
+    std::puts("I/O error when reading species-count array from the library");
     is_ok = false;
   } else
     std::fread(ts.scount_arr, sizeof(tT), _tbatch_size * _b, scountf);
@@ -565,7 +570,7 @@ bool Library::saveBatchHTs(HTs<encT> &ts, unsigned int curr_batch)
     FILE *encf = IO::open_file((save_dirpath + "/enc_arr-" + std::to_string(curr_batch)).c_str(), is_ok, "wb");
     std::fwrite(ts.enc_arr, sizeof(encT), ts.num_rows * ts.b, encf);
     if (std::ferror(encf)) {
-      std::puts("I/O error when writing encoding array to the library.\n");
+      std::puts("I/O error when writing encoding array to the library");
       is_ok = false;
     }
     std::fclose(encf);
@@ -575,7 +580,7 @@ bool Library::saveBatchHTs(HTs<encT> &ts, unsigned int curr_batch)
     FILE *indf = IO::open_file((save_dirpath + "/ind_arr-" + std::to_string(curr_batch)).c_str(), is_ok, "wb");
     std::fwrite(ts.ind_arr, sizeof(uint8_t), ts.num_rows, indf);
     if (std::ferror(indf)) {
-      std::puts("I/O error when writing indicator array to the library.\n");
+      std::puts("I/O error when writing indicator array to the library");
       is_ok = false;
     }
     std::fclose(indf);
@@ -585,7 +590,7 @@ bool Library::saveBatchHTs(HTs<encT> &ts, unsigned int curr_batch)
     FILE *tlcaf = IO::open_file((save_dirpath + "/tlca_arr-" + std::to_string(curr_batch)).c_str(), is_ok, "wb");
     std::fwrite(ts.tlca_arr, sizeof(tT), ts.num_rows * ts.b, tlcaf);
     if (std::ferror(tlcaf)) {
-      std::puts("I/O error when writing taxon-LCA array to the library.\n");
+      std::puts("I/O error when writing taxon-LCA array to the library");
       is_ok = false;
     }
     std::fclose(tlcaf);
@@ -595,7 +600,7 @@ bool Library::saveBatchHTs(HTs<encT> &ts, unsigned int curr_batch)
     FILE *scountf = IO::open_file((save_dirpath + "/scount_arr-" + std::to_string(curr_batch)).c_str(), is_ok, "wb");
     std::fwrite(ts.scount_arr, sizeof(scT), ts.num_rows * ts.b, scountf);
     if (std::ferror(scountf)) {
-      std::puts("I/O error when writing species-count array to the library.\n");
+      std::puts("I/O error when writing species-count array to the library");
       is_ok = false;
     }
     std::fclose(scountf);
@@ -620,7 +625,7 @@ bool Library::loadMetadata()
   std::string save_dirpath(_library_dirpath);
   std::vector<std::pair<tT, uint64_t>> bases_sizes;
   std::vector<std::pair<tT, uint64_t>> tIDs_sizes;
-  std::vector<std::pair<tT, uint64_t>> tIDs_ngenomes;
+  std::vector<std::pair<tT, uint32_t>> tIDs_ngenomes;
   std::vector<std::pair<tT, float>> tIDs_lengths;
 
   FILE *metadata_f = IO::open_file((save_dirpath + "/metadata").c_str(), is_ok, "rb");
@@ -631,8 +636,8 @@ bool Library::loadMetadata()
   std::fread(&_total_batches, sizeof(uint16_t), 1, metadata_f);
   std::fread(&_tbatch_size, sizeof(uint32_t), 1, metadata_f);
   std::fread(&_num_rows, sizeof(uint64_t), 1, metadata_f);
-  std::fread(&_num_species, sizeof(uint64_t), 1, metadata_f);
-  std::fread(&_num_nodes, sizeof(uint64_t), 1, metadata_f);
+  std::fread(&_num_species, sizeof(uint32_t), 1, metadata_f);
+  std::fread(&_num_nodes, sizeof(uint32_t), 1, metadata_f);
   std::fread(&_root_size, sizeof(uint64_t), 1, metadata_f);
 
   bases_sizes.resize(_num_species);
@@ -644,13 +649,13 @@ bool Library::loadMetadata()
 
   std::fread(bases_sizes.data(), sizeof(std::pair<tT, uint64_t>), _num_species, metadata_f);
   std::fread(tIDs_sizes.data(), sizeof(std::pair<tT, uint64_t>), _num_nodes, metadata_f);
-  std::fread(tIDs_ngenomes.data(), sizeof(std::pair<tT, uint64_t>), _num_nodes, metadata_f);
+  std::fread(tIDs_ngenomes.data(), sizeof(std::pair<tT, uint32_t>), _num_nodes, metadata_f);
   std::fread(tIDs_lengths.data(), sizeof(std::pair<tT, float>), _num_nodes, metadata_f);
   std::fread(_positions.data(), sizeof(uint8_t), _positions.size(), metadata_f);
   std::fread(_npositions.data(), sizeof(uint8_t), _npositions.size(), metadata_f);
 
   if (std::ferror(metadata_f)) {
-    std::puts("I/O error when reading metadata file from the library.\n");
+    std::puts("I/O error when reading metadata file from the library");
     is_ok = false;
   }
   std::fclose(metadata_f);
@@ -687,7 +692,7 @@ bool Library::saveMetadata()
 
   std::vector<std::pair<tT, uint64_t>> bases_sizes(_basis_to_size.begin(), _basis_to_size.end());
   std::vector<std::pair<tT, uint64_t>> tIDs_sizes(_tID_to_size.begin(), _tID_to_size.end());
-  std::vector<std::pair<tT, uint64_t>> tIDs_ngenomes(_tID_to_ngenomes.begin(), _tID_to_ngenomes.end());
+  std::vector<std::pair<tT, uint32_t>> tIDs_ngenomes(_tID_to_ngenomes.begin(), _tID_to_ngenomes.end());
   std::vector<std::pair<tT, float>> tIDs_lengths(_tID_to_length.begin(), _tID_to_length.end());
 
   assert(_basis_to_size.size() == _num_species);
@@ -703,18 +708,18 @@ bool Library::saveMetadata()
   std::fwrite(&_total_batches, sizeof(uint16_t), 1, metadata_f);
   std::fwrite(&_tbatch_size, sizeof(uint32_t), 1, metadata_f);
   std::fwrite(&_num_rows, sizeof(uint64_t), 1, metadata_f);
-  std::fwrite(&_num_species, sizeof(uint64_t), 1, metadata_f);
-  std::fwrite(&_num_nodes, sizeof(uint64_t), 1, metadata_f);
+  std::fwrite(&_num_species, sizeof(uint32_t), 1, metadata_f);
+  std::fwrite(&_num_nodes, sizeof(uint32_t), 1, metadata_f);
   std::fwrite(&_root_size, sizeof(uint64_t), 1, metadata_f);
   std::fwrite(bases_sizes.data(), sizeof(std::pair<tT, uint64_t>), bases_sizes.size(), metadata_f);
   std::fwrite(tIDs_sizes.data(), sizeof(std::pair<tT, uint64_t>), tIDs_sizes.size(), metadata_f);
-  std::fwrite(tIDs_ngenomes.data(), sizeof(std::pair<tT, uint64_t>), tIDs_ngenomes.size(), metadata_f);
+  std::fwrite(tIDs_ngenomes.data(), sizeof(std::pair<tT, uint32_t>), tIDs_ngenomes.size(), metadata_f);
   std::fwrite(tIDs_lengths.data(), sizeof(std::pair<tT, float>), tIDs_lengths.size(), metadata_f);
   std::fwrite(_positions.data(), sizeof(uint8_t), _positions.size(), metadata_f);
   std::fwrite(_npositions.data(), sizeof(uint8_t), _npositions.size(), metadata_f);
 
   if (std::ferror(metadata_f)) {
-    std::puts("I/O error when writing metadata file to the library.\n");
+    std::puts("I/O error when writing metadata file to the library");
     is_ok = false;
   }
   std::fclose(metadata_f);

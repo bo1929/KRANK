@@ -43,7 +43,7 @@ Query::Query(std::vector<std::string> library_dirpaths,
     }
   }
 
-  std::unordered_map<uint64_t, uint64_t> taxIDs_to_libcounts;
+  std::unordered_map<uint32_t, uint32_t> taxIDs_to_libcounts;
   for (unsigned int i = 0; i < _num_libraries; ++i) {
     for (auto &kv : _slib_ptr_v[i]->_tID_to_length) {
       taxIDs_to_libcounts[_slib_ptr_v[i]->_tID_to_taxID[kv.first]]++;
@@ -78,8 +78,8 @@ Query::Query(std::vector<std::string> library_dirpaths,
   }
 }
 
-void Query::postprocessProfile(std::unordered_map<uint64_t, float> &query_corrected_profile,
-                               std::unordered_map<uint64_t, float> &query_acc_profile)
+void Query::postprocessProfile(std::unordered_map<uint32_t, float> &query_corrected_profile,
+                               std::unordered_map<uint32_t, float> &query_acc_profile)
 {
   std::unordered_map<std::string, float> rank_sum, rank_crsum;
   for (auto &kv : query_acc_profile) {
@@ -91,14 +91,13 @@ void Query::postprocessProfile(std::unordered_map<uint64_t, float> &query_correc
   for (auto &kv : query_acc_profile) {
     std::string tmp_rank = _rank_inmap[kv.first];
     tmp_rank = tmp_rank == "no rank" ? tmp_rank + std::to_string(_depth_inmap[kv.first]) : tmp_rank;
-    query_corrected_profile[kv.first] =
-      kv.second * _taxID_to_length[kv.first] / rank_crsum[tmp_rank] * rank_sum[tmp_rank];
+    query_corrected_profile[kv.first] = kv.second * _taxID_to_length[kv.first] / rank_crsum[tmp_rank] * rank_sum[tmp_rank];
   }
 }
 
-void Query::profileBatch(std::unordered_map<uint64_t, float> &query_acc_profile, std::vector<tvote_info_t> &tvinfo_vec)
+void Query::profileBatch(std::unordered_map<uint32_t, float> &query_acc_profile, std::vector<tvote_info_t> &tvinfo_vec)
 {
-  uint64_t curr_taxID;
+  uint32_t curr_taxID;
   std::string curr_rank, curr_name;
   for (auto &vi : tvinfo_vec) {
     curr_taxID = vi.pred_taxID;
@@ -113,15 +112,15 @@ void Query::profileBatch(std::unordered_map<uint64_t, float> &query_acc_profile,
 
 void Query::classifyBatch(std::vector<tvote_info_t> &tvinfo_vec,
                           vec_str &names_vec,
-                          vvec_uint64 &tlca_vec_or,
-                          vvec_uint64 &tlca_vec_rc,
+                          vvec_uint32 &tlca_vec_or,
+                          vvec_uint32 &tlca_vec_rc,
                           vvec_uint8 &hdist_vec_or,
                           vvec_uint8 &hdist_vec_rc)
 {
 #pragma omp parallel for num_threads(num_threads), schedule(static)
   for (std::size_t ix = 0; ix < names_vec.size(); ++ix) {
-    std::unordered_map<uint64_t, float> tvotes_map_or, tvotes_map_rc;
-    uint64_t curr_tID;
+    std::unordered_map<uint32_t, float> tvotes_map_or, tvotes_map_rc;
+    uint32_t curr_tID;
     for (std::size_t j = 0; j < tlca_vec_or[ix].size(); ++j) {
       float vote = pow((1 - static_cast<float>(hdist_vec_or[ix][j]) / static_cast<float>(_k)), _k);
       curr_tID = tlca_vec_or[ix][j];
@@ -140,8 +139,8 @@ void Query::classifyBatch(std::vector<tvote_info_t> &tvinfo_vec,
         tvotes_map_rc[curr_tID] += vote;
       }
     }
-    if ((tlca_vec_rc[ix].size() + tlca_vec_rc[ix].size()) > 0) {
-      std::unordered_map<uint64_t, float> tvotes_map =
+    if ((tlca_vec_or[ix].size() + tlca_vec_rc[ix].size()) > 0) {
+      std::unordered_map<uint32_t, float> tvotes_map =
         (tvotes_map_rc[ROOT] > tvotes_map_or[ROOT]) ? tvotes_map_rc : tvotes_map_or;
       float majority_th = tvotes_map[ROOT] / 2;
       for (auto &kv : tvotes_map) {
@@ -157,8 +156,8 @@ void Query::classifyBatch(std::vector<tvote_info_t> &tvinfo_vec,
 
 void Query::processBatch(std::vector<sseq_t> &seqBatch,
                          vec_str &names_vec,
-                         vvec_uint64 &tlca_vec_or,
-                         vvec_uint64 &tlca_vec_rc,
+                         vvec_uint32 &tlca_vec_or,
+                         vvec_uint32 &tlca_vec_rc,
                          vvec_uint8 &hdist_vec_or,
                          vvec_uint8 &hdist_vec_rc)
 {
@@ -166,15 +165,14 @@ void Query::processBatch(std::vector<sseq_t> &seqBatch,
   for (std::size_t ix = 0; ix < seqBatch.size(); ++ix) {
     std::vector<uint8_t> hdist_vor;
     std::vector<uint8_t> hdist_vrc;
-    std::vector<uint64_t> tlca_vor;
-    std::vector<uint64_t> tlca_vrc;
+    std::vector<uint32_t> tlca_vor;
+    std::vector<uint32_t> tlca_vrc;
     names_vec[ix] = seqBatch[ix].name;
     std::string kmer_seq;
     unsigned int kix, mi, cc;
     uint32_t rix;
     uint32_t enc32_lr, enc32_bp;
     uint64_t enc64_bp, enc64_lr, cenc64_bp, cenc64_lr;
-    ;
     uint8_t min_dist, closest_di;
     if (seqBatch[ix].len > _k) {
       for (kix = mi = 0; kix < seqBatch[ix].len; ++kix) {
@@ -306,7 +304,7 @@ void Query::perform(uint64_t rbatch_size)
     kseq_t *reader = IO::getReader(_queryID_to_path[queryID].c_str());
     rbatch_size = IO::adjustBatchSize(rbatch_size, num_threads);
     std::vector<sseq_t> seqBatch;
-    std::unordered_map<uint64_t, float> query_acc_profile;
+    std::unordered_map<uint32_t, float> query_acc_profile;
     IO::readBatch(seqBatch, reader, rbatch_size);
     uint64_t tnum_reads = 0;
     if (_log)
@@ -316,8 +314,8 @@ void Query::perform(uint64_t rbatch_size)
       vec_str names_vec(seqBatch.size());
       vvec_uint8 hdist_vec_or(seqBatch.size());
       vvec_uint8 hdist_vec_rc(seqBatch.size());
-      vvec_uint64 tlca_vec_or(seqBatch.size());
-      vvec_uint64 tlca_vec_rc(seqBatch.size());
+      vvec_uint32 tlca_vec_or(seqBatch.size());
+      vvec_uint32 tlca_vec_rc(seqBatch.size());
       Query::processBatch(seqBatch, names_vec, tlca_vec_or, tlca_vec_rc, hdist_vec_or, hdist_vec_rc);
       Query::classifyBatch(tvinfo_vec, names_vec, tlca_vec_or, tlca_vec_rc, hdist_vec_or, hdist_vec_rc);
       Query::profileBatch(query_acc_profile, tvinfo_vec);
@@ -359,14 +357,14 @@ void Query::perform(uint64_t rbatch_size)
 
     std::string curr_rank, curr_name;
     ofs_aprofile << "RANK\tTAXON_ID\tTAXON_NAME\tREAD_COUNT\tREAD_ABUNDANCE\tCELL_ABUNDANCE" << std::endl;
-    std::vector<std::pair<uint64_t, float>> query_profile(query_acc_profile.begin(), query_acc_profile.end());
+    std::vector<std::pair<uint32_t, float>> query_profile(query_acc_profile.begin(), query_acc_profile.end());
     std::sort(query_profile.begin(),
               query_profile.end(),
-              [](const std::pair<uint64_t, float> &l, const std::pair<uint64_t, float> &r) { return l.second < r.second; });
+              [](const std::pair<uint32_t, float> &l, const std::pair<uint32_t, float> &r) { return l.second < r.second; });
     for (auto &kv : query_acc_profile) {
       query_acc_profile[kv.first] = kv.second / tnum_reads;
     }
-    std::unordered_map<uint64_t, float> query_corrected_profile;
+    std::unordered_map<uint32_t, float> query_corrected_profile;
     postprocessProfile(query_corrected_profile, query_acc_profile);
     for (auto &tc : query_profile) {
       ofs_aprofile << _rank_inmap[tc.first] << "\t" << tc.first << "\t" << _name_inmap[tc.first];
@@ -452,6 +450,7 @@ Query::QLibrary::QLibrary(const char *library_dirpath, bool log)
         LOG(INFO) << "Library has been loaded into the memory: " << i << "/" << _total_batches << std::endl;
     }
   }
+
   std::cout << "Library is loaded and ready for performing queries" << std::endl;
   std::cout << "Details:" << std::endl;
   std::cout << "\tLength of the k-mer, k: " << std::to_string(_k) << std::endl;
@@ -462,7 +461,6 @@ Query::QLibrary::QLibrary(const char *library_dirpath, bool log)
   std::cout << "\tTotal number of rows: " << _num_rows << std::endl;
   std::cout << "\tNumber of species: " << _num_species << std::endl;
   std::cout << "\tTotal number of (non-unique) kmers: " << _root_size << std::endl;
-  std::cout << std::endl;
 
   if (_log) {
     std::map<uint8_t, uint64_t> hist_map;
@@ -488,7 +486,7 @@ bool Query::QLibrary::loadMetadata()
 
   std::vector<std::pair<tT, uint64_t>> bases_sizes;
   std::vector<std::pair<tT, uint64_t>> tIDs_sizes;
-  std::vector<std::pair<tT, uint64_t>> tIDs_ngenomes;
+  std::vector<std::pair<tT, uint32_t>> tIDs_ngenomes;
   std::vector<std::pair<tT, float>> tIDs_lengths;
 
   FILE *metadata_f = IO::open_file((load_dirpath + "/metadata").c_str(), is_ok, "rb");
@@ -499,8 +497,8 @@ bool Query::QLibrary::loadMetadata()
   std::fread(&_total_batches, sizeof(uint16_t), 1, metadata_f);
   std::fread(&_tbatch_size, sizeof(uint32_t), 1, metadata_f);
   std::fread(&_num_rows, sizeof(uint64_t), 1, metadata_f);
-  std::fread(&_num_species, sizeof(uint64_t), 1, metadata_f);
-  std::fread(&_num_nodes, sizeof(uint64_t), 1, metadata_f);
+  std::fread(&_num_species, sizeof(uint32_t), 1, metadata_f);
+  std::fread(&_num_nodes, sizeof(uint32_t), 1, metadata_f);
   std::fread(&_root_size, sizeof(uint64_t), 1, metadata_f);
 
   bases_sizes.resize(_num_species);
@@ -512,7 +510,7 @@ bool Query::QLibrary::loadMetadata()
 
   std::fread(bases_sizes.data(), sizeof(std::pair<tT, uint64_t>), _num_species, metadata_f);
   std::fread(tIDs_sizes.data(), sizeof(std::pair<tT, uint64_t>), _num_nodes, metadata_f);
-  std::fread(tIDs_ngenomes.data(), sizeof(std::pair<tT, uint64_t>), _num_nodes, metadata_f);
+  std::fread(tIDs_ngenomes.data(), sizeof(std::pair<tT, uint32_t>), _num_nodes, metadata_f);
   std::fread(tIDs_lengths.data(), sizeof(std::pair<tT, float>), _num_nodes, metadata_f);
   std::fread(_positions.data(), sizeof(uint8_t), _positions.size(), metadata_f);
   std::fread(_npositions.data(), sizeof(uint8_t), _npositions.size(), metadata_f);
@@ -552,26 +550,25 @@ bool Query::QLibrary::loadTaxonomy()
   if (_log)
     LOG(INFO) << "Loading taxonomy data and records of the library" << std::endl;
   std::string load_dirpath(_library_dirpath);
-  std::vector<std::pair<tT, uint64_t>> tIDs_taxIDs;
-  std::vector<std::pair<uint64_t, uint64_t>> taxIDs_parents;
-  std::vector<std::pair<uint64_t, uint8_t>> taxIDs_depths;
+  std::vector<std::pair<tT, uint32_t>> tIDs_taxIDs;
+  std::vector<std::pair<uint32_t, uint32_t>> taxIDs_parents;
+  std::vector<std::pair<uint32_t, uint8_t>> taxIDs_depths;
 
   FILE *taxonomy_f = IO::open_file((load_dirpath + "/taxonomy").c_str(), is_ok, "rb");
   std::fread(&_tax_num_nodes, sizeof(tT), 1, taxonomy_f);
-  std::fread(&_tax_full_size, sizeof(uint64_t), 1, taxonomy_f);
-  std::fread(&_tax_num_input, sizeof(uint64_t), 1, taxonomy_f);
+  std::fread(&_tax_num_input, sizeof(uint32_t), 1, taxonomy_f);
 
   tIDs_taxIDs.resize(_tax_num_nodes);
   _tax_parent_vec.resize(_tax_num_nodes);
   _tax_depth_vec.resize(_tax_num_nodes);
-  taxIDs_parents.resize(_tax_full_size);
-  taxIDs_depths.resize(_tax_full_size);
+  taxIDs_parents.resize(_tax_num_nodes);
+  taxIDs_depths.resize(_tax_num_nodes);
 
   std::fread(_tax_parent_vec.data(), sizeof(tT), _tax_num_nodes, taxonomy_f);
   std::fread(_tax_depth_vec.data(), sizeof(uint8_t), _tax_num_nodes, taxonomy_f);
-  std::fread(tIDs_taxIDs.data(), sizeof(std::pair<tT, uint64_t>), _tax_num_nodes, taxonomy_f);
-  std::fread(taxIDs_parents.data(), sizeof(std::pair<uint64_t, uint64_t>), _tax_full_size, taxonomy_f);
-  std::fread(taxIDs_depths.data(), sizeof(std::pair<uint64_t, uint8_t>), _tax_full_size, taxonomy_f);
+  std::fread(tIDs_taxIDs.data(), sizeof(std::pair<tT, uint32_t>), _tax_num_nodes, taxonomy_f);
+  std::fread(taxIDs_parents.data(), sizeof(std::pair<uint32_t, uint32_t>), _tax_num_nodes, taxonomy_f);
+  std::fread(taxIDs_depths.data(), sizeof(std::pair<uint32_t, uint8_t>), _tax_num_nodes, taxonomy_f);
 
   for (auto kv : tIDs_taxIDs)
     _tID_to_taxID[kv.first] = kv.second;
@@ -580,18 +577,18 @@ bool Query::QLibrary::loadTaxonomy()
   for (auto kv : taxIDs_depths)
     _depth_inmap[kv.first] = kv.second;
 
-  uint64_t curr_taxID;
+  uint32_t curr_taxID;
   size_t curr_size_str;
   std::string curr_name, curr_rank;
-  for (unsigned int i = 0; i < _tax_full_size; ++i) {
-    std::fread(&curr_taxID, sizeof(uint64_t), 1, taxonomy_f);
+  for (unsigned int i = 0; i < _tax_num_nodes; ++i) {
+    std::fread(&curr_taxID, sizeof(uint32_t), 1, taxonomy_f);
     std::fread(&curr_size_str, sizeof(size_t), 1, taxonomy_f);
     curr_rank.resize(curr_size_str);
     std::fread(&curr_rank[0], sizeof(char), curr_size_str, taxonomy_f);
     _rank_inmap[curr_taxID] = curr_rank;
   }
-  for (unsigned int i = 0; i < _tax_full_size; ++i) {
-    std::fread(&curr_taxID, sizeof(uint64_t), 1, taxonomy_f);
+  for (unsigned int i = 0; i < _tax_num_nodes; ++i) {
+    std::fread(&curr_taxID, sizeof(uint32_t), 1, taxonomy_f);
     std::fread(&curr_size_str, sizeof(size_t), 1, taxonomy_f);
     curr_name.resize(curr_size_str);
     std::fread(&curr_name[0], sizeof(char), curr_size_str, taxonomy_f);

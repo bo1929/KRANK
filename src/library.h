@@ -56,10 +56,10 @@ private:
   std::unordered_map<tT, size_t> _basis_to_ninput;
   std::unordered_map<tT, uint64_t> _tID_to_size;
   std::unordered_map<tT, float> _tID_to_length;
-  std::unordered_map<tT, uint64_t> _tID_to_ngenomes;
+  std::unordered_map<tT, uint32_t> _tID_to_ngenomes;
   std::vector<tT> _tID_vec;
-  uint64_t _num_species;
-  uint64_t _num_nodes;
+  uint32_t _num_species;
+  uint32_t _num_nodes;
   bool _from_library;
   bool _input_kmers;
   uint16_t _target_batch;

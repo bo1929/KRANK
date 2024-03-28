@@ -91,7 +91,7 @@ struct inputStream
   {
   }
   void loadBatch(std::vector<std::pair<uint32_t, encT>> &lsh_enc_vec, unsigned int curr_batch);
-  void loadCounts(std::unordered_map<encT, uint64_t> &rcounts);
+  void loadCounts(std::unordered_map<encT, uint32_t> &rcounts);
   uint64_t retrieveBatch(vvec<encT> &td, uint32_t tbatch_size, unsigned int curr_batch, bool shared_table = false);
 };
 
