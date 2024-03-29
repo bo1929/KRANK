@@ -19,7 +19,8 @@ int main(int argc, char **argv)
       gen.seed(seed);
   });
 
-  CLI::App *sub_build = app.add_subcommand("build", "Builds a referenece library with given k-mers sets.");
+  CLI::App *sub_build =
+    app.add_subcommand("build", "Builds a referenece library with given k-mers sets or reference genomes.");
   std::string library_dir;
   sub_build->add_option("-l,--library-dir", library_dir, "Path to the directory containing the library.")
     ->required()
