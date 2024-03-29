@@ -1,5 +1,6 @@
 # KRANK
 :bangbang: This tutorial and examples are outdated, and will be updated soon. :bangbang:
+
 ## Quickstart
 KRANK consists of two main subprograms: `build` and `query`.
 You can extract *k*-mer sets from input sequences, and build a KRANK library using `krank build [OPTIONS]`.
@@ -8,8 +9,9 @@ Running `krank --help` will display available subprograms together with brief de
 
 ### Building a KRANK library
 Please run `krank build --help` to see all options and defaults.
-KRANK requires two input files: a taxonomy and a mapping from taxon IDs to paths of input sequences.
-The path to the directory in which the krank library will be initialized, built, or updated must be stated with `--library-dir` or `-l`.
+KRANK requires two input files: a taxonomy and a mapping from taxon IDs to file paths (or FTP URLs) of input sequences.
+For both URLs and files, the input can be `gzip` compressed.
+The path to the directory in which the krank library will be created, (or updated) must be stated with `--library-dir` or `-l`.
 
 #### Input sequences
 The input sequences could be assembled genomes (contigs or reads are also possible).
@@ -109,7 +111,7 @@ Initialization and library building can be done in a single command, only if all
 This can be achieved by running the above command with `--target-batch 0` without the `--from-library` flag.
 
 ## Usage
-Running `krank`, `krank build` and `krank query` with `--help` will give you the list of options, their description and default values.
+Running `krank`, `krank build`, and `krank query` with `--help` will give you the list of options, their description and default values.
 
 ### `krank`
 ```
@@ -132,7 +134,6 @@ The option `--log` may output considerably many log messages and is probably not
 It would be helpful to include logs while creating a new issue.
 The default verbosity should be sufficient.
 
->>>>>>> 9f5ff3a (Updated README.)
 ### `krank build`
 ```
 Usage: ./krank build [OPTIONS]
@@ -174,7 +175,7 @@ Options:
                               Then, KRANK would only initialize the library.
                               Default --build-tables selects k-mers, builds tables, and also computes soft LCAs.
 ```
-To emulate CONSULT-II and to skip hierarchical *k*-mer selection step (which is only suggested if you have large number of reference genomes), use `--fast-mode`.
+To emulate CONSULT-II and to skip the hierarchical *k*-mer selection step (which is only suggested if you have a large number of reference genomes), use `--fast-mode`.
 Otherwise, to gradually filter some *k*-mers to fit your input to the library size specified, use `--selection-mode`.
 
 ### `krank query`
