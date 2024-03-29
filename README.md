@@ -111,6 +111,28 @@ This can be achieved by running the above command with `--target-batch 0` withou
 ## Usage
 Running `krank`, `krank build` and `krank query` with `--help` will give you the list of options, their description and default values.
 
+### `krank`
+```
+Memory-bound and accurate taxonomic classification and profiling.
+Usage: ./krank [OPTIONS] SUBCOMMAND
+
+Options:
+  --help
+  --log,--no-log{false}       Extensive logging, might be too much and helpful for troubleshooting.
+  --verbose,--no-verbose{false}
+                              Increased verbosity and progress report.
+  --seed INT                  Random seed for the LSH and other parts that require randomness.
+
+Subcommands:
+  build                       Builds a referenece library with given k-mers sets or reference genomes.
+  query                       Performs query with respect to a given referenece library.
+
+```
+The option `--log` may output considerably many log messages and is probably not useful unless you have an error.
+It would be helpful to include logs while creating a new issue.
+The default verbosity should be sufficient.
+
+>>>>>>> 9f5ff3a (Updated README.)
 ### `krank build`
 ```
 Usage: ./krank build [OPTIONS]
@@ -139,10 +161,21 @@ Options:
                               Use size constraint heuristic while gradually building the library.
   --num-threads UINT          Number of threads to use for OpenMP based parallelism.
   --fast-mode,--selection-mode{false}
-                              The default mode is --selection-mode which traverses the taxonomy, and selects k-mers accordingly. When --fast-mode is given, tree traversal will be skipped, and the final library will be built at the root. With --kmer-ranking random_kmer, this is equivalent to CONSULT-II. If --fast-mode is given, --adaptive-size will be ignored and has no effect. Note  --fast-mode is significantly faster.
+                              The default mode is --selection-mode which traverses the taxonomy, and selects k-mers accordingly.
+                              When --fast-mode is given, tree traversal will be skipped, and the final library will be built at the root.
+                              With --kmer-ranking random_kmer, this is equivalent to CONSULT-II.
+                              If --fast-mode is given, --adaptive-size will be ignored and has no effect.
+                              Note  --fast-mode is significantly faster.
   --update-annotations,--build-tables{false}
-                              When --update-annotations is given, KRANK tries to update soft LCAs of k-mers by going over reference genomes. This will be done without rebuilding the tables, hence it would be quite fast. This might be particularly useful when parameters for soft LCA is changed. Without a target batch given (using --target-batch), both options would be ignored. Then, KRANK would only initialize the library. Default --build-tables selects k-mers, builds tables, and also computes soft LCAs.
+                              When --update-annotations is given, KRANK tries to update soft LCAs of k-mers by going over reference genomes.
+                              This will be done without rebuilding the tables, hence it would be quite fast.
+                              This might be particularly useful when parameters for soft LCA is changed.
+                              Without a target batch given (using --target-batch), both options would be ignored.
+                              Then, KRANK would only initialize the library.
+                              Default --build-tables selects k-mers, builds tables, and also computes soft LCAs.
 ```
+To emulate CONSULT-II and to skip hierarchical *k*-mer selection step (which is only suggested if you have large number of reference genomes), use `--fast-mode`.
+Otherwise, to gradually filter some *k*-mers to fit your input to the library size specified, use `--selection-mode`.
 
 ### `krank query`
 ```
