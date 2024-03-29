@@ -8,6 +8,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstddef>
+#include <curl/curl.h>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -26,6 +27,7 @@
 #include <numeric>
 #include <ostream>
 #include <random>
+#include <regex>
 #include <set>
 #include <sstream>
 #include <stdio.h>
@@ -35,12 +37,10 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <type_traits>
-#include <type_traits>
 #include <unistd.h>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
-#include <regex>
 #include <vector>
 #include <zlib.h>
 
@@ -50,7 +50,7 @@
   #warning "OpenMP not found, multi-threading will be DISABLED and --num-threads option will be ignored!"
 #endif
 
-#define VERSION "v0.3.0"
+#define VERSION "v0.3.1"
 #define PRINT_VERSION printf("KRANK version: " VERSION "\n");
 
 #define LNUM_TASKS 8

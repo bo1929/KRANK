@@ -106,7 +106,6 @@ struct HTs
     tIDsBasis = rhs.tIDsBasis;
     return *this;
   }
-
   ~HTs(void)
   {
     delete[] enc_arr;
@@ -181,17 +180,17 @@ struct HTd
   void updateAfter(std::unordered_map<encT, scT> &scount_map, std::unordered_map<encT, tT> &tlca_map, uint32_t rix);
   void accumulateCounts(std::unordered_map<encT, scT> &scount_map, HTd<encT> &child, uint32_t rix);
   void getScores(std::vector<float> &scores_vec, uint32_t rix);
-  void selectCoverage(std::vector<size_t> &ixs, uint32_t rix, size_t b_max);
-  void unionRows(HTd<encT> &child, bool update_size = true);
-  void makeUnique(bool update_size = true);
-  void trimColumns(size_t b_max);
-  void pruneColumns(size_t b_max);
-  void shrinkHT(uint64_t num_rm, size_t b_max);
-  void convertHTs(HTs<encT> *new_table);
-  void initBasis(tT tID);
-  void updateLCA();
   void filterLSR(std::vector<uint8_t> &depth_vec, uint8_t slr_depth);
   void getRowOrdering(std::vector<unsigned int> &row_order, bool reverse);
+  void selectCoverage(std::vector<size_t> &ixs, uint32_t rix, size_t b_max);
+  void unionRows(HTd<encT> &child, bool update_size = true);
+  void shrinkHT(uint64_t num_rm, size_t b_max);
+  void makeUnique(bool update_size = true);
+  void convertHTs(HTs<encT> *new_table);
+  void trimColumns(size_t b_max);
+  void pruneColumns(size_t b_max);
+  void initBasis(tT tID);
+  void updateLCA();
   std::map<size_t, uint64_t> histRowSizes();
 };
 

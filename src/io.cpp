@@ -251,6 +251,7 @@ float inputHandler<encT>::extractInput(uint64_t rbatch_size)
       std::cout << "Downloading: " << filepath_v[fix] << std::endl;
       filepath = IO::downloadURL(filepath_v[fix]);
     } else {
+      std::cout << "Reading: " << filepath_v[fix] << std::endl;
       filepath = filepath_v[fix];
     }
     kseq_t *reader = IO::getReader(filepath.c_str());
@@ -500,12 +501,6 @@ bool IO::ensureDirectory(const char *dirpath)
   }
   return is_ok;
 }
-#include <curl/curl.h>
-/* For older cURL versions you will also need 
-#include <curl/types.h>
-#include <curl/easy.h>
-*/
-#include <string>
 
 size_t IO::writeData(void *ptr, size_t size, size_t nmemb, FILE *stream)
 {
@@ -515,9 +510,10 @@ size_t IO::writeData(void *ptr, size_t size, size_t nmemb, FILE *stream)
 
 std::string IO::downloadURL(std::string url)
 {
-  char tmp_input_path[FILENAME_MAX] = "/tmp/seq.XXXXXX";
+  char tmp_input_path[FILENAME_MAX] = "/tmp/seq";
   const char *sx = std::to_string(gp_hash(url)).c_str();
   strcat(tmp_input_path, sx);
+  strcat(tmp_input_path, ".XXXXXX");
   int tmp_fd = mkstemp(tmp_input_path);
   CURL *curl;
   FILE *fp;

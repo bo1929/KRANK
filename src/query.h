@@ -27,11 +27,19 @@ public:
         bool save_match_info = true,
         bool verbose = false,
         bool log = false);
-  void perform(uint64_t rbatch_size = DEFAULT_BATCH_SIZE);
-  void postprocessProfile(std::unordered_map<uint32_t, float> &query_corrected_profile,
-                          std::unordered_map<uint32_t, float> &query_acc_profile);
-  void profileBatch(std::unordered_map<uint32_t, float> &query_acc_profile, std::vector<tvote_info_t> &tvinfo_vec);
-  void classifyBatch(std::vector<tvote_info_t> &tvinfo_vec,
+  ~Query(void)
+  {
+    for (unsigned int i = 0; i < _num_libraries; ++i) {
+      delete[] _slib_ptr_v[i]->_enc_arr;
+      /* delete[] _slib_ptr_v[i]->_scount_arr; */
+      delete[] _slib_ptr_v[i]->_tlca_arr;
+      delete[] _slib_ptr_v[i]->_ind_arr;
+    }
+  }
+  void postprocessProfile(std::unordered_map<uint32_t, float> &profile_corrected,
+                          std::unordered_map<uint32_t, float> &profile_accumulated);
+  void profileBatch(std::unordered_map<uint32_t, float> &profile_accumulated, std::vector<tvote_info_t> &total_vinfo_v);
+  void classifyBatch(std::vector<tvote_info_t> &total_vinfo_v,
                      vec_str &names_vec,
                      vvec_uint32 &tlca_vec_or,
                      vvec_uint32 &tlca_vec_rc,
@@ -55,15 +63,7 @@ public:
     }
     return a;
   }
-  ~Query(void)
-  {
-    for (unsigned int i = 0; i < _num_libraries; ++i) {
-      delete[] _slib_ptr_v[i]->_enc_arr;
-      /* delete[] _slib_ptr_v[i]->_scount_arr; */
-      delete[] _slib_ptr_v[i]->_tlca_arr;
-      delete[] _slib_ptr_v[i]->_ind_arr;
-    }
-  }
+  void perform(uint64_t rbatch_size = DEFAULT_BATCH_SIZE);
 
 private:
   struct QLibrary

@@ -1,6 +1,5 @@
 #include "query.h"
 #include "common.h"
-#include <unordered_set>
 
 #define ROOT 1
 
@@ -78,39 +77,39 @@ Query::Query(std::vector<std::string> library_dirpaths,
   }
 }
 
-void Query::postprocessProfile(std::unordered_map<uint32_t, float> &query_corrected_profile,
-                               std::unordered_map<uint32_t, float> &query_acc_profile)
+void Query::postprocessProfile(std::unordered_map<uint32_t, float> &profile_corrected,
+                               std::unordered_map<uint32_t, float> &profile_accumulated)
 {
   std::unordered_map<std::string, float> rank_sum, rank_crsum;
-  for (auto &kv : query_acc_profile) {
+  for (auto &kv : profile_accumulated) {
     std::string tmp_rank = _rank_inmap[kv.first];
     tmp_rank = tmp_rank == "no rank" ? tmp_rank + std::to_string(_depth_inmap[kv.first]) : tmp_rank;
     rank_sum[tmp_rank] += kv.second;
     rank_crsum[tmp_rank] += kv.second * _taxID_to_length[kv.first];
   }
-  for (auto &kv : query_acc_profile) {
+  for (auto &kv : profile_accumulated) {
     std::string tmp_rank = _rank_inmap[kv.first];
     tmp_rank = tmp_rank == "no rank" ? tmp_rank + std::to_string(_depth_inmap[kv.first]) : tmp_rank;
-    query_corrected_profile[kv.first] = kv.second * _taxID_to_length[kv.first] / rank_crsum[tmp_rank] * rank_sum[tmp_rank];
+    profile_corrected[kv.first] = kv.second * _taxID_to_length[kv.first] / rank_crsum[tmp_rank] * rank_sum[tmp_rank];
   }
 }
 
-void Query::profileBatch(std::unordered_map<uint32_t, float> &query_acc_profile, std::vector<tvote_info_t> &tvinfo_vec)
+void Query::profileBatch(std::unordered_map<uint32_t, float> &profile_accumulated, std::vector<tvote_info_t> &total_vinfo_v)
 {
   uint32_t curr_taxID;
   std::string curr_rank, curr_name;
-  for (auto &vi : tvinfo_vec) {
+  for (auto &vi : total_vinfo_v) {
     curr_taxID = vi.pred_taxID;
     if ((curr_taxID != 0) && (vi.tvote_n > _tvote_threshold)) {
       while (curr_taxID != 0) {
-        query_acc_profile[curr_taxID] += 1.0;
+        profile_accumulated[curr_taxID] += 1.0;
         curr_taxID = _parent_inmap[curr_taxID];
       }
     }
   }
 }
 
-void Query::classifyBatch(std::vector<tvote_info_t> &tvinfo_vec,
+void Query::classifyBatch(std::vector<tvote_info_t> &total_vinfo_v,
                           vec_str &names_vec,
                           vvec_uint32 &tlca_vec_or,
                           vvec_uint32 &tlca_vec_rc,
@@ -140,14 +139,14 @@ void Query::classifyBatch(std::vector<tvote_info_t> &tvinfo_vec,
       }
     }
     if ((tlca_vec_or[ix].size() + tlca_vec_rc[ix].size()) > 0) {
-      std::unordered_map<uint32_t, float> tvotes_map =
+      std::unordered_map<uint32_t, float> &tvotes_map =
         (tvotes_map_rc[ROOT] > tvotes_map_or[ROOT]) ? tvotes_map_rc : tvotes_map_or;
       float majority_th = tvotes_map[ROOT] / 2;
       for (auto &kv : tvotes_map) {
-        if ((kv.second > majority_th) && (_depth_inmap[kv.first] > _depth_inmap[tvinfo_vec[ix].pred_taxID])) {
-          tvinfo_vec[ix].pred_taxID = kv.first;
-          tvinfo_vec[ix].tvote_n = kv.second;
-          tvinfo_vec[ix].tvote_r = tvotes_map[ROOT];
+        if ((kv.second > majority_th) && (_depth_inmap[kv.first] > _depth_inmap[total_vinfo_v[ix].pred_taxID])) {
+          total_vinfo_v[ix].pred_taxID = kv.first;
+          total_vinfo_v[ix].tvote_n = kv.second;
+          total_vinfo_v[ix].tvote_r = tvotes_map[ROOT];
         }
       }
     }
@@ -283,42 +282,38 @@ void Query::perform(uint64_t rbatch_size)
   for (auto &kv : _queryID_to_path) {
     keys.push_back(kv.first);
   }
+
   uint64_t u64m = std::numeric_limits<uint64_t>::max();
   _mask_bp = u64m >> (32 - _k) * 2;
   _mask_lr = ((u64m >> (64 - _k)) << 32) + ((u64m << 32) >> (64 - _k));
+
   for (unsigned int i = 0; i < _queryID_to_path.size(); ++i) {
     std::string queryID = keys[i];
-    if (_log)
-      LOG(NOTICE) << "Searching for k-mer matches for the query " << queryID << std::endl;
     std::fstream ofs_minfo, ofs_clsinfo, ofs_aprofile;
+    std::string output_file(_output_dirpath);
     if (_save_match_info) {
-      if (_log)
-        LOG(INFO) << "Opening file to output match information" << std::endl;
-      std::string output_file(_output_dirpath);
       ofs_minfo.open(output_file + "/match_info-" + queryID, std::fstream::out);
-      ofs_clsinfo.open(output_file + "/classification_info-" + queryID, std::fstream::out);
-      ofs_aprofile.open(output_file + "/abundance_profile-" + queryID, std::fstream::out);
-      if (!ofs_minfo.is_open() || !ofs_clsinfo.is_open())
-        std::cerr << "Failed to open output file in " << output_file << std::endl;
     }
+    ofs_clsinfo.open(output_file + "/classification_info-" + queryID, std::fstream::out);
+    ofs_aprofile.open(output_file + "/abundance_profile-" + queryID, std::fstream::out);
+    if (ofs_minfo.fail() || ofs_clsinfo.fail() || ofs_aprofile.fail())
+      std::cerr << "Failed to open output file in " << output_file << std::endl;
     kseq_t *reader = IO::getReader(_queryID_to_path[queryID].c_str());
     rbatch_size = IO::adjustBatchSize(rbatch_size, num_threads);
     std::vector<sseq_t> seqBatch;
-    std::unordered_map<uint32_t, float> query_acc_profile;
+    std::unordered_map<uint32_t, float> profile_accumulated;
     IO::readBatch(seqBatch, reader, rbatch_size);
     uint64_t tnum_reads = 0;
-    if (_log)
-      LOG(INFO) << "Batch size for the query reads in the current query file is " << seqBatch.size() << std::endl;
     while (!(seqBatch.empty())) {
-      std::vector<tvote_info_t> tvinfo_vec(seqBatch.size());
+      std::vector<tvote_info_t> total_vinfo_v(seqBatch.size());
       vec_str names_vec(seqBatch.size());
       vvec_uint8 hdist_vec_or(seqBatch.size());
       vvec_uint8 hdist_vec_rc(seqBatch.size());
       vvec_uint32 tlca_vec_or(seqBatch.size());
       vvec_uint32 tlca_vec_rc(seqBatch.size());
       Query::processBatch(seqBatch, names_vec, tlca_vec_or, tlca_vec_rc, hdist_vec_or, hdist_vec_rc);
-      Query::classifyBatch(tvinfo_vec, names_vec, tlca_vec_or, tlca_vec_rc, hdist_vec_or, hdist_vec_rc);
-      Query::profileBatch(query_acc_profile, tvinfo_vec);
+      Query::classifyBatch(total_vinfo_v, names_vec, tlca_vec_or, tlca_vec_rc, hdist_vec_or, hdist_vec_rc);
+      Query::profileBatch(profile_accumulated, total_vinfo_v);
       if (_save_match_info) {
         for (uint32_t ix = 0; ix < seqBatch.size(); ++ix) {
           ofs_minfo << names_vec[ix] << std::endl;
@@ -338,15 +333,15 @@ void Query::perform(uint64_t rbatch_size)
       std::string curr_rank, curr_name;
       ofs_clsinfo << "SEQ_ID\tRANK\tTAXON_ID\tTAXON_NAME\tPREDICTION_SCORE\tMATCH_SCORE" << std::endl;
       for (uint32_t ix = 0; ix < seqBatch.size(); ++ix) {
-        if ((tvinfo_vec[ix].pred_taxID != 0) && (tvinfo_vec[ix].tvote_n > _tvote_threshold)) {
-          curr_rank = _rank_inmap[tvinfo_vec[ix].pred_taxID];
-          curr_name = _name_inmap[tvinfo_vec[ix].pred_taxID];
-          th_ratio = tvinfo_vec[ix].tvote_n / tvinfo_vec[ix].tvote_r;
+        if ((total_vinfo_v[ix].pred_taxID != 0) && (total_vinfo_v[ix].tvote_n > _tvote_threshold)) {
+          curr_rank = _rank_inmap[total_vinfo_v[ix].pred_taxID];
+          curr_name = _name_inmap[total_vinfo_v[ix].pred_taxID];
+          th_ratio = total_vinfo_v[ix].tvote_n / total_vinfo_v[ix].tvote_r;
           ofs_clsinfo << names_vec[ix];
-          ofs_clsinfo << "\t" << curr_rank << "\t" << tvinfo_vec[ix].pred_taxID << "\t" << curr_name;
-          ofs_clsinfo << "\t" << std::setprecision(3) << th_ratio << "\t" << tvinfo_vec[ix].tvote_n << std::endl;
+          ofs_clsinfo << "\t" << curr_rank << "\t" << total_vinfo_v[ix].pred_taxID << "\t" << curr_name;
+          ofs_clsinfo << "\t" << std::setprecision(3) << th_ratio << "\t" << total_vinfo_v[ix].tvote_n << std::endl;
         } else {
-          ofs_clsinfo << names_vec[ix] << "\tU\tNA\tNA\tNA\t" << tvinfo_vec[ix].tvote_n << std::endl;
+          ofs_clsinfo << names_vec[ix] << "\tU\tNA\tNA\tNA\t" << total_vinfo_v[ix].tvote_n << std::endl;
         }
       }
       tnum_reads += seqBatch.size();
@@ -357,19 +352,19 @@ void Query::perform(uint64_t rbatch_size)
 
     std::string curr_rank, curr_name;
     ofs_aprofile << "RANK\tTAXON_ID\tTAXON_NAME\tREAD_COUNT\tREAD_ABUNDANCE\tCELL_ABUNDANCE" << std::endl;
-    std::vector<std::pair<uint32_t, float>> query_profile(query_acc_profile.begin(), query_acc_profile.end());
-    std::sort(query_profile.begin(),
-              query_profile.end(),
+    std::vector<std::pair<uint32_t, float>> profile_acc_v(profile_accumulated.begin(), profile_accumulated.end());
+    std::sort(profile_acc_v.begin(),
+              profile_acc_v.end(),
               [](const std::pair<uint32_t, float> &l, const std::pair<uint32_t, float> &r) { return l.second < r.second; });
-    for (auto &kv : query_acc_profile) {
-      query_acc_profile[kv.first] = kv.second / tnum_reads;
+    for (auto &kv : profile_accumulated) {
+      profile_accumulated[kv.first] = kv.second / tnum_reads;
     }
-    std::unordered_map<uint32_t, float> query_corrected_profile;
-    postprocessProfile(query_corrected_profile, query_acc_profile);
-    for (auto &tc : query_profile) {
+    std::unordered_map<uint32_t, float> profile_corrected;
+    postprocessProfile(profile_corrected, profile_accumulated);
+    for (auto &tc : profile_acc_v) {
       ofs_aprofile << _rank_inmap[tc.first] << "\t" << tc.first << "\t" << _name_inmap[tc.first];
-      ofs_aprofile << "\t" << std::setprecision(6) << tc.second << "\t" << query_acc_profile[tc.first] << "\t"
-                   << query_corrected_profile[tc.first] << std::endl;
+      ofs_aprofile << "\t" << std::setprecision(6) << tc.second << "\t" << profile_accumulated[tc.first] << "\t"
+                   << profile_corrected[tc.first] << std::endl;
     }
 
     if (_save_match_info) {
@@ -406,6 +401,8 @@ Query::QLibrary::QLibrary(const char *library_dirpath, bool log)
       LOG(INFO) << "Allocated memory for the taxon-LCA array" << std::endl;
     /* scount_arr = new scT[_num_rows * _b]; */
     /* std::fill(scount_arr, scount_arr + _num_rows * _b, 0); */
+    /* if (_log) */
+    /*   LOG(INFO) << "Allocated memory for the species-count array" << std::endl; */
     _ind_arr = new uint8_t[_num_rows];
     std::fill(_ind_arr, _ind_arr + _num_rows, 0);
     if (_log)

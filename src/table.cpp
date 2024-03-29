@@ -281,6 +281,26 @@ void HTd<encT>::trimColumns(size_t b_max)
 }
 
 template<typename encT>
+void HTs<encT>::getScores(std::vector<float> &scores_vec, uint32_t rix)
+{
+  std::unordered_map<scT, scT> cmap{};
+  std::unordered_map<encT, float> values_map{};
+  for (auto &ht : childrenHT) {
+    for (unsigned int i = 0; i < ht.ind_arr[rix]; ++i)
+      cmap[ht.tID] += ht.scount_arr[rix * b + i];
+  }
+  for (auto &ht : childrenHT) {
+    for (unsigned int i = 0; i < ht.ind_arr[rix]; ++i) {
+      values_map[ht.enc_arr[rix * b + i]] += static_cast<float>(ht.scount_arr[rix * b + i]) / ht.ind_arr[rix];
+    }
+  }
+  scores_vec.resize(ind_arr[rix]);
+  for (unsigned int i = 0; i < ind_arr[rix]; ++i) {
+    scores_vec[i] = values_map[enc_arr[rix * b + i]];
+  }
+}
+
+template<typename encT>
 void HTd<encT>::getScores(std::vector<float> &scores_vec, uint32_t rix)
 {
   /* std::random_device rd_; */
@@ -401,26 +421,6 @@ void HTd<encT>::pruneColumns(size_t b_max)
   }
   LOG(INFO) << "The current size, after pruning, of the table is " << num_kmers << std::endl;
 #endif
-}
-
-template<typename encT>
-void HTs<encT>::getScores(std::vector<float> &scores_vec, uint32_t rix)
-{
-  std::unordered_map<scT, scT> cmap{};
-  std::unordered_map<encT, float> values_map{};
-  for (auto &ht : childrenHT) {
-    for (unsigned int i = 0; i < ht.ind_arr[rix]; ++i)
-      cmap[ht.tID] += ht.scount_arr[rix * b + i];
-  }
-  for (auto &ht : childrenHT) {
-    for (unsigned int i = 0; i < ht.ind_arr[rix]; ++i) {
-      values_map[ht.enc_arr[rix * b + i]] += static_cast<float>(ht.scount_arr[rix * b + i]) / ht.ind_arr[rix];
-    }
-  }
-  scores_vec.resize(ind_arr[rix]);
-  for (unsigned int i = 0; i < ind_arr[rix]; ++i) {
-    scores_vec[i] = values_map[enc_arr[rix * b + i]];
-  }
 }
 
 template<typename encT>

@@ -26,7 +26,7 @@ inline void drop64Encoding32(std::vector<uint8_t> &npositions,
                              uint32_t &enc32_bp,
                              uint32_t &enc32_lr)
 {
-  assert(npositions.size() <= 16);
+  /* assert(npositions.size() <= 16); */
   enc32_bp = 0;
   enc32_lr = 0;
   for (unsigned int i = npositions.size() - 1; i >= 1; --i) {

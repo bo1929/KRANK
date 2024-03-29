@@ -36,7 +36,7 @@ namespace IO {
   size_t writeData(void *ptr, size_t size, size_t nmemb, FILE *stream);
 
   std::string downloadURL(std::string url);
-} // namespace IO
+}
 
 template<typename encT>
 struct inputHandler
@@ -74,9 +74,9 @@ struct inputHandler
   bool loadInput(const char *dirpath, tT tID_key, uint16_t total_batches);
   bool checkInput(const char *dirpath, tT tID_key, uint16_t total_batches);
   uint64_t getBatch(vvec<encT> &td, uint32_t tbatch_size);
+  std::map<uint8_t, uint64_t> histRowSizes();
   void clearInput();
   void resetInput();
-  std::map<uint8_t, uint64_t> histRowSizes();
 };
 
 template<typename encT>

@@ -93,6 +93,14 @@ template void HTd<uint64_t>::filterLSR(std::vector<uint8_t> &depth_vec, uint8_t 
 
 template void HTd<uint32_t>::filterLSR(std::vector<uint8_t> &depth_vec, uint8_t slr_depth);
 
+template void HTs<uint32_t>::getScores(std::vector<float> &scores_vec, uint32_t rix);
+
+template void HTs<uint64_t>::getScores(std::vector<float> &scores_vec, uint32_t rix);
+
+template void HTd<uint32_t>::getScores(std::vector<float> &scores_vec, uint32_t rix);
+
+template void HTd<uint64_t>::getScores(std::vector<float> &scores_vec, uint32_t rix);
+
 template void
 HTd<uint32_t>::accumulateCounts(std::unordered_map<uint32_t, scT> &scount_map, HTd<uint32_t> &child, uint32_t rix);
 
@@ -105,15 +113,8 @@ HTs<uint32_t>::accumulateCounts(std::unordered_map<uint32_t, scT> &scount_map, H
 template void
 HTs<uint64_t>::accumulateCounts(std::unordered_map<uint64_t, scT> &scount_map, HTs<uint64_t> &child, uint32_t rix);
 
-template void HTs<uint32_t>::getScores(std::vector<float> &scores_vec, uint32_t rix);
-
-template void HTs<uint64_t>::getScores(std::vector<float> &scores_vec, uint32_t rix);
-
-template void HTd<uint32_t>::getScores(std::vector<float> &scores_vec, uint32_t rix);
-
-template void HTd<uint64_t>::getScores(std::vector<float> &scores_vec, uint32_t rix);
-
 template void HTd<uint32_t>::selectCoverage(std::vector<size_t> &ixs, uint32_t rix, size_t b_max);
 
 template void HTd<uint64_t>::selectCoverage(std::vector<size_t> &ixs, uint32_t rix, size_t b_max);
+
 #endif

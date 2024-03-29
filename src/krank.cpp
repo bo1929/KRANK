@@ -5,7 +5,7 @@ int main(int argc, char **argv)
   PRINT_VERSION
   AixLog::Log::init<AixLog::SinkCout>(AixLog::Severity::trace);
 
-  CLI::App app{"KRANK: a memory-bound taxonomic identification tool."};
+  CLI::App app{"Memory-bound and accurate taxonomic identification and profiling."};
   app.set_help_flag("--help");
   bool log = false;
   app.add_flag("--log,!--no-log", log, "Extensive logging, might be too much and helpful for troubleshooting.");
