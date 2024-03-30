@@ -6,7 +6,7 @@ KRANK consists of two main subprograms: `build` and `query`.
 The subprogram `krank build [OPTIONS]` reads input reference sequences and builds a KRANK library.
 Once you have a library (or multiple libraries),  `krank query [OPTIONS]` performs queries against it (or against multiple libraries at the same time).
 If you would rather use available libraries, you can download relevant ones and skip building your custom library.  
-Running each subprogram with `--help` will display available subprograms together with brief descriptions regarding them and main arguments ([see](#Usage)).
+Running each subprogram with `--help` will display available subprograms together with brief descriptions regarding the program and its arguments ([see](#Usage)).
 
 ### Querying sequences against a KRANK library
 
