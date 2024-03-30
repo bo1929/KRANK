@@ -16,7 +16,7 @@ The path to the directory in which the krank library will be created, (or update
 
 #### Input sequences
 The input reference sequences could be any type: assembled sequences (genomes, contigs, scaffolds, etc.) or sets of *k*-mers (but not a mixture of all these them).
-Although for most users it is not practical or useful, it is possible to use an external tool to extract *k*-mer sets, such as Jellyfish, and give *k*-mer sets directly as the input data.
+Although for most users it is neither practical nor useful, it is possible to use an external tool to extract *k*-mer sets, such as Jellyfish, and give *k*-mer sets directly as the input data.
 These references might be in both FASTA and FASTQ format. Both `gzip` compressed or raw files are allowed.
 Whatever input type you prefer, you need to provide filepaths or FTP URLs (or a mixture of them).
 All you need is a mapping between taxon IDs (i.e., species ID) and paths/URLs, which will be a tab-separated file.
@@ -45,12 +45,22 @@ The latest version of the NCBI taxonomy can be found [here](https://ftp.ncbi.nih
 The keys (the first column) in the `--input-file` must appear in the taxonomy, i.e., the first field in the `nodes.dmp` and `names.dmp`.
 
 #### Example commands and usage
-KRANK is a computationally intensive algorithm, but it is possible to build a library relatively fast if you have enough computational resources.
-You can benefit from parallel processing a lot by setting `--num-threads` to the number of available cores you have.
-Note that the overhead is very little, the speed-up will grow with the number of cores you utilize.
+Building a library is a relatively expensive but one-time operation.
+It consists of two steps: library initialization and batch building.
+The subprogram `krank build` can either initialize a library or construct all/some batches of the library.
+To initialize a library with default parameters, run the below command:
+```bash
+ krank build \
+   -l $LIBRARY_DIRECTORY -t $TAXONOMY_DIRECTORY \
+   -i ./MAPPING_TSV  \
+   --from-scratch --input-sequences
+   --num-threads $NUM_THREADS
+```
+You can benefit from parallel processing to a great extent by setting `--num-threads` to the number of available cores you have.
+Note that the overhead is very little, the speed-up will increase with the number of cores you use.
 
 In order to keep memory usage feasible, there are two ways: use the `--on-disk` flag (default) and increase the number of batches using `--batch-size`.
-Unless you have a very small reference dataset (e.g., a few hundred genomes), do not use `--in-memory` flag, and keep using the default (`--on-disk).
+Unless you have a very small reference dataset (e.g., a few hundred genomes), do not use `--in-memory` flag, and keep using the default (`--on-disk`).
 With `--on-disk`, KRANK first reads input and stores *k*-mer encodings and LSH keys in the library as separate files and reads from there in batches during the table building.
 When the final library is built, you can delete them (files with the prefix `lsh_enc_vec-*`).
 
@@ -96,7 +106,6 @@ Otherwise (default: `--from-scratch`), k-mers would be processed again, and LSH 
 Hence, when a specific target is going to be built, `--from-library` must be given.
 Initialization and library building can be done in a single command, only if all batches are going to be built together one by one.
 This can be achieved by running the above command with `--target-batch 0` without the `--from-library` flag.
-
 
 #### Parameters and library size
 Two parameters define the shape of the final hash table: `-h` and `-b` (`--num-positions` and `--num-columns`, respectively).
