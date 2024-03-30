@@ -26,7 +26,7 @@ int main(int argc, char **argv)
     ->required()
     ->check(CLI::ExistingDirectory);
   std::string taxonomy_dir;
-  sub_build->add_option("-t,--taxonomy-dmp", taxonomy_dir, "Path to the file containing the taxonomy files.")
+  sub_build->add_option("-t,--taxonomy-dir", taxonomy_dir, "Path to the directory containing the taxonomy files.")
     ->required()
     ->check(CLI::ExistingDirectory);
   std::string input_file;
@@ -46,12 +46,12 @@ int main(int argc, char **argv)
                       "If sequences, k-mers sets will be extracted internally. "
                       "Ignored if --from-library given. "
                       "Default: --input-sequences.");
-  uint8_t k = 28;
+  uint8_t k = 29;
   uint8_t w = k + 3;
-  sub_build->add_option("-k,--kmer-length", k, "Length of k-mers. Default: 28.");
+  sub_build->add_option("-k,--kmer-length", k, "Length of k-mers. Default: 29.");
   sub_build->add_option("-w,--window-length", w, "Length of minimizer window. Default: k+3.");
-  uint8_t h = 12;
-  sub_build->add_option("-h,--num-positions", h, "Number of positions for the LSH. Default: 12.");
+  uint8_t h = 13;
+  sub_build->add_option("-h,--num-positions", h, "Number of positions for the LSH. Default: 13.");
   uint8_t b = 16;
   sub_build->add_option("-b,--num-columns", b, "Number of columns of the table. Default: 16.");
   uint8_t batch_size = 2;
