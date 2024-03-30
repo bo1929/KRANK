@@ -3,61 +3,48 @@
 
 ## Quickstart
 KRANK consists of two main subprograms: `build` and `query`.
-You can extract *k*-mer sets from input sequences, and build a KRANK library using `krank build [OPTIONS]`.
-Once you have a library (or multiple libraries), you can perform queries against it using `krank query [OPTIONS]`.
-Running `krank --help` will display available subprograms together with brief descriptions regarding them and main arguments.
+The subprogram `krank build [OPTIONS]` reads input reference sequences and builds a KRANK library.
+Once you have a library (or multiple libraries),  `krank query [OPTIONS]` performs queries against it (or against multiple libraries at the same time).
+If you would rather use available libraries, you can download relevant ones and skip building your custom library.  
+Running each subprogram with `--help` will display available subprograms together with brief descriptions regarding them and main arguments ([see](#Usage)).
+
+### Querying sequences against a KRANK library
 
 ### Building a KRANK library
-Please run `krank build --help` to see all options and defaults.
-KRANK requires two input files: a taxonomy and a mapping from taxon IDs to file paths (or FTP URLs) of input sequences.
-For both URLs and files, the input can be `gzip` compressed.
+KRANK requires two input files: a taxonomy and a mapping from taxon IDs to filepaths (or FTP URLs) of input sequences.
 The path to the directory in which the krank library will be created, (or updated) must be stated with `--library-dir` or `-l`.
 
 #### Input sequences
-The input sequences could be assembled genomes (contigs or reads are also possible).
-Alternatively, you can also use an external tool to extract *k*-mer sets, such as Jellyfish, and give *k*-mer sets directly as the input data.
-Whatever input type you prefer, both FASTA and FASTQ formats can be used.
-All you need is a mapping between taxon IDs and file paths, which will be a tab-separated file.
+The input reference sequences could be any type: assembled sequences (genomes, contigs, scaffolds, etc.) or sets of *k*-mers (but not a mixture of all these them).
+Although for most users it is not practical or useful, it is possible to use an external tool to extract *k*-mer sets, such as Jellyfish, and give *k*-mer sets directly as the input data.
+These references might be in both FASTA and FASTQ format. Both `gzip` compressed or raw files are allowed.
+Whatever input type you prefer, you need to provide filepaths or FTP URLs (or a mixture of them).
+All you need is a mapping between taxon IDs (i.e., species ID) and paths/URLs, which will be a tab-separated file.
 Each line should look similar to this.
 ```
 562	/path/to/file/escherichia_coli-0001.fq
-562	/path/to/file/escherichia_coli-0002.fq
+562	/path/to/file/escherichia_coli-0002.fq.gz
 54736 /path/to/file/salmonell_abongori-0001.fa
+2287  https://ftp.ncbi.nlm.nih.gov/path/to/genome.fna.gz
 ```
 Note that, you can specify more than one file per taxon ID, but not vice versa.
-Full paths are always preferred. File names are not relevant and can be anything.
-This file must be specified with the `--input-file /path/to/file/mapping` argument.
-If each line (2 lines actually, if FASTA) is a sequence (such as a scaffold) in the input data, then use the `--input-sequences` flag.
-Otherwise, if each line corresponds to a *k*-mer extracted with an external tool, then use the `--input-kmers` flag (default).
-
+Full paths are always preferred., filenames are not relevant and can be anything.
+This file must be given with the option `--input-file /path/to/file/mapping` argument.
+If the input references are sets of *k*-mers, then use the `--input-kmers` flag (the default is the complementary option `--input-sequences`).
 Use `-k` or `--kmer-length` to specify the *k*-mer lengths, and `-w` or `--window-length` for minimizer window length.
 The default value for $w$ is $k+3$, and $k=28$ by default.
-You might want to increase $k$ to 31, $k=28$ would result in lighter-weight libraries with slightly worse precision.
-Simply, set $k$ and $w$ to the same value if you do not want to use minimizers.
+You might want to increase $k$ to 31, $k=28$ would result in lighter-weight libraries with slightly worse recall.
+Simply set $k$ and $w$ to the same value if you do not want to use minimizers.
 If `--input-kmers` is given, the length of each line must be equal to $w$.
 Otherwise, it is undefined behavior.
 
 #### Taxonomy
-KRANK only expects a taxonomy tree, as a nodes file `nodes.dmp`, which you can download from the NCBI website.
-The format of the file is given [here](https://www.nlm.nih.gov/research/umls/sourcereleasedocs/current/NCBI/sourcerepresentation.html#file3).
-The keys (the first column) in the `--input-file` must appear in the taxonomy, i.e., the first field in the `nodes.dmp`.
-Use `--taxonomy-dmp` or `-t` to give the path to the file, note that the file name is not important.
+The taxonomy consists of two files, namely `nodes.dmp` and `names.dmp`, and the path to the directory containing both must be given to the option `-t` (or `--taxonomy-dir`).
+The format of these file is given [here](https://www.nlm.nih.gov/research/umls/sourcereleasedocs/current/NCBI/sourcerepresentation.html#file3).
+The latest version of the NCBI taxonomy can be found [here](https://ftp.ncbi.nih.gov/pub/taxonomy/).
+The keys (the first column) in the `--input-file` must appear in the taxonomy, i.e., the first field in the `nodes.dmp` and `names.dmp`.
 
-#### Library parameters
-Two parameters define the shape of the final hash table: `-h` and `-b` (`--num-positions` and `--num-columns`, respectively).
-KRANK uses $h$ many of positions (i.e., bases) of each *k*-mer to compute the hash value.
-This also determines the number of rows of the table ($2^{2h}$).
-As $b$ gives the number of columns, the total number of *k*-mers stored in a table is given by $2^{2h}b$.
-So increasing $h$ and $b$ will directly translate into more memory usage, based on this.
-If you are not sure about these values, just use `-b 16` and set `-h` to $k-16$.
-
-The other two flags are related to *k*-mer selection.
-Just use the defaults and do not change them if you do not know what you are doing.
-Setting `--kmer-ranking 0` (default is 1) changes *k*-mer selection to random; and KRANK does not use our heuristic.
-The other flag is `--free-size`, which disables our sampling strategy.
-If you want to use multiple libraries to query against, using `--free-size` for one of them might improve the performance.
-
-#### Logistics and usage details (with example commands)
+#### Example commands and usage
 KRANK is a computationally intensive algorithm, but it is possible to build a library relatively fast if you have enough computational resources.
 You can benefit from parallel processing a lot by setting `--num-threads` to the number of available cores you have.
 Note that the overhead is very little, the speed-up will grow with the number of cores you utilize.
@@ -110,8 +97,23 @@ Hence, when a specific target is going to be built, `--from-library` must be giv
 Initialization and library building can be done in a single command, only if all batches are going to be built together one by one.
 This can be achieved by running the above command with `--target-batch 0` without the `--from-library` flag.
 
+
+#### Parameters and library size
+Two parameters define the shape of the final hash table: `-h` and `-b` (`--num-positions` and `--num-columns`, respectively).
+KRANK uses $h$ many of positions (i.e., bases) of each *k*-mer to compute the hash value.
+This also determines the number of rows of the table ($2^{2h}$).
+As $b$ gives the number of columns, the total number of *k*-mers stored in a table is given by $2^{2h}b$.
+So increasing $h$ and $b$ will directly translate into more memory usage, based on this.
+If you are not sure about these values, just use `-b 16` and set `-h` to $k-16$.
+The resulting reference library will use $2^(2h)16(4+2)+2^(2h)$ bytes. For $h=14$, $k=30$, and $b=16$, KRANK will construct a 26Gb library with high sensitivity.
+
+The other two flags are related to *k*-mer selection and gradual *k*-mer filtering.
+Setting `--kmer-ranking 0` (default is 1) changes *k*-mer selection to random; and KRANK does not use its heuristic to filter *k*-mers.
+The other flag is `--free-size`, which disables our sampling strategy (option `--adaptive-size` is on by default).
+If you want to use multiple libraries to query against, using `--free-size` for one of them might improve the performance.
+
 ## Usage
-Running `krank`, `krank build`, and `krank query` with `--help` will give you the list of options, their description and default values.
+Running `krank`, `krank build`, and `krank query` with `--help` will give you the list of options, their description, and default values.
 
 ### `krank`
 ```
@@ -142,8 +144,8 @@ Options:
   --help
   -l,--library-dir TEXT:DIR REQUIRED
                               Path to the directory containing the library.
-  -t,--taxonomy-dmp TEXT:DIR REQUIRED
-                              Path to the file containing the taxonomy files.
+  -t,--taxonomy-dir TEXT:DIR REQUIRED
+                              Path to the directory containing the taxonomy files.
   -i,--input-file TEXT:FILE REQUIRED
                               Path to the file containing paths and taxon IDs of reference k-mer sets.
   --from-library,--from-scratch{false}
