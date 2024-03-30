@@ -54,11 +54,11 @@ int main(int argc, char **argv)
   sub_build->add_option("-h,--num-positions", h, "Number of positions for the LSH. Default: 13.");
   uint8_t b = 16;
   sub_build->add_option("-b,--num-columns", b, "Number of columns of the table. Default: 16.");
-  uint8_t batch_size = 2;
+  uint8_t batch_size = 7;
   sub_build->add_option("-s,--batch-size",
                         batch_size,
                         "Number of bits to divide the table into batches. "
-                        "Default: 2, i.e., 4 batches.");
+                        "Default: 7, i.e., 128 batches.");
   uint16_t target_batch = 0;
   bool only_init = false;
   sub_build->add_option("--target-batch",

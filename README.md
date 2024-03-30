@@ -5,7 +5,7 @@
 KRANK consists of two main subprograms: `build` and `query`.
 The subprogram `krank build [OPTIONS]` reads input reference sequences and builds a KRANK library.
 Once you have a library (or multiple libraries),  `krank query [OPTIONS]` performs queries against it (or against multiple libraries at the same time).
-If you would rather use available libraries, you can download relevant ones and skip building your custom library.  
+If you would rather use available libraries, you can download relevant ones and skip building your custom library.
 Running each subprogram with `--help` will display available subprograms together with brief descriptions regarding the program and its arguments ([see](#Usage)).
 
 ### Querying sequences against a KRANK library
@@ -17,7 +17,8 @@ The path to the directory in which the krank library will be created, (or update
 #### Input sequences
 The input reference sequences could be any type: assembled sequences (genomes, contigs, scaffolds, etc.) or sets of *k*-mers (but not a mixture of all these them).
 Although for most users it is neither practical nor useful, it is possible to use an external tool to extract *k*-mer sets, such as Jellyfish, and give *k*-mer sets directly as the input data.
-These references might be in both FASTA and FASTQ format. Both `gzip` compressed or raw files are allowed.
+These references might be in both FASTA and FASTQ format.
+Both `gzip` compressed or raw files are allowed.
 Whatever input type you prefer, you need to provide filepaths or FTP URLs (or a mixture of them).
 All you need is a mapping between taxon IDs (i.e., species ID) and paths/URLs, which will be a tab-separated file.
 Each line should look similar to this.
@@ -30,10 +31,9 @@ Each line should look similar to this.
 Note that, you can specify more than one file per taxon ID, but not vice versa.
 Full paths are always preferred., filenames are not relevant and can be anything.
 This file must be given with the option `--input-file /path/to/file/mapping` argument.
-If the input references are sets of *k*-mers, then use the `--input-kmers` flag (the default is the complementary option `--input-sequences`).
+If the input references are sets of *k*-mers, then use the `--input-kmers` flag (the default is the complement option `--input-sequences`).
 Use `-k` or `--kmer-length` to specify the *k*-mer lengths, and `-w` or `--window-length` for minimizer window length.
-The default value for $w$ is $k+3$, and $k=28$ by default.
-You might want to increase $k$ to 31, $k=28$ would result in lighter-weight libraries with slightly worse recall.
+See [this section](#parameters-and-library-size) for a discussion of these parameters.
 Simply set $k$ and $w$ to the same value if you do not want to use minimizers.
 If `--input-kmers` is given, the length of each line must be equal to $w$.
 Otherwise, it is undefined behavior.
@@ -48,16 +48,23 @@ The keys (the first column) in the `--input-file` must appear in the taxonomy, i
 Building a library is a relatively expensive but one-time operation.
 It consists of two steps: library initialization and batch building.
 The subprogram `krank build` can either initialize a library or construct all/some batches of the library.
-To initialize a library with default parameters, run the below command:
+To initialize a library from reference sequences using default parameters (6.5Gb lightweight mode), run the below command.
 ```bash
  krank build \
-   -l $LIBRARY_DIRECTORY -t $TAXONOMY_DIRECTORY \
-   -i ./MAPPING_TSV  \
-   --from-scratch --input-sequences
-   --num-threads $NUM_THREADS
+   -l $LIBRARY_DIRECTORY -t $TAXONOMY_DIRECTORY -i $MAPPING_TSV_FILE \
+   --batch-size 7 --from-scratch --num-threads $NUM_THREADS
 ```
 You can benefit from parallel processing to a great extent by setting `--num-threads` to the number of available cores you have.
 Note that the overhead is very little, the speed-up will increase with the number of cores you use.
+The option `--from-scratch` specifies that this command is intended to initialize a non-existing library.
+Hence, KRANK will not be looking for a already initialized library at `$LIBRARY_DIRECTORY`.
+The option `--batch-size` sets the number of batches that the table will be split in log scale.
+For `--batch-size`, it is $2^7=128$.
+It is a bit nuanced and the optimal value will vary.
+Luckily, it does not effect the classification performance, but using a value that is too low may result in explosion in memory usage.
+A value between 4 and 9 should work fine.
+If you have the computational resources available to build multiple batches in parallel (e.g., on different cluster nodes or on the same large-memory machine), higher values (e.g., 7 to 9) are recommended.
+Next paragraph discusses how library batches are built in parallel or one-by-one.
 
 In order to keep memory usage feasible, there are two ways: use the `--on-disk` flag (default) and increase the number of batches using `--batch-size`.
 Unless you have a very small reference dataset (e.g., a few hundred genomes), do not use `--in-memory` flag, and keep using the default (`--on-disk`).
@@ -110,11 +117,14 @@ This can be achieved by running the above command with `--target-batch 0` withou
 #### Parameters and library size
 Two parameters define the shape of the final hash table: `-h` and `-b` (`--num-positions` and `--num-columns`, respectively).
 KRANK uses $h$ many of positions (i.e., bases) of each *k*-mer to compute the hash value.
-This also determines the number of rows of the table ($2^{2h}$).
-As $b$ gives the number of columns, the total number of *k*-mers stored in a table is given by $2^{2h}b$.
-So increasing $h$ and $b$ will directly translate into more memory usage, based on this.
+The recommended value for $h$ is equal to $k-16$.
+This value determines the number of rows of the table ($2^{2h}$).
+Since $b$ is the number of columns, the total number of *k*-mers stored in a table is given by $2^{2h}b$.
+So increasing $h$ and $b$ will directly translate into more memory use.
 If you are not sure about these values, just use `-b 16` and set `-h` to $k-16$.
-The resulting reference library will use $2^(2h)16(4+2)+2^(2h)$ bytes. For $h=14$, $k=30$, and $b=16$, KRANK will construct a 26Gb library with high sensitivity.
+The resulting reference library will use $2^{2h}16(4+2)+2^{2h}$ bytes.
+For $h=14$, $k=30$, and $b=16$, KRANK will construct a 26Gb library with high sensitivity.
+Alternatively, a lighter-weight 6.5Gb version could be built by setting $h=13$ and $k=29$.
 
 The other two flags are related to *k*-mer selection and gradual *k*-mer filtering.
 Setting `--kmer-ranking 0` (default is 1) changes *k*-mer selection to random; and KRANK does not use its heuristic to filter *k*-mers.
