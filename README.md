@@ -51,7 +51,7 @@ The subprogram `krank build` can either initialize a library or construct all/so
 To initialize a library from reference sequences using default parameters (6.5Gb lightweight mode), run the below command.
 ```bash
  krank build \
-   -l $LIBRARY_DIRECTORY -t $TAXONOMY_DIRECTORY -i $MAPPING_TSV_FILE \
+   -l $LIBRARY_DIRECTORY -t $TAXONOMY_DIRECTORY -i $MAPPING_FILE \
    --batch-size 7 --from-scratch --num-threads $NUM_THREADS
 ```
 You can benefit from parallel processing to a great extent by setting `--num-threads` to the number of available cores you have.
@@ -66,53 +66,42 @@ A value between 4 and 9 should work fine.
 If you have the computational resources available to build multiple batches in parallel (e.g., on different cluster nodes or on the same large-memory machine), higher values (e.g., 7 to 9) are recommended.
 Next paragraph discusses how library batches are built in parallel or one-by-one.
 
-In order to keep memory usage feasible, there are two ways: use the `--on-disk` flag (default) and increase the number of batches using `--batch-size`.
-Unless you have a very small reference dataset (e.g., a few hundred genomes), do not use `--in-memory` flag, and keep using the default (`--on-disk`).
-With `--on-disk`, KRANK first reads input and stores *k*-mer encodings and LSH keys in the library as separate files and reads from there in batches during the table building.
-When the final library is built, you can delete them (files with the prefix `lsh_enc_vec-*`).
-
-The default value for `--batch-size` is $3$, meaning that $3$ bits will be used for batching, and hence, there will be $2^3=8$ batches.
-Increasing `--batch-size` will split the table rows into more batches, and memory usage will decrease exponentially.
-If you have a cluster with many nodes, you can process each of these batches in parallel on different nodes, using multiple cores too (by submitting each batch's job to a different node).
-Note that you will need to process each batch separately, running `krank build` as independent jobs for each batch.
-Alternatively, you can just build each batch one by one.
-You can configure this behavior using `--target-batch` and `--from-library` options as shown below.
-
-First, you need to initialize a library, without giving the `--target-batch` option.
+After initializing the library, you will need to process each batch independently.
+This can be achieved by running separate `krank build` commands by setting the `--target-batch`.
+For instance to construct the library for the first batch out of 128, run the below command.
 ```bash
-./krank build \
-  --library-dir /path/to/directory --taxonomy-dmp /path/to/nodes.dmp --input-files /path/to/mapping.tsv \
-  -k 28 -w 31 -h 12 -b 16 --batch-size 3 \
-  --kmer-ranking 1 --adaptive_size \
-   --on-disk --input-sequences \
-  --num-threads 32
-```
-This will initialize the library, and save the metadata & taxonomy file together with encoding and LSH keys (since `--on-disk` is given).
-
-Then, you can process 8 batches one by one using 32 cores as follows:
-```bash
-./krank build \
-  --library-dir /path/to/directory --taxonomy-dmp /path/to/nodes.dmp --input-files /path/to/mapping.tsv \
-  -k 28 -w 31 -h 12 -b 16 --batch-size 3 \
-  --kmer-ranking 1 --adaptive_size \
-  --from-library --on-disk --input-sequences --target-batch 0 \
-  --num-threads 32
-```
-Note that, using 0 as the target process all batches one by one.
-Alternatively, you can process a specific batch, and even in parallel as mentioned.
-```bash
-printf '%d\n' {1..8} | xargs -I{} -P8 ./krank build \
-    --library-dir /path/to/directory --taxonomy-dmp /path/to/nodes.dmp --input-files /path/to/mapping.tsv \
-    -k 28 -w 31 -h 12 -b 16 --batch-size 3 \
-    --kmer-ranking 1 --adaptive_size \
-    --from-library --on-disk --input-sequences --target-batch {} \
-    --num-threads 1
+krank build \
+   -l $LIBRARY_DIRECTORY -t $TAXONOMY_DIRECTORY -i $MAPPING_FILE \
+   --from-library --batch-size 7 --target-batch 1 \
+  --num-threads $NUM_THREADS
 ```
 Notice that, when an initialized library is targeted, the `--from-library` flag is given.
-Otherwise (default: `--from-scratch`), k-mers would be processed again, and LSH keys would be overwritten, possibly computed with a new random seed.
-Hence, when a specific target is going to be built, `--from-library` must be given.
-Initialization and library building can be done in a single command, only if all batches are going to be built together one by one.
-This can be achieved by running the above command with `--target-batch 0` without the `--from-library` flag.
+Otherwise (initialization with `--from-scratch`), k-mers would be processed again, and LSH keys would be overwritten, possibly computed with a new random seed.
+Hence, `--from-library` option must be given to build the initialized library.
+
+Alternatively, you can just build all batches with a single command one by setting the `--target-batch` to 0.
+```bash
+krank build \
+   -l $LIBRARY_DIRECTORY -t $TAXONOMY_DIRECTORY -i $MAPPING_FILE \
+   --from-library --batch-size 7 --target-batch 1 \
+  --num-threads $NUM_THREADS
+```
+But the running time would be 128 times more compared to the previous command used for a single batch.
+
+Suppose the memory on a machine (a single cluster node or a personal computer) allows to run 4 batch in parallel.
+Then, we could do this by using `xargs` as below.
+```bash
+printf '%d\n' {1..128} | xargs -I{} -P4  krank build \
+   -l $LIBRARY_DIRECTORY -t $TAXONOMY_DIRECTORY -i $MAPPING_FILE \
+   --from-library --batch-size 7 --target-batch {} \
+  --num-threads $NUM_THREADS
+```
+
+The most desired scenario would be having access to a cluster, and submitting independent jobs for each batch, letting the scheduler do the job.
+First, you need to initialize a library, without giving the `--target-batch` option.
+
+Note that, KRANK first reads input and stores *k*-mer encodings and LSH keys in the library as separate files and reads from there in batches during the table building.
+Hence, when the final library is built, you can delete them (i.e., files with the prefix `lsh_enc_vec-*`) by running `find $LIBRARY_DIRECTORY -type f -name "*lsh_enc_vec*" -delete`.
 
 #### Parameters and library size
 Two parameters define the shape of the final hash table: `-h` and `-b` (`--num-positions` and `--num-columns`, respectively).
