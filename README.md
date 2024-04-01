@@ -9,19 +9,44 @@ If you would rather use available libraries, you can download relevant ones and 
 Running each subprogram with `--help` will display available subprograms together with brief descriptions regarding the program and its arguments ([see](#Usage)).
 
 ### Querying sequences against a KRANK library
+KRANK can query against a single or multiple libraries.
+Each KRANK library is essentially a directory containing a searchable data structure in binary format.
+See [Available libraries](#available-libraries) for ready-to-go libraries, download one or multiple based on your needs.
+In [the next section](#building-a-krank-library), we discuss the library building procedure for custom libraries, this might be useful if you have some specific new genomes that you want to be considered during the search.
+Below, a command to query against one library (stored at directory `$LIBRARY_DIRECTORY`) is given.
+```bash
+krank query \
+  -l $LIBRARY_DIRECTORY -o $OUTPUT_DIRECTORY -q $QUERY_PATHS \
+  --num-threads $NUM_THREADS
+```
+You can substitute `$NUM_THREADS` simply with the number of cores available.
+The value of `$OUTPUT_DIRECTORY` for option  `-o` (or `--output-dir`)  should be the path to the directory which you wish the results to be saved.
+The option `-q` (or `--query-file`) can be one of the following: i) a path to the FASTA/FASTQ file containing the query sequences/reads, ii) a path to a tab-separated file containing two column mapping from a query ID to the corresponding query filepath to the FASTA/FASTQ file.
+```
+query_1	./query1.fna
+query_2	./query2.fq
+```
+
+As mentioned earlier, you can use multiple libraries to expand your reference set by specifying corresponding directory paths after `-l` (or `--library-dir`, e.g., `-l $LIBRARY_DIRECTORY1 $LIBRARY_DIRECTORY2`).
+
+#### Outputs: sequence classifications and relative abundances
+
+
+#### Available libraries
+Soon.
 
 ### Building a KRANK library
-KRANK requires two input files: a taxonomy and a mapping from taxon IDs to filepaths (or FTP URLs) of input sequences.
-The path to the directory in which the krank library will be created, (or updated) must be stated with `--library-dir` or `-l`.
+To build a reference library, KRANK requires two input files: a taxonomy and a mapping from taxon IDs to filepaths (or URLs for FTP) of input reference sequences.
+The path to the directory in which the krank library will be created (or updated) should be specified with `--library-dir` or `-l`.
 
-#### Input sequences
-The input reference sequences could be any type: assembled sequences (genomes, contigs, scaffolds, etc.) or sets of *k*-mers (but not a mixture of all these them).
+#### Input reference sequences
+The input reference sequences could be any type: assembled sequences (genomes, contigs, scaffolds, etc.) or sets of *k*-mers (but not a mixture).
 Although for most users it is neither practical nor useful, it is possible to use an external tool to extract *k*-mer sets, such as Jellyfish, and give *k*-mer sets directly as the input data.
-These references might be in both FASTA and FASTQ format.
+These reference sequences might be in both FASTA and FASTQ format.
 Both `gzip` compressed or raw files are allowed.
-Whatever input type you prefer, you need to provide filepaths or FTP URLs (or a mixture of them).
-All you need is a mapping between taxon IDs (i.e., species ID) and paths/URLs, which will be a tab-separated file.
-Each line should look similar to this.
+Whatever input type you prefer, you need to provide filepaths or URLs (or a mixture of them).
+All you have to provide is a mapping between taxon IDs (i.e., species ID) and paths/URLs, which will be a tab-separated file.
+Lines from such a file should look similar to this.
 ```
 562	/path/to/file/escherichia_coli-0001.fq
 562	/path/to/file/escherichia_coli-0002.fq.gz
@@ -206,6 +231,6 @@ Options:
   --max-match-distance,--max-match-hdist UINT
                               The maximum Hamming distance for a k-mer to be considered as a match. Default: 5.
   --save-match-info,--no-match-info{false}
-                              Save macthing information to --output-dir for each query, this flag is given by default.
+                              Save macthing information to --output-dir for each query, this flag is not given by default.
   --num-threads UINT          Number of threads to use for OpenMP based parallelism.
 ```

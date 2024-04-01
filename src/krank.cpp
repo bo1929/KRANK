@@ -131,7 +131,7 @@ int main(int argc, char **argv)
   bool save_match_info = false;
   sub_query->add_flag("--save-match-info,!--no-match-info",
                       save_match_info,
-                      "Save macthing information to --output-dir for each query, this flag is given by default.");
+                      "Save macthing information to --output-dir for each query, this flag is not given by default.");
   sub_query->add_option("--num-threads", num_threads, "Number of threads to use for OpenMP based parallelism.");
 
   CLI11_PARSE(app, argc, argv);
