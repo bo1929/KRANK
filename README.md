@@ -30,7 +30,40 @@ query_2	./query2.fq
 As mentioned earlier, you can use multiple libraries to expand your reference set by specifying corresponding directory paths after `-l` (or `--library-dir`, e.g., `-l $LIBRARY_DIRECTORY1 $LIBRARY_DIRECTORY2`).
 
 #### Outputs: sequence classifications and relative abundances
+Querying against a file generate two output files by default: a taxonomic classification for each sequence (short/long read or contig) and a summary of the taxonomic composition of the entire query file, i.e., relative abundances of taxa at different levels.
 
+Classification file is named as prefix + query ID (or prefix + filename without the extension if a single fine is given) : `classification_info-*`. The first couple lines should look like the following example.
+```
+SEQ_ID  RANK  TAXON_ID  TAXON_NAME  PREDICTION_SCORE  MATCH_SCORE
+AIJN01000024.1-771547 species 201 Campylobacter lari  0.744 0.101
+AIJN01000024.1-369645 species 201 Campylobacter lari  0.978 11.4
+```
+`SEQ_ID` is simply the identifier of the sequence in FASTA/FASTQ.
+If `PREDICTION_SCORE` is not close to 1, it means that KRANK also found some *k*-mers related to other taxa.
+If it is close to 1, the prediction is not ambiguous, i.e., there is no other potential assignment.
+However, this does not necessarily imply that the assignment is *confident*.
+`MATCH_SCORE` quantifies the confidence, and the highest possible value is the number of *k*-mers in the sequence (e.g., 122 for short reads in the default parameter configuration).
+KRANK internally filters assignments with `MATCH_SCORE` smaller than 0.03.
+You can disable this by setting `--tvote-threshold 0`.
+Values greater than 1 are sufficiently high.
+Below 1 is still worth considering especially novel/distant queries are of interest.
+
+For relative abundances abundance, output files are prefixed with `abundance_profile-*`.
+An example output would look as below.
+```
+RANK  TAXON_ID  TAXON_NAME  READ_COUNT  READ_ABUNDANCE  CELL_ABUNDANCE
+class 117743  Flavobacteriia  3 0.012 0.0256103
+class 1236  Gammaproteobacteria 6 0.024 0.0495194
+class 183924  Thermoprotei  2 0.008 0.00916362
+class 186801  Clostridia  4 0.016 0.0277098
+```
+`READ_COUNT` columns is simply the count of query sequences that are assigned to a particular taxon.
+`READ_ABUNDANCE` is the `READ_COUNT` value divided by the total number of reads given in the query/sample.
+`CELL_ABUNDANCE` is the corrected abundance value which incorporates genomes sizes on top of `READ_ABUNDANCE`, and this is the value which you should probably consider.
+Note that the neither `READ_ABUNDANCE` nor `CELL_ABUNDANCE` columns does not sum up to 1 for a fixed taxonomic rank (e.g., phylum).
+This is because it is possible for some sequences to be left unassigned to any taxon.
+You can further normalize these values for each taxonomic level.
+If you would like to benchmark KRANK against some other tools, you can use [OPAL](https://github.com/CAMI-challenge/OPAL), it has an option (`-n`) which automatically does this normalization and enables comparison between normalized and un-normalized profiles.
 
 #### Available libraries
 Soon.
