@@ -194,9 +194,8 @@ Options:
   --seed INT                  Random seed for the LSH and other parts that require randomness.
 
 Subcommands:
-  build                       Builds a referenece library with given k-mers sets or reference genomes.
+  build                       Builds a referenece librarywith given k-mers sets or reference genomes.
   query                       Performs query with respect to a given referenece library.
-
 ```
 The option `--log` may output considerably many log messages and is probably not useful unless you have an error.
 It would be helpful to include logs while creating a new issue.
@@ -204,6 +203,7 @@ The default verbosity should be sufficient.
 
 ### `krank build`
 ```
+Builds a referenece librarywith given k-mers sets or reference genomes.
 Usage: ./krank build [OPTIONS]
 
 Options:
@@ -215,15 +215,21 @@ Options:
   -i,--input-file TEXT:FILE REQUIRED
                               Path to the file containing paths and taxon IDs of reference k-mer sets.
   --from-library,--from-scratch{false}
-                              Are k-mers already encoded and stored in the library? Default: --from-scratch, and it reads k-mer sets or sequences from given input paths.
+                              Are k-mers already encoded and stored in the library?
+                              Default: --from-scratch, and it reads k-mer sets or sequences from given input paths.
   --input-kmers,--input-sequences{false}
-                              Are given input files k-mers sets or sequences? If sequences, k-mers sets will be extracted internally. Ignored if --from-library given. Default: --input-sequences.
-  -k,--kmer-length UINT       Length of k-mers. Default: 28.
+                              Are given input files k-mers sets or sequences?
+                              If sequences, k-mers sets will be extracted internally.
+                              Ignored if --from-library given.
+                              Default: --input-sequences.
+  -k,--kmer-length UINT       Length of k-mers. Default: 29.
   -w,--window-length UINT     Length of minimizer window. Default: k+3.
-  -h,--num-positions UINT     Number of positions for the LSH. Default: 12.
+  -h,--num-positions UINT     Number of positions for the LSH. Default: 13.
   -b,--num-columns UINT       Number of columns of the table. Default: 16.
-  -s,--batch-size UINT        Number of bits to divide the table into batches. Default: 2, i.e., 4 batches.
-  --target-batch UINT         The specific library batch to be built. If 0, all batches will be processed one by one. If not given, library will only be initialized after reading the input data and encoding k-mers.
+  -s,--batch-size UINT        Number of bits to divide the table into batches. Default: 7, i.e., 128 batches.
+  --target-batch UINT         The specific library batch to be built.
+                              If 0, all batches will be processed one by one.
+                              If not given, library will only be initialized after reading the input data and encoding k-mers.
   --kmer-ranking ENUM:value in {random_kmer->0,representative_kmer->1} OR {0,1}
                               Which strategy will be used for k-mer ranking? (random_kmer, representative_kmer)
   --adaptive-size,--free-size{false}
@@ -260,9 +266,11 @@ Options:
   -q,--query-file TEXT:FILE REQUIRED
                               Path to the tab-seperated file containing paths and IDs of query FASTA/FASTQ files.
   --total-vote-threshold,--tvote-threshold FLOAT
-                              The minimum total vote to classify, can be considered as a confidence threshold. Default: 0.03.
+                              The minimum total vote to classify, can be considered as a confidence threshold.
+                              Default: 0.03.
   --max-match-distance,--max-match-hdist UINT
-                              The maximum Hamming distance for a k-mer to be considered as a match. Default: 5.
+                              The maximum Hamming distance for a k-mer to be considered as a match.
+                              Default: 5.
   --save-match-info,--no-match-info{false}
                               Save macthing information to --output-dir for each query, this flag is not given by default.
   --num-threads UINT          Number of threads to use for OpenMP based parallelism.
