@@ -50,7 +50,7 @@
   #warning "OpenMP not found, multi-threading will be DISABLED and --num-threads option will be ignored!"
 #endif
 
-#define VERSION "v0.3.1"
+#define VERSION "v0.3.2"
 #define PRINT_VERSION printf("KRANK version: " VERSION "\n");
 
 #define LNUM_TASKS 8

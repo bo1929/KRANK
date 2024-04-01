@@ -590,7 +590,7 @@ FILE *IO::open_file(const char *filepath, bool &is_ok, const char *mode)
   FILE *f;
   f = std::fopen(filepath, mode);
   if (!f) {
-    std::cerr << "File opening failed!" << filepath << std::endl;
+    std::cerr << "File opening failed! " << filepath << std::endl;
     is_ok = false;
   }
   return f;

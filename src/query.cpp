@@ -25,20 +25,28 @@ Query::Query(std::vector<std::string> library_dirpaths,
     _slib_ptr_v.push_back(std::make_unique<QLibrary>(_library_dirpaths[i].c_str(), _log));
     if (i == 0) {
       _k = _slib_ptr_v[i]->_k;
-      _parent_inmap = _slib_ptr_v[i]->_parent_inmap;
-      _depth_inmap = _slib_ptr_v[i]->_depth_inmap;
-      _rank_inmap = _slib_ptr_v[i]->_rank_inmap;
-      _name_inmap = _slib_ptr_v[i]->_name_inmap;
-    } else {
-      if (!(_k == _slib_ptr_v[i]->_k)) {
-        std::cerr << "All libraries to search in must have the same k-mer length" << std::endl;
-        exit(EXIT_FAILURE);
-      }
-      if (!(_parent_inmap == _slib_ptr_v[i]->_parent_inmap) || !(_depth_inmap == _slib_ptr_v[i]->_depth_inmap) ||
-          !(_rank_inmap == _slib_ptr_v[i]->_rank_inmap) || !(_name_inmap == _slib_ptr_v[i]->_name_inmap)) {
+    } else if (!(_k == _slib_ptr_v[i]->_k)) {
+      std::cerr << "All libraries to search in must have the same k-mer length" << std::endl;
+      exit(EXIT_FAILURE);
+    }
+    bool is_compatible = true;
+    for (auto &kv : _slib_ptr_v[i]->_tID_to_taxID) {
+      is_compatible = is_compatible && ((_parent_inmap.count(kv.second) == 0) ||
+                                        (_parent_inmap[kv.second] == _slib_ptr_v[i]->_parent_inmap[kv.second]));
+      is_compatible = is_compatible && ((_depth_inmap.count(kv.second) == 0) ||
+                                        (_depth_inmap[kv.second] == _slib_ptr_v[i]->_depth_inmap[kv.second]));
+      is_compatible = is_compatible && ((_name_inmap.count(kv.second) == 0) ||
+                                        (_name_inmap[kv.second] == _slib_ptr_v[i]->_name_inmap[kv.second]));
+      is_compatible = is_compatible && ((_rank_inmap.count(kv.second) == 0) ||
+                                        (_rank_inmap[kv.second] == _slib_ptr_v[i]->_rank_inmap[kv.second]));
+      if (!is_compatible) { // If so, can merge.
         std::cerr << "All libraries must share the same taxonomy" << std::endl;
         exit(EXIT_FAILURE);
       }
+      _parent_inmap[kv.second] = _slib_ptr_v[i]->_parent_inmap[kv.second];
+      _depth_inmap[kv.second] = _slib_ptr_v[i]->_depth_inmap[kv.second];
+      _name_inmap[kv.second] = _slib_ptr_v[i]->_name_inmap[kv.second];
+      _rank_inmap[kv.second] = _slib_ptr_v[i]->_rank_inmap[kv.second];
     }
   }
 
