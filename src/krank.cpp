@@ -20,7 +20,7 @@ int main(int argc, char **argv)
   });
 
   CLI::App *sub_build =
-    app.add_subcommand("build", "Builds a referenece librarywith given k-mers sets or reference genomes.");
+    app.add_subcommand("build", "Builds a reference library with given k-mers sets or reference genomes.");
   std::string library_dir;
   sub_build->add_option("-l,--library-dir", library_dir, "Path to the directory containing the library.")
     ->required()
@@ -61,11 +61,12 @@ int main(int argc, char **argv)
                         "Default: 7, i.e., 128 batches.");
   uint16_t target_batch = 0;
   bool only_init = false;
-  sub_build->add_option("--target-batch",
-                        target_batch,
-                        "The specific library batch to be built. "
-                        "If 0, all batches will be processed one by one. "
-                        "If not given, library will only be initialized after reading the input data and encoding k-mers.");
+  sub_build->add_option(
+    "--target-batch",
+    target_batch,
+    "The specific library batch to be built. "
+    "If 0, all batches will be processed one by one. "
+    "If not given, the library will only be initialized after reading the input data and encoding k-mers.");
   std::map<std::string, RankingMethod> map_ranking{{"random_kmer", random_kmer},
                                                    {"representative_kmer", representative_kmer}};
   RankingMethod ranking_method = representative_kmer;
@@ -76,23 +77,23 @@ int main(int argc, char **argv)
   bool adaptive_size = false;
   sub_build->add_flag(
     "--adaptive-size,!--free-size", adaptive_size, "Use size constraint heuristic while gradually building the library.");
-  sub_build->add_option("--num-threads", num_threads, "Number of threads to use for OpenMP based parallelism.");
+  sub_build->add_option("--num-threads", num_threads, "Number of threads to use for OpenMP-based parallelism.");
   bool fast_mode = false;
   sub_build->add_flag(
     "--fast-mode,!--selection-mode",
     fast_mode,
-    "The default mode is --selection-mode which traverses the taxonomy, and selects k-mers accordingly. "
+    "The default mode is --selection-mode which traverses the taxonomy and selects k-mers accordingly. "
     "When --fast-mode is given, tree traversal will be skipped, and the final library will be built at the root. "
     "With --kmer-ranking random_kmer, this is equivalent to CONSULT-II. "
-    "If --fast-mode is given, --adaptive-size will be ignored and has no effect. "
+    "If --fast-mode is given, --adaptive-size will be ignored and have no effect. "
     "Note  --fast-mode is significantly faster.");
   bool update_annotations = false;
   sub_build->add_flag(
     "--update-annotations,!--build-tables",
     update_annotations,
-    "When --update-annotations is given, KRANK tries to update soft LCAs of k-mers by going over reference genomes. "
+    "When --update-annotations option is given, KRANK tries to update soft LCAs of k-mers by going over reference genomes. "
     "This will be done without rebuilding the tables, hence it would be quite fast. "
-    "This might be particularly useful when parameters for soft LCA is changed. "
+    "This might be particularly useful when parameters for soft LCA are changed. "
     "Without a target batch given (using --target-batch), both options would be ignored. "
     "Then, KRANK would only initialize the library. "
     "Default --build-tables selects k-mers, builds tables, and also computes soft LCAs.");
@@ -105,7 +106,7 @@ int main(int argc, char **argv)
       w = k + 3;
   });
 
-  CLI::App *sub_query = app.add_subcommand("query", "Performs query with respect to a given referenece library.");
+  CLI::App *sub_query = app.add_subcommand("query", "Performs querying with respect to a given reference library.");
   std::vector<std::string> library_dir_v;
   sub_query->add_option("-l,--library-dir", library_dir_v, "Path(s) to the directory containing the library.")->required();
   std::string output_dir = "./";
@@ -117,7 +118,7 @@ int main(int argc, char **argv)
   std::string query_file;
   sub_query
     ->add_option(
-      "-q,--query-file", query_file, "Path to the tab-seperated file containing paths and IDs of query FASTA/FASTQ files.")
+      "-q,--query-file", query_file, "Path to the tab-separated file containing paths and IDs of query FASTA/FASTQ files.")
     ->required()
     ->check(CLI::ExistingFile);
   float tvote_threshold = 0.03;
@@ -131,8 +132,8 @@ int main(int argc, char **argv)
   bool save_match_info = false;
   sub_query->add_flag("--save-match-info,!--no-match-info",
                       save_match_info,
-                      "Save macthing information to --output-dir for each query, this flag is not given by default.");
-  sub_query->add_option("--num-threads", num_threads, "Number of threads to use for OpenMP based parallelism.");
+                      "Save matching information to --output-dir for each query, this flag is not given by default.");
+  sub_query->add_option("--num-threads", num_threads, "Number of threads to use for OpenMP-based parallelism.");
 
   CLI11_PARSE(app, argc, argv);
 
