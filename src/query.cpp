@@ -60,20 +60,29 @@ Query::Query(std::vector<std::string> library_dirpaths,
     exit(EXIT_FAILURE);
   }
 
-  std::ifstream query_file(query_filepath);
-  if (!query_file.good()) {
-    std::cerr << "Error opening " << query_filepath << std::endl;
-    exit(EXIT_FAILURE);
-  }
-  std::string line;
-  while (std::getline(query_file, line)) {
-    std::istringstream iss(line);
-    std::string queryID, fpath;
-    if (!(std::getline(iss, queryID, '\t') && std::getline(iss, fpath, '\t'))) {
-      std::cerr << "Failed to read file for query ID to query path map" << std::endl;
+  if (IO::checkFASTAQ(_query_filepath)) {
+    ghc::filesystem::path qpath{_query_filepath};
+    qpath.replace_extension();
+    std::string fpath = _query_filepath;
+    std::string queryID = qpath.generic_string();
+    _queryID_to_path[queryID] = fpath;
+  } else {
+    std::ifstream query_file(_query_filepath);
+    if (!query_file.good()) {
+      std::cerr << "Error opening " << _query_filepath << std::endl;
       exit(EXIT_FAILURE);
     }
-    _queryID_to_path[queryID] = fpath;
+    std::string line;
+    while (std::getline(query_file, line)) {
+      std::istringstream iss(line);
+      std::string queryID, fpath;
+      if (!(std::getline(iss, queryID, '\t') && std::getline(iss, fpath, '\t'))) {
+        std::cerr << "Failed to read file for query ID to query path map" << std::endl;
+        exit(EXIT_FAILURE);
+      }
+      _queryID_to_path[queryID] = fpath;
+    }
+    query_file.close();
   }
 }
 

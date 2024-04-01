@@ -113,7 +113,6 @@ int main(int argc, char **argv)
   sub_query
     ->add_option(
       "-o,--output-dir", output_dir, "Path to the directory to output result files. Default: the current working directory.")
-    ->required()
     ->check(CLI::ExistingDirectory);
   std::string query_file;
   sub_query

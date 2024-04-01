@@ -548,6 +548,26 @@ kseq_t *IO::getReader(const char *fpath)
 
 uint64_t IO::adjustBatchSize(uint64_t batch_size, uint8_t num_threads) { return (batch_size / num_threads) * num_threads; }
 
+bool IO::checkFASTAQ(const char *filepath)
+{
+  gzFile fp;
+  fp = gzopen(filepath, "rb");
+  bool is_fastaq = false;
+  if (fp == nullptr) {
+    std::cerr << "Failed to open file at " << filepath << std::endl;
+    exit(1);
+  }
+  kseq_t *reader;
+  reader = kseq_init(fp);
+  if (kseq_read(reader) >= 0)
+    is_fastaq = true;
+  else
+    is_fastaq = false;
+  kseq_destroy(reader);
+  gzclose(reader->f->f);
+  return is_fastaq;
+}
+
 void IO::readBatch(std::vector<sseq_t> &seqRead, kseq_t *kseq, uint64_t batch_size)
 {
   int l;
