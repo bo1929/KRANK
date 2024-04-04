@@ -377,9 +377,11 @@ void Library::getBatchHTs(HTs<encT> *ts, unsigned int curr_batch)
   if (_fast_mode) {
     uint64_t num_batch_kmers;
     uint64_t constraint_size = getConstrainedSizeKC(td.tID);
-    for (auto kv_it = _inputStream_map.begin(); kv_it != _inputStream_map.end(); kv_it++) {
+    omp_set_num_threads(num_threads);
+#pragma omp parallel for schedule(dynamic), shared(td)
+    for (unsigned int i = 0; i < _tID_vec.size(); ++i) {
       bool is_below = false;
-      tT tmp_tID = kv_it->first;
+      tT tmp_tID = _tID_vec[i];
       while ((tmp_tID != _rootID) || (td.tID != _rootID)) {
         if (tmp_tID == ts->tID) {
           is_below = true;
@@ -389,9 +391,8 @@ void Library::getBatchHTs(HTs<encT> *ts, unsigned int curr_batch)
         }
       }
       if (is_below || (td.tID == _rootID))
-        num_batch_kmers = (kv_it->second).retrieveBatch(td.enc_vvec, _tbatch_size, curr_batch);
+        num_batch_kmers = _inputStream_map.at(_tID_vec[i]).retrieveBatch(td.enc_vvec, _tbatch_size, curr_batch, true);
     }
-    omp_set_num_threads(num_threads);
     td.initBasis(td.tID);
     td.makeUnique();
     int64_t num_rm = static_cast<int64_t>(td.num_kmers) - static_cast<int64_t>(constraint_size);
@@ -430,7 +431,7 @@ void Library::getBatchHTd(HTd<encT> *td, unsigned int curr_batch)
 #pragma omp critical
     std::cout << "Constructing the table for " << curr_taxID << std::endl;
   if (_taxonomy_record.isBasis(td->tID)) {
-    num_batch_kmers = _inputStream_map.at(td->tID).retrieveBatch(td->enc_vvec, _tbatch_size, curr_batch);
+    num_batch_kmers = _inputStream_map.at(td->tID).retrieveBatch(td->enc_vvec, _tbatch_size, curr_batch, false);
     td->initBasis(td->tID);
     /* td->makeUnique(true); */
     if (_log) {

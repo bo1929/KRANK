@@ -1,6 +1,6 @@
 #include "io.h"
 
-#define BUFF_SIZE 2 * 1024 * 1024
+#define BUFF_SIZE 1024 * 1024
 
 struct vhash
 {
@@ -248,9 +248,11 @@ float inputHandler<encT>::extractInput(uint64_t rbatch_size)
     std::string filepath;
     bool is_url = std::regex_match(filepath_v[fix], url_regexp);
     if (is_url) {
+#pragma omp critical
       std::cout << "Downloading: " << filepath_v[fix] << std::endl;
       filepath = IO::downloadURL(filepath_v[fix]);
     } else {
+#pragma omp critical
       std::cout << "Reading: " << filepath_v[fix] << std::endl;
       filepath = filepath_v[fix];
     }
