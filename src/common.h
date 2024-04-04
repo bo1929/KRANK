@@ -57,8 +57,8 @@
 #define LSR 3
 
 extern unsigned int num_threads;
-extern std::random_device rd;
-extern std::mt19937 gen;
+extern thread_local std::random_device rd;
+extern thread_local std::mt19937 gen;
 extern unsigned int num_tasks;
 extern std::bernoulli_distribution ct;
 extern const unsigned char seq_nt4_table[128];

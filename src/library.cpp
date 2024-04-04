@@ -265,11 +265,9 @@ void Library::softLCA(HTs<encT> &ts, unsigned int curr_batch)
           } else {
             p_update = 1 - pow((1 - 1 / log2(pow((ts.scount_arr[rix * _b + j] - 1) / w, 2) + 2.0)), sc);
             std::bernoulli_distribution bt(p_update);
+            if (bt(gen))
 #pragma omp critical
-            {
-              if (bt(gen))
-                ts.tlca_arr[rix * _b + j] = _taxonomy_record.getLowestCommonAncestor(ts.tlca_arr[rix * _b + j], tID_key);
-            }
+              ts.tlca_arr[rix * _b + j] = _taxonomy_record.getLowestCommonAncestor(ts.tlca_arr[rix * _b + j], tID_key);
           }
         }
       }
