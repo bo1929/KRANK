@@ -16,7 +16,7 @@ KRANK currently does not have pre-built libraries. You need to compile with make
 
 That is all you need. Simply compile by running `make`.
 ```bash
-https://github.com/bo1929/KRANK.git
+git clone https://github.com/bo1929/KRANK.git
 make -C KRANK
 chmod +x KRANK/krank
 ```
