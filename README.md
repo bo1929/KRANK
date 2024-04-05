@@ -18,7 +18,8 @@ That is all you need. Simply compile by running `make`.
 ```bash
 git clone https://github.com/bo1929/KRANK.git
 make -C KRANK
-chmod +x KRANK/krank
+KRANK/krank build --help
+KRANK/krank query --help
 ```
 
 ### Querying sequences against a KRANK library
