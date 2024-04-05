@@ -65,6 +65,10 @@ You can further normalize these values for each taxonomic level.
 If you would like to benchmark KRANK against some other tools, you can use [OPAL](https://github.com/CAMI-challenge/OPAL), it has an option (`-n`) which automatically does this normalization and enables comparison between normalized and un-normalized profiles.
 
 #### Available libraries
+More and more diverse libraries will be added soon.
+- [WoL-v1 dataset - archaeal and bacterial genomes - lightweight (6.25Gb) and w/ ranking v0.3.2](https://ter-trees.ucsd.edu/data/krank/library-WoLv1-k29w32h13b16s7-reps_adpt.tar.gz)
+
+#### Recommendations for choosing the right set of libraries
 Soon.
 
 ### Building a KRANK library
