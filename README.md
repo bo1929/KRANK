@@ -7,6 +7,20 @@ Once you have a library (or multiple libraries),  `krank query [OPTIONS]` perfor
 If you would rather use available libraries, you can download relevant ones and skip building your custom library.
 Running each subprogram with `--help` will display available subprograms together with brief descriptions regarding the program and its arguments ([see](#Usage)).
 
+## Installation
+KRANK currently does not have pre-built libraries. You need to compile with make. Requirements are as follows:
+- libcurl library (this is only needed for downloading reference sequences using URLs, otherwise not needed),
+- OpenMP for parallelism,
+- C++11 support,
+- zlib library.
+
+That is all you need. Simply compile by running `make`.
+```bash
+https://github.com/bo1929/KRANK.git
+make -C KRANK
+chmod +x KRANK/krank
+```
+
 ### Querying sequences against a KRANK library
 KRANK can query against a single or multiple libraries.
 Each KRANK library is essentially a directory containing a searchable data structure in binary format.
