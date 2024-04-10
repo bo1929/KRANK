@@ -23,7 +23,7 @@ KRANK/krank query --help
 ```
 
 ### Querying sequences against a KRANK library
-KRANK can query against a single or multiple libraries.
+KRANK can query against a single or multiple binaries.
 Each KRANK library is essentially a directory containing a searchable data structure in binary format.
 See [a list of available libraries](#available-libraries) to download one or multiple based on your needs and quickly get started with your queries.
 In [the next section](#building-a-krank-library), we discuss the library building procedure for custom libraries, this might be useful if you have some specific new genomes that you want to be considered during the search.
