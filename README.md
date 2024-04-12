@@ -8,7 +8,7 @@ If you would rather use available libraries, you can download relevant ones and 
 Running each subprogram with `--help` will display available subprograms together with brief descriptions regarding the program and its arguments ([see](#Usage)).
 
 ## Installation
-KRANK currently does not have pre-built libraries. You need to compile with make. Requirements are as follows:
+KRANK currently does not have pre-built binaries. You need to compile with make. Requirements are as follows:
 - libcurl library (this is only needed for downloading reference sequences using URLs, otherwise not needed),
 - OpenMP for parallelism,
 - C++11 support,
@@ -23,7 +23,7 @@ KRANK/krank query --help
 ```
 
 ### Querying sequences against a KRANK library
-KRANK can query against a single or multiple binaries.
+KRANK can query against a single or multiple libraries.
 Each KRANK library is essentially a directory containing a searchable data structure in binary format.
 See [a list of available libraries](#available-libraries) to download one or multiple based on your needs and quickly get started with your queries.
 In [the next section](#building-a-krank-library), we discuss the library building procedure for custom libraries, this might be useful if you have some specific new genomes that you want to be considered during the search.
