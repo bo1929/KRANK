@@ -46,7 +46,7 @@ As mentioned earlier, you can use multiple libraries to expand your reference se
 #### Outputs: sequence classifications and relative abundances
 Querying against a file generates two output files by default: a taxonomic label assignment for each sequence (i.e., short/long read or contig) and a summary of the taxonomic composition of the entire query file, i.e., relative abundances of taxa at different ranks.
 
-The naming convention for output reports consists of a prefix + query ID -- or prefix + filename without the extension if a single query file is given: `classification_info-*` and abundance_profile-*`. The first couple of lines of the classification report should look like the below example.
+The naming convention for output reports consists of a prefix + query ID -- or prefix + filename without the extension if a single query file is given: `classification_info-*` and `abundance_profile-*`. The first couple of lines of the classification report should look like the below example.
 ```
 SEQ_ID  RANK  TAXON_ID  TAXON_NAME  PREDICTION_SCORE  MATCH_SCORE
 AIJN01000024.1-771547 species 201 Campylobacter lari  0.744 0.101

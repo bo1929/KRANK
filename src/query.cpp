@@ -313,8 +313,8 @@ void Query::perform(uint64_t rbatch_size)
     }
     ofs_clsinfo.open(output_file + "/classification_info-" + queryID, std::fstream::out);
     ofs_aprofile.open(output_file + "/abundance_profile-" + queryID, std::fstream::out);
-    if (ofs_minfo.fail() || ofs_clsinfo.fail() || ofs_aprofile.fail())
-      std::cerr << "Failed to open output file in " << output_file << std::endl;
+    /* if (ofs_minfo.fail() || ofs_clsinfo.fail() || ofs_aprofile.fail()) */
+    /*   std::cerr << "Failed to open output file in " << output_file << std::endl; */
     kseq_t *reader = IO::getReader(_queryID_to_path[queryID].c_str());
     rbatch_size = IO::adjustBatchSize(rbatch_size, num_threads);
     std::vector<sseq_t> seqBatch;
