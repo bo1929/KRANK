@@ -32,8 +32,6 @@ NUMPOS=${NUMPOS:-12}
 NUMCOL=${NUMCOL:-8}
 NBATCHB=${NBATCHB:-2}
 
-mkdir -p ${LIBDIR}
-
 echo "Initialzing the library..."
 /usr/bin/time -v ../krank --seed ${RANDOM_SEED} build \
   -l ${LIBDIR} -t ./taxonomy/ \
