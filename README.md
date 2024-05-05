@@ -59,7 +59,7 @@ However, this does not necessarily imply that the assignment is *confident*.
 `MATCH_SCORE` quantifies the confidence, and the highest possible value is the number of *k*-mers in the sequence (e.g., 122 for short reads in the default parameter configuration).
 KRANK internally filters assignments with `MATCH_SCORE` smaller than 0.03.
 You can disable this by setting `--tvote-threshold 0`.
-All alues greater than 1 could be considered sufficiently high.
+All values greater than 1 could be considered sufficiently high.
 Below 1 is still worth considering especially for novel/distant queries that are of interest.
 
 For relative abundances, an example for the output report would look as below.
@@ -109,8 +109,9 @@ This file must be given with the option `--input-file /path/to/file/mapping` arg
 [^2]: If the input references are sets of *k*-mers, then use the `--input-kmers` flag (the default is the complement option `--input-sequences`).
 Use `-k` or `--kmer-length` to specify the *k*-mer lengths, and `-w` or `--window-length` for minimizer window length.
 See [this section](#parameters-and-library-size) for a discussion of these parameters.
-Simply set $k$ and $w$ to the same value if you do not want to use minimizers[^3].
-[^3]: If `--input-kmers` is given, the length of each line must be equal to $w$. Otherwise, it is undefined behavior.
+Simply set -k and -w to the same value if you do not want to use minimizers[^3].
+[^3]: If `--input-kmers` is given, the length of each line must be equal to -w.
+Otherwise, it is undefined behavior.
 
 #### Taxonomy
 The taxonomy consists of two files, namely `nodes.dmp` and `names.dmp`, and the path to the directory containing both must be given to the option `-t` (or `--taxonomy-dir`).
@@ -138,7 +139,7 @@ This parameter is a bit nuanced and the optimal value will vary.
 Luckily, it does not affect the classification performance, but using a value that is too low may result in an explosion in memory usage.
 A value between 4 and 9 should work just fine.
 If you have the computational resources available to build multiple batches in parallel (e.g., on different cluster nodes or on the same large-memory machine), higher values (e.g., 7 to 9) are recommended.
-The next paragraph discusses how library batches are built in parallel or one-by-one.
+The next paragraph discusses how library batches are built in parallel or one by one.
 
 After initializing the library, you will need to process each batch independently.
 This can be achieved by running separate `krank build` commands by setting the `--target-batch`.
@@ -202,7 +203,8 @@ Running `krank`, `krank build`, and `krank query` with `--help` will give you th
 
 ### `krank`
 ```
-Memory-bound and accurate taxonomic classification and profiling.
+KRANK version: v0.3.2
+Memory-bound & accurate taxonomic classification and profiling.
 Usage: ./krank [OPTIONS] SUBCOMMAND
 
 Options:
@@ -214,81 +216,78 @@ Options:
 
 Subcommands:
   build                       Builds a reference library with given k-mers sets or reference genomes.
-  query                       Performs query with respect to a given reference library.
+  query                       Query given sequences with respect to given reference libraries.
 ```
-The option `--log` may output considerably many log messages and is probably not useful unless you have an error.
-It would be helpful to include logs while creating a new issue.
-The default verbosity should be sufficient.
+The option `--log` is likely to be more than needed and is probably not useful unless you have an error.
+It would be helpful to include logs if you need to create a new issue.
+The default verbosity should be sufficient (`--verbose`).
+Note that these options (`--help`, `--verbose`, `--log` and `--seed`) cannot be given after the subcommand (e.g., `krank query --seed 0 [OPTIONS]` will throw an error).
 
 ### `krank build`
 ```
+KRANK version: v0.3.2
 Builds a reference library with given k-mers sets or reference genomes.
 Usage: ./krank build [OPTIONS]
 
 Options:
   --help
-  -l,--library-dir TEXT:DIR REQUIRED
+  -l,--library-dir TEXT REQUIRED
                               Path to the directory containing the library.
   -t,--taxonomy-dir TEXT:DIR REQUIRED
-                              Path to the directory containing the taxonomy files.
+                              Path to the directory containing the taxonomy files (nodes.dmp and names.dmp).
   -i,--input-file TEXT:FILE REQUIRED
-                              Path to the file containing paths and taxon IDs of reference k-mer sets.
+                              Path to the file containing paths and taxon IDs of references.
   --from-library,--from-scratch{false}
                               Are k-mers already encoded and stored in the library?
-                              Default: --from-scratch, and it reads k-mer sets or sequences from given input paths.
+							  Default: --from-scratch, and it reads k-mer sets or sequences from given input paths.
+							  If --from-library is given, KRANK will try to read k-mers from an already-initialized library.
   --input-kmers,--input-sequences{false}
-                              Are given input files k-mers sets or sequences?
-                              If sequences, k-mers sets will be extracted internally.
-                              Ignored if --from-library given.
-                              Default: --input-sequences.
+                              Are given input files k-mers sets (extracted with some external tool) or sequences (genomes, contigs etc.)?
+							  If sequences, k-mers sets will be extracted internally.
+							  Ignored if --from-library given.
+							  Default: --input-sequences.
   -k,--kmer-length UINT       Length of k-mers. Default: 29.
   -w,--window-length UINT     Length of minimizer window. Default: k+3.
   -h,--num-positions UINT     Number of positions for the LSH. Default: 13.
   -b,--num-columns UINT       Number of columns of the table. Default: 16.
-  -s,--batch-size UINT        Number of bits to divide the table into batches. Default: 7, i.e., 128 batches.
+  -s,--batch-size UINT        Number of bits to divide the table into batches. Default: 6, i.e., 64 batches.
   --target-batch UINT         The specific library batch to be built.
-                              If 0, all batches will be processed one by one.
-                              If not given, the library will only be initialized after reading the input data and encoding k-mers.
+							  If 0, all batches will be processed one by one.
+							  If not given, the library will only be initialized after reading the input data and encoding k-mers.
   --kmer-ranking ENUM:value in {random_kmer->0,representative_kmer->1} OR {0,1}
-                              Which strategy will be used for k-mer ranking? (random_kmer, representative_kmer)
+                              Which strategy will be used for k-mer ranking? (0: random_kmer, 1: representative_kmer)
   --adaptive-size,--free-size{false}
                               Use size constraint heuristic while gradually building the library.
   --num-threads UINT          Number of threads to use for OpenMP-based parallelism.
   --fast-mode,--selection-mode{false}
                               The default mode is --selection-mode which traverses the taxonomy and selects k-mers accordingly.
-                              When --fast-mode is given, tree traversal will be skipped, and the final library will be built at the root.
-                              With --kmer-ranking random_kmer, this is equivalent to CONSULT-II.
-                              If --fast-mode is given, --adaptive-size will be ignored and have no effect.
-                              Note  --fast-mode is significantly faster.
+							  When --fast-mode is given, tree traversal will be skipped, and the final library will be built at the root.
+							  With --kmer-ranking random_kmer, this is equivalent to CONSULT-II.
+							  If --fast-mode is given, --adaptive-size will be ignored and have no effect.
+							  Note  --fast-mode is significantly faster.
   --update-annotations,--build-tables{false}
                               When --update-annotations option is given, KRANK tries to update soft LCAs of k-mers by going over reference genomes.
-                              This will be done without rebuilding the tables, hence it would be quite fast.
-                              This might be particularly useful when parameters for soft LCA are changed.
-                              Without a target batch given (using --target-batch), both options would be ignored.
-                              Then, KRANK would only initialize the library.
-                              Default --build-tables selects k-mers, builds tables, and also computes soft LCAs.
+							  Default --build-tables selects k-mers, builds tables, and also computes soft LCAs.
 ```
 
 ### `krank query`
 ```
-Performs querying with respect to a given reference library.
+KRANK version: v0.3.2
+Query given sequences with respect to given reference libraries.
 Usage: ./krank query [OPTIONS]
 
 Options:
   --help
   -l,--library-dir TEXT ... REQUIRED
-                              Path(s) to the directory containing the library.
-  -o,--output-dir TEXT:DIR REQUIRED
-                              Path to the directory to output result files. Default: the current working directory.
+                              Path(s) to the directory containing the library. Note that multiple libraries could be given to this option.
+  -o,--output-dir TEXT:DIR    Path to the directory to output result files. Default: the current working directory.
   -q,--query-file TEXT:FILE REQUIRED
                               Path to the tab-separated file containing paths and IDs of query FASTA/FASTQ files.
   --total-vote-threshold,--tvote-threshold FLOAT
-                              The minimum total vote to classify can be considered as a confidence threshold.
-                              Default: 0.03.
+                              The minimum total vote to classify, can be considered as a confidence threshold. Default: 0.03.
   --max-match-distance,--max-match-hdist UINT
-                              The maximum Hamming distance for a k-mer to be considered as a match.
-                              Default: 5.
+                              The maximum Hamming distance for a k-mer to be considered as a match. Default: 5.
   --save-match-info,--no-match-info{false}
-                              Save matching information to --output-dir for each query, this flag is not given by default.
+                              Save matching information to --output-dir for each query, this flag is not given by default. There is no practical need to give this flag. This is for debugging purposes and maybe for alternative down-stream analyses.
   --num-threads UINT          Number of threads to use for OpenMP-based parallelism.
 ```
