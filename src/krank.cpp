@@ -55,9 +55,9 @@ int main(int argc, char **argv)
   sub_build->add_option("-h,--num-positions", h, "Number of positions for the LSH. Default: 13.");
   uint8_t b = 16;
   sub_build->add_option("-b,--num-columns", b, "Number of columns of the table. Default: 16.");
-  uint8_t batch_size = 6;
+  uint8_t batch_bsize = 6;
   sub_build->add_option("-s,--batch-size",
-                        batch_size,
+                        batch_bsize,
                         "Number of bits to divide the table into batches. "
                         "Default: 6, i.e., 64 batches.");
   uint16_t target_batch = 0;
@@ -157,14 +157,14 @@ int main(int argc, char **argv)
     std::cerr << "The maximum allowed k-mer length (-k) is 32." << std::endl;
   if (h >= k)
     std::cerr << "The number of LSH positions (-h) cannot be greater than or equal to k-mer length (-k)." << std::endl;
-  if ((batch_size < 1) || (batch_size > (2 * h - 1)))
+  if ((batch_bsize < 1) || (batch_bsize > (2 * h - 1)))
     std::cerr << "The number of batching-bits (-s) must be smaller than 2h and greater than 0." << std::endl;
-  if (target_batch > pow(2, batch_size))
+  if (target_batch > pow(2, batch_bsize))
     std::cerr << "The given target batch index cannot be greater than the total number of batches (2^s)." << std::endl;
   if (max_match_hdist > k)
     std::cerr << "Maximum Hamming distance for a match cannot be greater than k-mer length." << std::endl;
-  if ((w < k) || (b < 2) || (h < 2) || (h > 16) || (k > 32) || (h >= k) || (batch_size > (2 * h - 1)) ||
-      (target_batch > pow(2, batch_size)) || (max_match_hdist > k)) {
+  if ((w < k) || (b < 2) || (h < 2) || (h > 16) || (k > 32) || (h >= k) || (batch_bsize > (2 * h - 1)) ||
+      (target_batch > pow(2, batch_bsize)) || (max_match_hdist > k)) {
     exit(EXIT_FAILURE);
   }
 #ifndef SHORT_TABLE
@@ -182,6 +182,8 @@ int main(int argc, char **argv)
       "Since flag --fast-mode has been given, --kmer-ranking will be ignored, k-mer selection will be inherently random.");
   if (only_init && (sub_build->count("--update-annotations") || sub_build->count("--build-tables")))
     std::puts("Since no target batch is given (using --target-batch), --build-tables/--update-annotations will be ignored.");
+  if (batch_bsize > 10)
+    std::puts("Having too many batches may cause issues since a separate directory will be created for each batch.");
 
   if (sub_build->parsed()) {
     Library l(library_dir.c_str(),
@@ -193,8 +195,8 @@ int main(int argc, char **argv)
               b,
               ranking_method,
               adaptive_size,
-              pow(2, 2 * h) * b,          // capacity
-              pow(2, 2 * h - batch_size), // tbatch_size
+              pow(2, 2 * h) * b,           // capacity
+              pow(2, 2 * h - batch_bsize), // tbatch_size
               from_library,
               input_kmers,
               target_batch,

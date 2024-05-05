@@ -49,10 +49,11 @@ Library::Library(const char *library_dirpath,
   _root_size = 0;
   _num_species = _tax_record.trID_to_input().size();
   _num_nodes = _tax_record.get_num_nodes();
+  _num_rows = pow(2, 2 * _h);
+  _total_batches = _num_rows / _tbatch_size;
 
   if (!_from_library) {
     getRandomPositions();
-
     if (ghc::filesystem::exists(_library_dirpath)) {
       std::cout << "Library directory exists, current files will be overwritten " << _library_dirpath << std::endl;
     } else if (ghc::filesystem::create_directories(_library_dirpath)) {
@@ -79,8 +80,7 @@ Library::Library(const char *library_dirpath,
   }
 
   _lsh_vg = generateMaskLSH(_positions);
-  _num_rows = pow(2, 2 * _h);
-  _total_batches = _num_rows / _tbatch_size;
+
   _trID_vec.reserve(_num_species);
   tT tmp_trID;
   for (auto const &kv : _tax_record.trID_to_input()) {

@@ -40,7 +40,7 @@ echo "Initialzing the library..."
   --from-scratch --input-sequences \
   --kmer-ranking 1 --adaptive-size \
   --num-threads ${NTHREADS} \
-  && echo "All batches have been constucted, the library is ready to query against."
+  && echo "The library has been successfully initialized and k-mers havebeen extracted."
 
 echo "Building the library for each batch one by one..."
 /usr/bin/time -v ../krank --seed ${RANDOM_SEED} build \
@@ -50,13 +50,23 @@ echo "Building the library for each batch one by one..."
   --target-batch 0 --fast-mode --from-library --input-sequences \
   --kmer-ranking 1 --adaptive-size \
   --num-threads ${NTHREADS} \
-  && echo "The library has been successfully initialized and k-mers havebeen extracted."
+  && echo "All batches have been constucted, the library is ready to query against."
+
+echo "Building the library in fast mode, for each batch one by one..."
+/usr/bin/time -v ../krank --seed ${RANDOM_SEED} build \
+  -l ${LIBDIR} -t ./taxonomy/ \
+  -i ./input_map.tsv  \
+  -k ${MERLEN} -w ${WINSIZE} -h ${NUMPOS} -b ${NUMCOL} -s ${NBATCHB} \
+  --target-batch 0 --selection-mode --from-library --input-sequences \
+  --kmer-ranking 1 --adaptive-size \
+  --num-threads ${NTHREADS} \
+  && echo "All batches have been constucted, the library is ready to query against."
 
 /usr/bin/time -v ../krank --seed ${RANDOM_SEED} query \
   -l ${LIBDIR} -o ./ -q query.fq \
-  --save-match-info --max-match-distance 5 \
+  --max-match-distance 5 \
   --num-threads ${NTHREADS} \
-  && echo "Queries have been completed, results are saved."
+  && echo "Queries have been completed, results have been saved."
 
 date
 echo "========"

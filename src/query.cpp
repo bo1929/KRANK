@@ -64,7 +64,7 @@ Query::Query(std::vector<std::string> library_dirpaths,
   if (IO::ensureDirectory(_output_dirpath)) {
     std::cout << "Results will be written to " << _output_dirpath << std::endl;
   } else {
-    std::cerr << "Directory to output results can not be found " << _output_dirpath << std::endl;
+    std::cerr << "Directory to output results cannot be found " << _output_dirpath << std::endl;
     exit(EXIT_FAILURE);
   }
 
@@ -405,7 +405,7 @@ Query::QLibrary::QLibrary(const char *library_dirpath, bool log)
   if (IO::ensureDirectory(_library_dirpath)) {
     std::cout << "Library will be read from " << _library_dirpath << std::endl;
   } else {
-    std::cerr << "Library can not be found at " << _library_dirpath << std::endl;
+    std::cerr << "Library cannot be found at " << _library_dirpath << std::endl;
     exit(EXIT_FAILURE);
   }
 
