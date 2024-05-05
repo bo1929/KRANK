@@ -19,6 +19,7 @@ public:
           uint8_t h,
           uint8_t b,
           RankingMethod ranking_method,
+          LabelsLCA labels_lca,
           bool adaptive_size,
           uint64_t capacitiy_size,
           uint32_t num_batch_rows,
@@ -42,6 +43,7 @@ private:
   uint8_t _h;
   uint8_t _b;
   RankingMethod _ranking_method;
+  LabelsLCA _labels_lca;
   bool _adaptive_size;
   uint64_t _num_rows; // Total number of rows: pow(2, 2h).
   uint64_t _capacity_size;
@@ -85,7 +87,7 @@ public:
   void annotateInfo();
   void processLeaf(tT trID_key);
   void resetInfo(HTs<encT> &ts, bool reset_scount, bool reset_tlca);
-  void softLCA(HTs<encT> &ts, unsigned int curr_batch);
+  void labelLCAs(HTs<encT> &ts, unsigned int curr_batch);
   void countBasis(HTs<encT> &ts, unsigned int curr_batch);
   decltype(_npositions) &npositions() { return _npositions; }
   decltype(_positions) &positions() { return _positions; }

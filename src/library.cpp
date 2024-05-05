@@ -1,5 +1,11 @@
 #include "library.h"
 
+enum LabelsLCA
+{
+  hard_lca,
+  soft_lca,
+};
+
 Library::Library(const char *library_dirpath,
                  const char *tax_dirpath,
                  const char *input_filepath,
@@ -8,6 +14,7 @@ Library::Library(const char *library_dirpath,
                  uint8_t h,
                  uint8_t b,
                  RankingMethod ranking_method,
+                 LabelsLCA labels_lca,
                  bool adaptive_size,
                  uint64_t capacity_size,
                  uint32_t tbatch_size,
@@ -29,6 +36,7 @@ Library::Library(const char *library_dirpath,
   , _h(h)
   , _b(b)
   , _ranking_method(ranking_method)
+  , _labels_lca(labels_lca)
   , _adaptive_size(adaptive_size)
   , _capacity_size(capacity_size)
   , _tbatch_size(tbatch_size)
@@ -224,10 +232,10 @@ void Library::resetInfo(HTs<encT> &ts, bool reset_scount, bool reset_tlca)
   }
 }
 
-void Library::softLCA(HTs<encT> &ts, unsigned int curr_batch)
+void Library::labelLCAs(HTs<encT> &ts, unsigned int curr_batch)
 {
-  double w = 2.0;
-  unsigned int r = 4;
+  static double w = 2.0;
+  static unsigned int r = 4;
 #pragma omp parallel for schedule(dynamic), num_threads(num_threads)
   for (unsigned int i = 0; i < _trID_vec.size(); ++i) {
     tT trID_key = _trID_vec[i];
@@ -238,18 +246,26 @@ void Library::softLCA(HTs<encT> &ts, unsigned int curr_batch)
     double p_update, sc;
     for (unsigned int i = 0; i < lsh_enc_vec.size(); ++i) {
       uint32_t rix = lsh_enc_vec[i].first - (curr_batch - 1) * _tbatch_size;
+      bool update_label = false;
       for (unsigned int j = 0; j < ts.ind_arr[rix]; ++j) {
         if ((ts.enc_arr[rix * _b + j] == lsh_enc_vec[i].second)) {
-          sc = static_cast<double>(rcounts[lsh_enc_vec[i].second]) + 1.0;
-          if (ts.scount_arr[rix * _b + j] <= r) {
-            ts.tlca_arr[rix * _b + j] = _tax_record.getLowestCommonAncestor(ts.tlca_arr[rix * _b + j], trID_key);
+          if (_labels_lca == soft_lca) {
+            sc = static_cast<double>(rcounts[lsh_enc_vec[i].second]) + 1.0;
+            if (ts.scount_arr[rix * _b + j] <= r) {
+              update_label = true;
+            } else {
+              p_update = 1 - pow(1 - 1 / log2(pow((ts.scount_arr[rix * _b + j] - 1) / w, 2) + 2.0), sc);
+              std::bernoulli_distribution bt(p_update);
+              if (bt(gen))
+                update_label = true;
+            }
           } else {
-            p_update = 1 - pow(1 - 1 / log2(pow((ts.scount_arr[rix * _b + j] - 1) / w, 2) + 2.0), sc);
-            std::bernoulli_distribution bt(p_update);
-            if (bt(gen))
-#pragma omp critical
-              ts.tlca_arr[rix * _b + j] = _tax_record.getLowestCommonAncestor(ts.tlca_arr[rix * _b + j], trID_key);
+            update_label = true;
           }
+          if (update_label)
+#pragma omp critical
+            ts.tlca_arr[rix * _b + j] = _tax_record.getLowestCommonAncestor(ts.tlca_arr[rix * _b + j], trID_key);
+          break;
         }
       }
     }
@@ -271,7 +287,7 @@ void Library::annotateInfo()
       LOG(INFO) << COND(_log) << "The table is loaded with " << ts_r.num_kmers << "/" << tnb_mer << " k-mers" << std::endl;
       Library::resetInfo(ts_r, true, true);
       Library::countBasis(ts_r, curr_batch);
-      Library::softLCA(ts_r, curr_batch);
+      Library::labelLCAs(ts_r, curr_batch);
       LOG(INFO) << COND(_log) << "Leaves are counted and k-mers are annotated with soft-LCA" << std::endl;
       Library::saveBatchHTs(ts_r, curr_batch);
     }
@@ -293,7 +309,7 @@ void Library::buildTables()
       LOG(INFO) << COND(_log) << "The table is built with " << ts_r.num_kmers << "/" << tnb_mer << " k-mers" << std::endl;
       Library::resetInfo(ts_r, true, true);
       Library::countBasis(ts_r, curr_batch);
-      Library::softLCA(ts_r, curr_batch);
+      Library::labelLCAs(ts_r, curr_batch);
       LOG(INFO) << COND(_log) << "Leaves are counted and k-mers are annotated with soft-LCA" << std::endl;
       Library::saveBatchHTs(ts_r, curr_batch);
     }

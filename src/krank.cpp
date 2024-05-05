@@ -74,8 +74,17 @@ int main(int argc, char **argv)
   sub_build
     ->add_option("--kmer-ranking",
                  ranking_method,
-                 "Which strategy will be used for k-mer ranking? (0: random_kmer, 1: representative_kmer)")
+                 "Which strategy will be used for k-mer ranking? (0: random_kmer, 1: representative_kmer)"
+                 "Default: representative_kmer, selected based on coverage heuristic.")
     ->transform(CLI::CheckedTransformer(map_ranking, CLI::ignore_case));
+  std::map<std::string, LabelsLCA> map_labels{{"hard", hard_lca}, {"soft", soft_lca}};
+  LabelsLCA labels_lca = soft_lca;
+  sub_build
+    ->add_option("--lca",
+                 labels_lca,
+                 "This option determines LCA computation method for k-mer labels? (0: hard_lca, 1: soft_lca)"
+                 "Default: soft, computed using CONSULT-II's heuristic.")
+    ->transform(CLI::CheckedTransformer(map_labels, CLI::ignore_case));
   bool adaptive_size = false;
   sub_build->add_flag(
     "--adaptive-size,!--free-size", adaptive_size, "Use size constraint heuristic while gradually building the library.");
@@ -194,6 +203,7 @@ int main(int argc, char **argv)
               h,
               b,
               ranking_method,
+              labels_lca,
               adaptive_size,
               pow(2, 2 * h) * b,           // capacity
               pow(2, 2 * h - batch_bsize), // tbatch_size
