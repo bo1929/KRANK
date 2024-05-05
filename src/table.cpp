@@ -193,7 +193,7 @@ void HTd<encT>::clearRows()
   /* tlca_vvec.resize(num_rows); */
   HTd<encT>::updateSize();
   HTd<encT>::num_basis = 0;
-  HTd<encT>::tIDsBasis = {};
+  HTd<encT>::trIDsBasis = {};
 #ifdef DEBUG
   LOG(INFO) << "The current size, after clearing, of the table is " << num_kmers << std::endl;
 #endif
@@ -211,7 +211,7 @@ void HTs<encT>::clearRows()
   }
   HTs<encT>::updateSize();
   num_basis = 0;
-  tIDsBasis = {};
+  trIDsBasis = {};
 #ifdef DEBUG
   LOG(INFO) << "The current size, after clearing, of the table is " << num_kmers << std::endl;
 #endif
@@ -242,7 +242,7 @@ void HTs<encT>::updateSize()
 }
 
 template<typename encT>
-void HTd<encT>::initBasis(tT tID)
+void HTd<encT>::initBasis(tT trID)
 {
 #ifdef DEBUG
   LOG(INFO) << "The current size of the table is " << num_kmers << std::endl;
@@ -253,14 +253,14 @@ void HTd<encT>::initBasis(tT tID)
       scount_vvec[rix].resize(enc_vvec[rix].size());
       std::fill(scount_vvec[rix].begin(), scount_vvec[rix].end(), 1);
       /* tlca_vvec[rix].resize(enc_vvec[rix].size()); */
-      /* std::fill(tlca_vvec[rix].begin(), tlca_vvec[rix].end(), tID); */
+      /* std::fill(tlca_vvec[rix].begin(), tlca_vvec[rix].end(), trID); */
     } else {
       scount_vvec[rix].clear();
       /* tlca_vvec[rix].clear(); */
     }
   }
   num_basis = 1;
-  tIDsBasis = {tID};
+  trIDsBasis = {trID};
 }
 
 template<typename encT>
@@ -287,7 +287,7 @@ void HTs<encT>::getScores(std::vector<float> &scores_vec, uint32_t rix)
   std::unordered_map<encT, float> values_map{};
   for (auto &ht : childrenHT) {
     for (unsigned int i = 0; i < ht.ind_arr[rix]; ++i)
-      cmap[ht.tID] += ht.scount_arr[rix * b + i];
+      cmap[ht.trID] += ht.scount_arr[rix * b + i];
   }
   for (auto &ht : childrenHT) {
     for (unsigned int i = 0; i < ht.ind_arr[rix]; ++i) {
@@ -357,7 +357,7 @@ void HTd<encT>::selectCoverage(std::vector<size_t> &ixs_r, uint32_t rix, size_t 
     bool uc = ixs_k.size() < b_max;
     bool am = false;
     for (unsigned int k = 0; k < ixs_k.size() && uc; ++k) {
-      tT c_lca = taxonomy_record->getLowestCommonAncestor(tlca_vvec[rix][ixs[j]], tlca_vvec[rix][ixs_k[k]]);
+      tT c_lca = tax_record->getLowestCommonAncestor(tlca_vvec[rix][ixs[j]], tlca_vvec[rix][ixs_k[k]]);
       if ((c_lca == tlca_vvec[rix][ixs[j]])) {
         // Has lower score and someones parent (or the same taxon).
         uc = false;
@@ -472,7 +472,7 @@ void HTd<encT>::unionRows(HTd<encT> &child, bool update_size)
     }
   }
   num_basis += child.num_basis;
-  tIDsBasis.insert(child.tIDsBasis.begin(), child.tIDsBasis.end());
+  trIDsBasis.insert(child.trIDsBasis.begin(), child.trIDsBasis.end());
   if (update_size)
     HTd<encT>::updateSize();
 #ifdef DEBUG
@@ -550,7 +550,7 @@ void HTs<encT>::unionRows(HTs<encT> &child, bool update_size)
     }
   }
   num_basis += child.num_basis;
-  tIDsBasis.insert(child.tIDsBasis.begin(), child.tIDsBasis.end());
+  trIDsBasis.insert(child.trIDsBasis.begin(), child.trIDsBasis.end());
   if (update_size)
     HTs<encT>::updateSize();
 #ifdef DEBUG
@@ -721,7 +721,7 @@ void HTd<encT>::updateLCA()
             if (tlca_map.find(ht.enc_vvec[rix][i]) == tlca_map.end())
               tlca_map[ht.enc_vvec[rix][i]] = ht.tlca_vvec[rix][i];
             else
-              tlca_map[ht.enc_vvec[rix][i]] = tID;
+              tlca_map[ht.enc_vvec[rix][i]] = trID;
           }
         }
         tlca_vvec[rix].resize(enc_vvec[rix].size());
@@ -746,7 +746,7 @@ void HTs<encT>::updateLCA()
             if (tlca_map.find(ht.enc_arr[rix * ht.b + i]) == tlca_map.end())
               tlca_map[ht.enc_arr[rix * ht.b + i]] = ht.tlca_arr[rix * ht.b + i];
             else
-              tlca_map[ht.enc_arr[rix * ht.b + i]] = tID;
+              tlca_map[ht.enc_arr[rix * ht.b + i]] = trID;
           }
         }
         for (unsigned int i = 0; i < ind_arr[rix]; ++i) {
@@ -785,7 +785,7 @@ void HTd<encT>::convertHTs(HTs<encT> *new_table)
     }
   }
   new_table->num_basis = num_basis;
-  new_table->tIDsBasis = tIDsBasis;
+  new_table->trIDsBasis = trIDsBasis;
   new_table->updateSize();
 }
 

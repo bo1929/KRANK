@@ -17,7 +17,7 @@ enum RankingMethod
 template<typename encT>
 struct HTs
 {
-  tT tID;
+  tT trID;
   uint8_t k, h, b;
   uint32_t num_rows;
   uint64_t num_kmers;
@@ -29,19 +29,19 @@ struct HTs
   tT *tlca_arr;
   uint8_t *ind_arr;
   RankingMethod ranking_method;
-  TaxonomyRecord<tT> *taxonomy_record;
+  TaxonomyRecord<tT> *tax_record;
   std::vector<HTs<encT>> childrenHT;
-  std::set<tT> tIDsBasis;
+  std::set<tT> trIDsBasis;
 
-  HTs(tT tID,
+  HTs(tT trID,
       uint8_t k,
       uint8_t h,
       uint8_t b,
       uint32_t num_rows,
       maskLSH *ptr_lsh_vg,
       RankingMethod ranking_method,
-      TaxonomyRecord<tT> *taxonomy_record)
-    : tID(tID)
+      TaxonomyRecord<tT> *tax_record)
+    : trID(trID)
     , k(k)
     , h(h)
     , b(b)
@@ -50,7 +50,7 @@ struct HTs
     , num_basis(0)
     , ptr_lsh_vg(ptr_lsh_vg)
     , ranking_method(ranking_method)
-    , taxonomy_record(taxonomy_record)
+    , tax_record(tax_record)
   {
     enc_arr = new encT[num_rows * b];
     std::fill(enc_arr, enc_arr + num_rows * b, 0);
@@ -64,7 +64,7 @@ struct HTs
       num_rows * b * sizeof(encT) + num_rows * sizeof(uint8_t) + num_rows * b * sizeof(scT) + num_rows * b * sizeof(tT);
   }
   HTs(const HTs &ts)
-    : tID(ts.tID)
+    : trID(ts.trID)
     , k(ts.k)
     , h(ts.h)
     , b(ts.b)
@@ -74,7 +74,7 @@ struct HTs
     , ptr_lsh_vg(ts.ptr_lsh_vg)
     , ranking_method(ts.ranking_method)
     , childrenHT(ts.childrenHT)
-    , tIDsBasis(ts.tIDsBasis)
+    , trIDsBasis(ts.trIDsBasis)
   {
     enc_arr = new encT[num_rows * b];
     std::copy(ts.enc_arr, ts.enc_arr + num_rows * b, enc_arr);
@@ -93,7 +93,7 @@ struct HTs
     std::copy(rhs.scount_arr, rhs.scount_arr + num_rows * b, scount_arr);
     std::copy(rhs.tlca_arr, rhs.tlca_arr + num_rows * b, tlca_arr);
     std::copy(rhs.ind_arr, rhs.ind_arr + num_rows, ind_arr);
-    tID = rhs.tID;
+    trID = rhs.trID;
     k = rhs.k;
     h = rhs.h;
     b = rhs.b;
@@ -103,7 +103,7 @@ struct HTs
     ptr_lsh_vg = rhs.ptr_lsh_vg;
     ranking_method = rhs.ranking_method;
     childrenHT = rhs.childrenHT;
-    tIDsBasis = rhs.tIDsBasis;
+    trIDsBasis = rhs.trIDsBasis;
     return *this;
   }
   ~HTs(void)
@@ -133,7 +133,7 @@ struct HTs
 template<typename encT>
 struct HTd
 {
-  tT tID;
+  tT trID;
   uint8_t k, h;
   uint32_t num_rows;
   uint64_t num_kmers;
@@ -144,18 +144,18 @@ struct HTd
   vvec<scT> scount_vvec;
   vvec<tT> tlca_vvec;
   RankingMethod ranking_method;
-  TaxonomyRecord<tT> *taxonomy_record;
+  TaxonomyRecord<tT> *tax_record;
   std::vector<HTd<encT>> childrenHT;
-  std::set<tT> tIDsBasis;
+  std::set<tT> trIDsBasis;
 
-  HTd(tT tID,
+  HTd(tT trID,
       uint8_t k,
       uint8_t h,
       uint32_t num_rows,
       maskLSH *ptr_lsh_vg,
       RankingMethod ranking_method,
-      TaxonomyRecord<tT> *taxonomy_record)
-    : tID(tID)
+      TaxonomyRecord<tT> *tax_record)
+    : trID(trID)
     , k(k)
     , h(h)
     , num_rows(num_rows) // i.e., tbatch_size
@@ -163,7 +163,7 @@ struct HTd
     , num_basis(0)
     , ptr_lsh_vg(ptr_lsh_vg)
     , ranking_method(ranking_method)
-    , taxonomy_record(taxonomy_record)
+    , tax_record(tax_record)
   {
     enc_vvec.resize(num_rows);
     scount_vvec.resize(num_rows);
@@ -189,7 +189,7 @@ struct HTd
   void convertHTs(HTs<encT> *new_table);
   void trimColumns(size_t b_max);
   void pruneColumns(size_t b_max);
-  void initBasis(tT tID);
+  void initBasis(tT trID);
   void updateLCA();
   std::map<size_t, uint64_t> histRowSizes();
 };

@@ -71,9 +71,9 @@ struct inputHandler
   {}
   float readInput(uint64_t rbatch_size);
   float extractInput(uint64_t rbatch_size);
-  bool saveInput(const char *dirpath, tT tID_key, uint16_t total_batches, uint32_t tbatch_size);
-  bool loadInput(const char *dirpath, tT tID_key, uint16_t total_batches);
-  bool checkInput(const char *dirpath, tT tID_key, uint16_t total_batches);
+  bool saveInput(const char *dirpath, tT trID_key, uint16_t total_batches, uint32_t tbatch_size);
+  bool loadInput(const char *dirpath, tT trID_key, uint16_t total_batches);
+  bool checkInput(const char *dirpath, tT trID_key, uint16_t total_batches);
   uint64_t getBatch(vvec<encT> &td, uint32_t tbatch_size);
   std::map<uint8_t, uint64_t> histRowSizes();
   void clearInput();
@@ -83,12 +83,12 @@ struct inputHandler
 template<typename encT>
 struct inputStream
 {
-  tT tID_key;
+  tT trID_key;
   std::string dirpath;
 
-  inputStream(std::string dirpath, tT tID_key)
+  inputStream(std::string dirpath, tT trID_key)
     : dirpath(dirpath)
-    , tID_key(tID_key)
+    , trID_key(trID_key)
   {}
   void loadBatch(std::vector<std::pair<uint32_t, encT>> &lsh_enc_vec, unsigned int curr_batch);
   void loadCounts(std::unordered_map<encT, uint32_t> &rcounts);

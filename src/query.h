@@ -11,7 +11,7 @@
 
 struct tvote_info_t
 {
-  uint32_t pred_taxID = 0;
+  uint32_t pred_tiID = 0;
   float tvote_n = 0.0;
   float tvote_r = 0.0;
 };
@@ -70,7 +70,7 @@ private:
   {
     QLibrary(const char *library_dirpath, bool log = false);
     const char *_library_dirpath;
-    const uint16_t _rootID = 1;
+    const uint16_t _rootrID = 1;
     uint8_t _k;
     uint8_t _h;
     uint8_t _b;
@@ -84,12 +84,12 @@ private:
     maskLSH _lsh_vg;
     std::vector<uint8_t> _positions;
     std::vector<uint8_t> _npositions;
-    std::unordered_map<tT, uint32_t> _tID_to_taxID;
+    std::unordered_map<tT, uint32_t> _trID_to_tiID;
     std::unordered_map<uint32_t, uint32_t> _parent_inmap;
     std::unordered_map<uint32_t, uint8_t> _depth_inmap;
     std::unordered_map<uint32_t, std::string> _rank_inmap;
     std::unordered_map<uint32_t, std::string> _name_inmap;
-    std::unordered_map<tT, float> _tID_to_length;
+    std::unordered_map<tT, float> _trID_to_length;
     uint32_t _tax_num_input;
     tT _tax_num_nodes;
     uint32_t _tax_full_size;
@@ -123,7 +123,7 @@ private:
   std::unordered_map<uint32_t, uint8_t> _depth_inmap;
   std::unordered_map<uint32_t, std::string> _rank_inmap;
   std::unordered_map<uint32_t, std::string> _name_inmap;
-  std::unordered_map<uint32_t, float> _taxID_to_length;
+  std::unordered_map<uint32_t, float> _tiID_to_length;
 };
 
 #endif

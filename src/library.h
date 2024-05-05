@@ -12,7 +12,7 @@ class Library
 {
 public:
   Library(const char *library_dirpath,
-          const char *taxonomy_dirpath,
+          const char *tax_dirpath,
           const char *input_filepath,
           uint8_t k,
           uint8_t w,
@@ -32,10 +32,10 @@ public:
           bool log = true);
 
 private:
-  TaxonomyInput _taxonomy_input;
-  TaxonomyRecord<tT> _taxonomy_record;
+  TaxonomyInput _tax_input;
+  TaxonomyRecord<tT> _tax_record;
   const char *_library_dirpath;
-  const char *_taxonomy_dirpath;
+  const char *_tax_dirpath;
   const char *_input_filepath;
   uint8_t _k;
   uint8_t _w;
@@ -54,10 +54,10 @@ private:
   std::unordered_map<tT, inputStream<encT>> _inputStream_map;
   std::unordered_map<tT, uint64_t> _basis_to_size;
   std::unordered_map<tT, size_t> _basis_to_ninput;
-  std::unordered_map<tT, uint64_t> _tID_to_size;
-  std::unordered_map<tT, float> _tID_to_length;
-  std::unordered_map<tT, uint32_t> _tID_to_ngenomes;
-  std::vector<tT> _tID_vec;
+  std::unordered_map<tT, uint64_t> _trID_to_size;
+  std::unordered_map<tT, float> _trID_to_length;
+  std::unordered_map<tT, uint32_t> _trID_to_ngenomes;
+  std::vector<tT> _trID_vec;
   uint32_t _num_species;
   uint32_t _num_nodes;
   bool _from_library;
@@ -68,10 +68,10 @@ private:
   bool _fast_mode;
   bool _log;
   bool _verbose;
-  const tT _rootID = 1;
+  const tT _rootrID = 1;
 
 public:
-  uint64_t getConstrainedSizeKC(tT curr_tID);
+  uint64_t getConstrainedSizeKC(tT curr_trID);
   uint64_t getConstrainedSizeSC(uint64_t num_basis);
   void getBatchHTd(HTd<encT> *td, unsigned int curr_batch);
   void getBatchHTs(HTs<encT> *ts, unsigned int curr_batch);
@@ -83,7 +83,7 @@ public:
   void skipBatch();
   void buildTables();
   void annotateInfo();
-  void processLeaf(tT tID_key);
+  void processLeaf(tT trID_key);
   void resetInfo(HTs<encT> &ts, bool reset_scount, bool reset_tlca);
   void softLCA(HTs<encT> &ts, unsigned int curr_batch);
   void countBasis(HTs<encT> &ts, unsigned int curr_batch);

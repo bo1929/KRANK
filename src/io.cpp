@@ -32,7 +32,7 @@ inline void sortColumns(vvec<T> &table)
 }
 
 template<typename encT>
-bool inputHandler<encT>::saveInput(const char *dirpath, tT tID_key, uint16_t total_batches, uint32_t tbatch_size)
+bool inputHandler<encT>::saveInput(const char *dirpath, tT trID_key, uint16_t total_batches, uint32_t tbatch_size)
 {
   bool is_ok = true;
   auto vec_begin = lsh_enc_vec.begin();
@@ -40,7 +40,7 @@ bool inputHandler<encT>::saveInput(const char *dirpath, tT tID_key, uint16_t tot
   for (int i = 1; i <= total_batches; ++i) {
     std::string batch_dirpath = dirpath;
     batch_dirpath += +"/batch" + std::to_string(i);
-    std::string disk_path = batch_dirpath + "/lsh_enc_vec-" + std::to_string(tID_key);
+    std::string disk_path = batch_dirpath + "/lsh_enc_vec-" + std::to_string(trID_key);
     FILE *vec_f = IO::open_file(disk_path.c_str(), is_ok, "wb");
     auto vec_p =
       std::upper_bound(vec_begin, vec_end, i * tbatch_size - 1, [](uint32_t value, const std::pair<uint32_t, encT> &p) {
@@ -64,7 +64,7 @@ bool inputHandler<encT>::saveInput(const char *dirpath, tT tID_key, uint16_t tot
 
   std::string rcounts_dirpath = dirpath;
   rcounts_dirpath += "/rcounts";
-  std::string rcounts_fpath = (rcounts_dirpath + "/" + std::to_string(tID_key));
+  std::string rcounts_fpath = (rcounts_dirpath + "/" + std::to_string(trID_key));
   if (!ghc::filesystem::exists(rcounts_fpath)) {
     std::vector<std::pair<encT, uint64_t>> rcounts_vec(rcounts.begin(), rcounts.end());
     FILE *rcounts_f = IO::open_file(rcounts_fpath.c_str(), is_ok, "wb");
@@ -80,13 +80,13 @@ bool inputHandler<encT>::saveInput(const char *dirpath, tT tID_key, uint16_t tot
 }
 
 template<typename encT>
-bool inputHandler<encT>::checkInput(const char *dirpath, tT tID_key, uint16_t total_batches)
+bool inputHandler<encT>::checkInput(const char *dirpath, tT trID_key, uint16_t total_batches)
 {
   bool is_ready = true;
   for (int i = 1; i <= total_batches; ++i) {
     std::string batch_dirpath = dirpath;
     batch_dirpath += +"/batch" + std::to_string(i);
-    std::string disk_path = batch_dirpath + "/lsh_enc_vec-" + std::to_string(tID_key);
+    std::string disk_path = batch_dirpath + "/lsh_enc_vec-" + std::to_string(trID_key);
     if (!exists_test(disk_path.c_str())) {
       is_ready = false;
       break;
@@ -96,14 +96,14 @@ bool inputHandler<encT>::checkInput(const char *dirpath, tT tID_key, uint16_t to
 }
 
 template<typename encT>
-bool inputHandler<encT>::loadInput(const char *dirpath, tT tID_key, uint16_t total_batches)
+bool inputHandler<encT>::loadInput(const char *dirpath, tT trID_key, uint16_t total_batches)
 {
   bool is_ok = true;
   lsh_enc_vec.clear();
   for (int i = 1; i <= total_batches; ++i) {
     std::string batch_dirpath = dirpath;
     batch_dirpath += +"/batch" + std::to_string(i);
-    std::string disk_path = batch_dirpath + "/lsh_enc_vec-" + std::to_string(tID_key);
+    std::string disk_path = batch_dirpath + "/lsh_enc_vec-" + std::to_string(trID_key);
     std::ifstream vec_ifs = IO::open_ifstream(disk_path.c_str(), is_ok);
     char buf[BUFF_SIZE];
     vec_ifs.rdbuf()->pubsetbuf(buf, BUFF_SIZE);
@@ -148,7 +148,7 @@ void inputStream<encT>::loadBatch(std::vector<std::pair<uint32_t, encT>> &lsh_en
   bool is_ok = true;
   std::string batch_dirpath = dirpath;
   batch_dirpath += +"/batch" + std::to_string(curr_batch);
-  std::string disk_path = batch_dirpath + "/lsh_enc_vec-" + std::to_string(tID_key);
+  std::string disk_path = batch_dirpath + "/lsh_enc_vec-" + std::to_string(trID_key);
   std::ifstream batch_ifs = IO::open_ifstream(disk_path.c_str(), is_ok);
   if (!is_ok)
     exit(EXIT_FAILURE);
@@ -171,7 +171,7 @@ void inputStream<encT>::loadCounts(std::unordered_map<encT, uint32_t> &rcounts)
 {
   bool is_ok = true;
   std::string rcounts_path = dirpath;
-  rcounts_path += "/rcounts/" + std::to_string(tID_key);
+  rcounts_path += "/rcounts/" + std::to_string(trID_key);
   std::vector<std::pair<encT, uint32_t>> rcounts_vec;
   uint64_t num_kmers = ghc::filesystem::file_size(rcounts_path) / sizeof(std::pair<encT, uint32_t>);
   if (num_kmers > 0) {
@@ -199,7 +199,7 @@ uint64_t inputStream<encT>::retrieveBatch(vvec<encT> &td, uint32_t tbatch_size, 
   bool is_ok = true;
   std::string batch_dirpath = dirpath;
   batch_dirpath += +"/batch" + std::to_string(curr_batch);
-  std::string disk_path = batch_dirpath + "/lsh_enc_vec-" + std::to_string(tID_key);
+  std::string disk_path = batch_dirpath + "/lsh_enc_vec-" + std::to_string(trID_key);
   uint64_t num_kmers = ghc::filesystem::file_size(disk_path) / sizeof(std::pair<uint32_t, encT>);
   std::ifstream batch_ifs = IO::open_ifstream(disk_path.c_str(), is_ok);
   if (!is_ok)
@@ -621,18 +621,18 @@ template float inputHandler<uint32_t>::extractInput(uint64_t rbatch_size);
 template float inputHandler<uint64_t>::extractInput(uint64_t rbatch_size);
 
 template bool
-inputHandler<uint64_t>::saveInput(const char *dirpath, tT tID_key, uint16_t total_batches, uint32_t tbatch_size);
+inputHandler<uint64_t>::saveInput(const char *dirpath, tT trID_key, uint16_t total_batches, uint32_t tbatch_size);
 
 template bool
-inputHandler<uint32_t>::saveInput(const char *dirpath, tT tID_key, uint16_t total_batches, uint32_t tbatch_size);
+inputHandler<uint32_t>::saveInput(const char *dirpath, tT trID_key, uint16_t total_batches, uint32_t tbatch_size);
 
-template bool inputHandler<uint64_t>::loadInput(const char *dirpath, tT tID_key, uint16_t total_batches);
+template bool inputHandler<uint64_t>::loadInput(const char *dirpath, tT trID_key, uint16_t total_batches);
 
-template bool inputHandler<uint32_t>::loadInput(const char *dirpath, tT tID_key, uint16_t total_batches);
+template bool inputHandler<uint32_t>::loadInput(const char *dirpath, tT trID_key, uint16_t total_batches);
 
-template bool inputHandler<uint64_t>::checkInput(const char *dirpath, tT tID_key, uint16_t total_batches);
+template bool inputHandler<uint64_t>::checkInput(const char *dirpath, tT trID_key, uint16_t total_batches);
 
-template bool inputHandler<uint32_t>::checkInput(const char *dirpath, tT tID_key, uint16_t total_batches);
+template bool inputHandler<uint32_t>::checkInput(const char *dirpath, tT trID_key, uint16_t total_batches);
 
 template void inputHandler<uint32_t>::clearInput();
 

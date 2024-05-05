@@ -49,9 +49,9 @@ template void HTs<uint64_t>::updateSize();
 
 template void HTs<uint32_t>::updateSize();
 
-template void HTd<uint64_t>::initBasis(tT tID);
+template void HTd<uint64_t>::initBasis(tT trID);
 
-template void HTd<uint32_t>::initBasis(tT tID);
+template void HTd<uint32_t>::initBasis(tT trID);
 
 template void HTd<uint64_t>::unionRows(HTd<uint64_t> &child, bool update_size);
 

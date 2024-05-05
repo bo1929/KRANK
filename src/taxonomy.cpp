@@ -1,8 +1,8 @@
 #include "taxonomy.h"
 
-TaxonomyInput::TaxonomyInput(const char *taxonomy_dirpath)
+TaxonomyInput::TaxonomyInput(const char *tax_dirpath)
 {
-  std::string main_dir = taxonomy_dirpath;
+  std::string main_dir = tax_dirpath;
   std::ifstream nodes_file(main_dir + "/nodes.dmp");
   std::ifstream names_file(main_dir + "/names.dmp");
 
@@ -91,16 +91,16 @@ TaxonomyInput::TaxonomyInput(const char *taxonomy_dirpath)
     }
   }
 
-  uint32_t tmp_taxID;
+  uint32_t tmp_tiID;
   uint8_t depth;
   for (auto &kv : _parent_map) {
     depth = 0;
-    tmp_taxID = kv.first;
-    while (_parent_map[tmp_taxID] != 0) {
-      tmp_taxID = _parent_map[tmp_taxID];
+    tmp_tiID = kv.first;
+    while (_parent_map[tmp_tiID] != 0) {
+      tmp_tiID = _parent_map[tmp_tiID];
       depth++;
     }
-    if (tmp_taxID == 1)
+    if (tmp_tiID == 1)
       depth++;
     _depth_map[kv.first] = depth;
   }
@@ -109,14 +109,14 @@ TaxonomyInput::TaxonomyInput(const char *taxonomy_dirpath)
   names_file.close();
 }
 
-uint32_t TaxonomyInput::getParent(uint32_t taxID) { return _parent_map[taxID]; }
+uint32_t TaxonomyInput::getParent(uint32_t tiID) { return _parent_map[tiID]; }
 
-std::string TaxonomyInput::getRank(uint32_t taxID) { return _rank_map[taxID]; }
+std::string TaxonomyInput::getRank(uint32_t tiID) { return _rank_map[tiID]; }
 
 template<typename T>
 TaxonomyRecord<T>::TaxonomyRecord(const char *input_filepath, TaxonomyInput taxonomy)
 {
-  std::map<std::string, uint32_t> input_to_taxID;
+  std::map<std::string, uint32_t> input_to_tiID;
   std::ifstream input_file(input_filepath);
   if (!input_file.good()) {
     std::cerr << "Error opening " << input_filepath << std::endl;
@@ -126,46 +126,46 @@ TaxonomyRecord<T>::TaxonomyRecord(const char *input_filepath, TaxonomyInput taxo
 
   while (std::getline(input_file, line)) {
     std::istringstream iss(line);
-    std::string inputn, taxID;
-    if (!(std::getline(iss, taxID, '\t') && std::getline(iss, inputn, '\t'))) {
+    std::string inputn, tiID;
+    if (!(std::getline(iss, tiID, '\t') && std::getline(iss, inputn, '\t'))) {
       std::cerr << "Failed to read file for taxon ID to input map!" << std::endl;
       exit(EXIT_FAILURE);
     }
-    input_to_taxID[inputn] = (uint32_t)stoul(taxID);
+    input_to_tiID[inputn] = (uint32_t)stoul(tiID);
   }
   input_file.close();
 
-  _num_input = input_to_taxID.size();
+  _num_input = input_to_tiID.size();
 
-  _tID_to_taxID[0] = 0;
-  _tID_to_taxID[1] = 1;
-  _taxID_to_tID[0] = 0;
-  _taxID_to_tID[1] = 1;
-  T curr_tID = 2;
+  _trID_to_tiID[0] = 0;
+  _trID_to_tiID[1] = 1;
+  _tiID_to_trID[0] = 0;
+  _tiID_to_trID[1] = 1;
+  T curr_trID = 2;
   uint32_t num_nodes = 1;
-  uint32_t parent_taxID = 1;
+  uint32_t parent_tiID = 1;
 
-  for (auto &kv : input_to_taxID) {
-    if (_taxID_to_tID.find(kv.second) == _taxID_to_tID.end()) {
-      _input_to_tID[kv.first] = curr_tID;
-      _tID_to_input[curr_tID].push_back(kv.first);
-      _tID_to_taxID[curr_tID] = kv.second;
-      _tID_to_rank[curr_tID] = taxonomy.getRank(kv.second);
-      _taxID_to_tID[kv.second] = curr_tID;
-      parent_taxID = taxonomy.getParent(kv.second);
-      while ((_taxID_to_tID.find(parent_taxID) == _taxID_to_tID.end()) && parent_taxID != 1) {
-        curr_tID++;
+  for (auto &kv : input_to_tiID) {
+    if (_tiID_to_trID.find(kv.second) == _tiID_to_trID.end()) {
+      _input_to_trID[kv.first] = curr_trID;
+      _trID_to_input[curr_trID].push_back(kv.first);
+      _trID_to_tiID[curr_trID] = kv.second;
+      _trID_to_rank[curr_trID] = taxonomy.getRank(kv.second);
+      _tiID_to_trID[kv.second] = curr_trID;
+      parent_tiID = taxonomy.getParent(kv.second);
+      while ((_tiID_to_trID.find(parent_tiID) == _tiID_to_trID.end()) && parent_tiID != 1) {
+        curr_trID++;
         num_nodes++;
-        _tID_to_taxID[curr_tID] = parent_taxID;
-        _tID_to_rank[curr_tID] = taxonomy.getRank(parent_taxID);
-        _taxID_to_tID[parent_taxID] = curr_tID;
-        parent_taxID = taxonomy.getParent(parent_taxID);
+        _trID_to_tiID[curr_trID] = parent_tiID;
+        _trID_to_rank[curr_trID] = taxonomy.getRank(parent_tiID);
+        _tiID_to_trID[parent_tiID] = curr_trID;
+        parent_tiID = taxonomy.getParent(parent_tiID);
       }
-      curr_tID++;
+      curr_trID++;
       num_nodes++;
     } else {
-      _input_to_tID[kv.first] = _taxID_to_tID[kv.second];
-      _tID_to_input[_taxID_to_tID[kv.second]].push_back(kv.first);
+      _input_to_trID[kv.first] = _tiID_to_trID[kv.second];
+      _trID_to_input[_tiID_to_trID[kv.second]].push_back(kv.first);
     }
   }
 
@@ -183,18 +183,18 @@ TaxonomyRecord<T>::TaxonomyRecord(const char *input_filepath, TaxonomyInput taxo
   }
 #endif
 
-  _num_nodes = curr_tID - 1;
+  _num_nodes = curr_trID - 1;
 
-  for (auto &kv : _tID_to_taxID) {
+  for (auto &kv : _trID_to_tiID) {
     _parent_inmap[kv.second] = taxonomy.parent_map()[kv.second];
     _depth_inmap[kv.second] = taxonomy.depth_map()[kv.second];
     _rank_inmap[kv.second] = taxonomy.rank_map()[kv.second];
     _name_inmap[kv.second] = taxonomy.name_map()[kv.second];
   }
 
-  _parent_vec.resize(curr_tID);
-  for (auto &kv : _tID_to_taxID) {
-    _parent_vec[kv.first] = _taxID_to_tID[taxonomy.getParent(kv.second)];
+  _parent_vec.resize(curr_trID);
+  for (auto &kv : _trID_to_tiID) {
+    _parent_vec[kv.first] = _tiID_to_trID[taxonomy.getParent(kv.second)];
   }
 
   for (unsigned int i = 1; i < _parent_vec.size(); ++i) {
@@ -202,27 +202,27 @@ TaxonomyRecord<T>::TaxonomyRecord(const char *input_filepath, TaxonomyInput taxo
     _child_map[_parent_vec[i]].insert(i);
   }
 
-  _depth_vec.resize(curr_tID);
+  _depth_vec.resize(curr_trID);
   uint8_t depth;
-  for (auto &kv : _tID_to_taxID) {
+  for (auto &kv : _trID_to_tiID) {
     depth = 0;
-    curr_tID = kv.first;
-    while (_parent_vec[curr_tID] != 0) {
-      curr_tID = _parent_vec[curr_tID];
+    curr_trID = kv.first;
+    while (_parent_vec[curr_trID] != 0) {
+      curr_trID = _parent_vec[curr_trID];
       depth++;
     }
-    if (curr_tID == 1)
+    if (curr_trID == 1)
       depth++;
     _depth_vec[kv.first] = depth;
   }
 
-  tT tmp_tID = 0;
-  for (unsigned int tID_i = 1; tID_i <= _num_nodes; ++tID_i) {
-    tmp_tID = tID_i;
-    while (_depth_vec[tmp_tID] > LSR) {
-      tmp_tID = _parent_vec[tmp_tID];
+  tT tmp_trID = 0;
+  for (unsigned int trID_i = 1; trID_i <= _num_nodes; ++trID_i) {
+    tmp_trID = trID_i;
+    while (_depth_vec[tmp_trID] > LSR) {
+      tmp_trID = _parent_vec[tmp_trID];
     }
-    _tID_to_lsroot[tID_i] = tmp_tID;
+    _trID_to_lsroot[trID_i] = tmp_trID;
   }
 }
 
@@ -242,12 +242,12 @@ template<typename T>
 void TaxonomyRecord<T>::printTaxonomyRecord()
 {
   std::cout << "Taxonomy-record ID : Taxon ID" << std::endl;
-  for (auto &kv : _tID_to_taxID) {
+  for (auto &kv : _trID_to_tiID) {
     std::cout << kv.first << " " << kv.second << std::endl;
   }
   std::cout << "Genome path : Taxonomy-record ID : Taxon ID" << std::endl;
-  for (auto &kv : _input_to_tID) {
-    std::cout << kv.first << " " << kv.second << " " << _tID_to_taxID[kv.second] << std::endl;
+  for (auto &kv : _input_to_trID) {
+    std::cout << kv.first << " " << kv.second << " " << _trID_to_tiID[kv.second] << std::endl;
   }
 }
 
@@ -266,21 +266,21 @@ T TaxonomyRecord<T>::getLowestCommonAncestor(T a, T b)
 }
 
 template<typename T>
-T TaxonomyRecord<T>::tID_from_taxID(uint32_t taxID)
+T TaxonomyRecord<T>::trID_from_tiID(uint32_t tiID)
 {
-  return _taxID_to_tID[taxID];
+  return _tiID_to_trID[tiID];
 }
 
 template<typename T>
-uint32_t TaxonomyRecord<T>::taxID_from_tID(T tID)
+uint32_t TaxonomyRecord<T>::tiID_from_trID(T trID)
 {
-  return _tID_to_taxID[tID];
+  return _trID_to_tiID[trID];
 }
 
 template<typename T>
-bool TaxonomyRecord<T>::isBasis(T tID)
+bool TaxonomyRecord<T>::isBasis(T trID)
 {
-  return _tID_to_input.find(tID) != _tID_to_input.end();
+  return _trID_to_input.find(trID) != _trID_to_input.end();
 }
 
 template<typename T>
@@ -288,37 +288,37 @@ bool TaxonomyRecord<T>::saveTaxonomyRecord(const char *library_dirpath)
 {
   bool is_ok = true;
   std::string save_filepath(library_dirpath);
-  std::vector<std::pair<T, uint32_t>> tIDs_taxIDs(_tID_to_taxID.begin(), _tID_to_taxID.end());
-  std::vector<std::pair<uint32_t, uint32_t>> taxIDs_parents(_parent_inmap.begin(), _parent_inmap.end());
-  std::vector<std::pair<uint32_t, uint8_t>> taxIDs_depths(_depth_inmap.begin(), _depth_inmap.end());
+  std::vector<std::pair<T, uint32_t>> trIDs_tiIDs(_trID_to_tiID.begin(), _trID_to_tiID.end());
+  std::vector<std::pair<uint32_t, uint32_t>> tiIDs_parents(_parent_inmap.begin(), _parent_inmap.end());
+  std::vector<std::pair<uint32_t, uint8_t>> tiIDs_depths(_depth_inmap.begin(), _depth_inmap.end());
 
-  FILE *taxonomy_f = IO::open_file((save_filepath + "/taxonomy").c_str(), is_ok, "wb");
-  std::fwrite(&_num_nodes, sizeof(T), 1, taxonomy_f);
-  std::fwrite(&_num_input, sizeof(uint32_t), 1, taxonomy_f);
-  std::fwrite(_parent_vec.data(), sizeof(T), _num_nodes, taxonomy_f);
-  std::fwrite(_depth_vec.data(), sizeof(uint8_t), _num_nodes, taxonomy_f);
-  std::fwrite(tIDs_taxIDs.data(), sizeof(std::pair<T, uint32_t>), _num_nodes, taxonomy_f);
-  std::fwrite(taxIDs_parents.data(), sizeof(std::pair<uint32_t, uint32_t>), _num_nodes, taxonomy_f);
-  std::fwrite(taxIDs_depths.data(), sizeof(std::pair<uint32_t, uint8_t>), _num_nodes, taxonomy_f);
+  FILE *tax_f = IO::open_file((save_filepath + "/taxonomy").c_str(), is_ok, "wb");
+  std::fwrite(&_num_nodes, sizeof(T), 1, tax_f);
+  std::fwrite(&_num_input, sizeof(uint32_t), 1, tax_f);
+  std::fwrite(_parent_vec.data(), sizeof(T), _num_nodes, tax_f);
+  std::fwrite(_depth_vec.data(), sizeof(uint8_t), _num_nodes, tax_f);
+  std::fwrite(trIDs_tiIDs.data(), sizeof(std::pair<T, uint32_t>), _num_nodes, tax_f);
+  std::fwrite(tiIDs_parents.data(), sizeof(std::pair<uint32_t, uint32_t>), _num_nodes, tax_f);
+  std::fwrite(tiIDs_depths.data(), sizeof(std::pair<uint32_t, uint8_t>), _num_nodes, tax_f);
 
   for (auto &kv : _rank_inmap) {
     size_t size_str = kv.second.size();
-    std::fwrite(&kv.first, sizeof(uint32_t), 1, taxonomy_f);
-    std::fwrite(&size_str, sizeof(size_t), 1, taxonomy_f);
-    std::fwrite(&kv.second[0], sizeof(char), size_str, taxonomy_f);
+    std::fwrite(&kv.first, sizeof(uint32_t), 1, tax_f);
+    std::fwrite(&size_str, sizeof(size_t), 1, tax_f);
+    std::fwrite(&kv.second[0], sizeof(char), size_str, tax_f);
   }
   for (auto &kv : _name_inmap) {
     size_t size_str = kv.second.size();
-    std::fwrite(&kv.first, sizeof(uint32_t), 1, taxonomy_f);
-    std::fwrite(&size_str, sizeof(size_t), 1, taxonomy_f);
-    std::fwrite(&kv.second[0], sizeof(char), size_str, taxonomy_f);
+    std::fwrite(&kv.first, sizeof(uint32_t), 1, tax_f);
+    std::fwrite(&size_str, sizeof(size_t), 1, tax_f);
+    std::fwrite(&kv.second[0], sizeof(char), size_str, tax_f);
   }
 
-  if (std::ferror(taxonomy_f)) {
+  if (std::ferror(tax_f)) {
     std::puts("I/O error when writing taxonomy-record file to the library.\n");
     is_ok = false;
   }
-  std::fclose(taxonomy_f);
+  std::fclose(tax_f);
 
   return is_ok;
 }
@@ -335,17 +335,17 @@ template uint32_t TaxonomyRecord<uint32_t>::getLowestCommonAncestor(uint32_t a, 
 
 template uint16_t TaxonomyRecord<uint16_t>::getLowestCommonAncestor(uint16_t a, uint16_t b);
 
-template uint32_t TaxonomyRecord<uint16_t>::taxID_from_tID(uint16_t tID);
+template uint32_t TaxonomyRecord<uint16_t>::tiID_from_trID(uint16_t trID);
 
-template uint32_t TaxonomyRecord<uint32_t>::taxID_from_tID(uint32_t tID);
+template uint32_t TaxonomyRecord<uint32_t>::tiID_from_trID(uint32_t trID);
 
-template uint16_t TaxonomyRecord<uint16_t>::tID_from_taxID(uint32_t taxID);
+template uint16_t TaxonomyRecord<uint16_t>::trID_from_tiID(uint32_t tiID);
 
-template uint32_t TaxonomyRecord<uint32_t>::tID_from_taxID(uint32_t taxID);
+template uint32_t TaxonomyRecord<uint32_t>::trID_from_tiID(uint32_t tiID);
 
-template bool TaxonomyRecord<uint16_t>::isBasis(uint16_t tID);
+template bool TaxonomyRecord<uint16_t>::isBasis(uint16_t trID);
 
-template bool TaxonomyRecord<uint32_t>::isBasis(uint32_t tID);
+template bool TaxonomyRecord<uint32_t>::isBasis(uint32_t trID);
 
 template bool TaxonomyRecord<uint32_t>::saveTaxonomyRecord(const char *library_dirpath);
 
