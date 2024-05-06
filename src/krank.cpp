@@ -68,13 +68,12 @@ int main(int argc, char **argv)
     "The specific library batch to be built. "
     "If 0, all batches will be processed one by one. "
     "If not given, the library will only be initialized after reading the input data and encoding k-mers.");
-  std::map<std::string, RankingMethod> map_ranking{{"random_kmer", random_kmer},
-                                                   {"representative_kmer", representative_kmer}};
+  std::map<std::string, RankingMethod> map_ranking{{"random", random_kmer}, {"representative", representative_kmer}};
   RankingMethod ranking_method = representative_kmer;
   sub_build
     ->add_option("--kmer-ranking",
                  ranking_method,
-                 "Which strategy will be used for k-mer ranking? (0: random_kmer, 1: representative_kmer)"
+                 "Which strategy will be used for k-mer ranking? (0: random_kmer, 1: representative_kmer) "
                  "Default: representative_kmer, selected based on coverage heuristic.")
     ->transform(CLI::CheckedTransformer(map_ranking, CLI::ignore_case));
   std::map<std::string, LabelsLCA> map_labels{{"hard", hard_lca}, {"soft", soft_lca}};
@@ -82,8 +81,8 @@ int main(int argc, char **argv)
   sub_build
     ->add_option("--lca",
                  labels_lca,
-                 "This option determines LCA computation method for k-mer labels? (0: hard_lca, 1: soft_lca)"
-                 "Default: soft, computed using CONSULT-II's heuristic.")
+                 "This option determines LCA computation method for k-mer labels? (0: hard_lca, 1: soft_lca) "
+                 "Default: soft_lca, computed using CONSULT-II's heuristic.")
     ->transform(CLI::CheckedTransformer(map_labels, CLI::ignore_case));
   bool adaptive_size = false;
   sub_build->add_flag(

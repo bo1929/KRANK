@@ -8,6 +8,12 @@
 #include "taxonomy.h"
 #include "filesystem.hpp"
 
+enum LabelsLCA
+{
+  hard_lca,
+  soft_lca,
+};
+
 class Library
 {
 public:

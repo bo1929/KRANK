@@ -1,11 +1,5 @@
 #include "library.h"
 
-enum LabelsLCA
-{
-  hard_lca,
-  soft_lca,
-};
-
 Library::Library(const char *library_dirpath,
                  const char *tax_dirpath,
                  const char *input_filepath,

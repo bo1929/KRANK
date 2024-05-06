@@ -7,12 +7,11 @@ echo "KRANK is a taxonomic identification tool."
 echo "This script will run multiple test to make sure that KRANK can run flawlessly on your system."
 echo "You can configure KRANK by specifying each parameter - press ENTER to skip and use default test value."
 echo "Note that these defaults are only for the test and might not perform sufficiently good."
-sleep 5
+sleep 3
 
 if [ ! -d taxonomy ]; then
   mkdir -p taxonomy
-  wget https://ftp.ncbi.nih.gov/pub/taxonomy/taxdump.tar.gz && tar -xvf taxdump.tar.gz -C taxonomy
-  rm -f taxdump.tar.gz
+  wget https://ftp.ncbi.nih.gov/pub/taxonomy/taxdump.tar.gz && tar -xvf taxdump.tar.gz -C taxonomy rm -f taxdump.tar.gz
 fi
 
 echo "Please enter:"
@@ -38,7 +37,7 @@ echo "Initialzing the library..."
   -i ./input_map.tsv  \
   -k ${MERLEN} -w ${WINSIZE} -h ${NUMPOS} -b ${NUMCOL} -s ${NBATCHB} \
   --from-scratch --input-sequences \
-  --kmer-ranking 1 --adaptive-size \
+  --kmer-ranking representative --adaptive-size --lca soft \
   --num-threads ${NTHREADS} \
   && echo "The library has been successfully initialized and k-mers havebeen extracted."
 
@@ -48,7 +47,7 @@ echo "Building the library for each batch one by one..."
   -i ./input_map.tsv  \
   -k ${MERLEN} -w ${WINSIZE} -h ${NUMPOS} -b ${NUMCOL} -s ${NBATCHB} \
   --target-batch 0 --fast-mode --from-library --input-sequences \
-  --kmer-ranking 1 --adaptive-size \
+  --kmer-ranking representative --adaptive-size --lca soft \
   --num-threads ${NTHREADS} \
   && echo "All batches have been constucted, the library is ready to query against."
 
@@ -58,7 +57,7 @@ echo "Building the library in fast mode, for each batch one by one..."
   -i ./input_map.tsv  \
   -k ${MERLEN} -w ${WINSIZE} -h ${NUMPOS} -b ${NUMCOL} -s ${NBATCHB} \
   --target-batch 0 --selection-mode --from-library --input-sequences \
-  --kmer-ranking 1 --adaptive-size \
+  --kmer-ranking representative --adaptive-size --lca soft \
   --num-threads ${NTHREADS} \
   && echo "All batches have been constucted, the library is ready to query against."
 

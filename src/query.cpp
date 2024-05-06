@@ -574,17 +574,18 @@ bool Query::QLibrary::loadTaxonomy()
   std::fread(&_tax_num_nodes, sizeof(tT), 1, tax_f);
   std::fread(&_tax_num_input, sizeof(uint32_t), 1, tax_f);
 
-  trIDs_tiIDs.resize(_tax_num_nodes);
-  _tax_parent_vec.resize(_tax_num_nodes);
-  _tax_depth_vec.resize(_tax_num_nodes);
-  tiIDs_parents.resize(_tax_num_nodes);
-  tiIDs_depths.resize(_tax_num_nodes);
+  tT num_entry = _tax_num_nodes + 1;
+  trIDs_tiIDs.resize(num_entry);
+  _tax_parent_vec.resize(num_entry);
+  _tax_depth_vec.resize(num_entry);
+  tiIDs_parents.resize(num_entry);
+  tiIDs_depths.resize(num_entry);
 
-  std::fread(_tax_parent_vec.data(), sizeof(tT), _tax_num_nodes, tax_f);
-  std::fread(_tax_depth_vec.data(), sizeof(uint8_t), _tax_num_nodes, tax_f);
-  std::fread(trIDs_tiIDs.data(), sizeof(std::pair<tT, uint32_t>), _tax_num_nodes, tax_f);
-  std::fread(tiIDs_parents.data(), sizeof(std::pair<uint32_t, uint32_t>), _tax_num_nodes, tax_f);
-  std::fread(tiIDs_depths.data(), sizeof(std::pair<uint32_t, uint8_t>), _tax_num_nodes, tax_f);
+  std::fread(_tax_parent_vec.data(), sizeof(tT), num_entry, tax_f);
+  std::fread(_tax_depth_vec.data(), sizeof(uint8_t), num_entry, tax_f);
+  std::fread(trIDs_tiIDs.data(), sizeof(std::pair<tT, uint32_t>), num_entry, tax_f);
+  std::fread(tiIDs_parents.data(), sizeof(std::pair<uint32_t, uint32_t>), num_entry, tax_f);
+  std::fread(tiIDs_depths.data(), sizeof(std::pair<uint32_t, uint8_t>), num_entry, tax_f);
 
   for (auto kv : trIDs_tiIDs)
     _trID_to_tiID[kv.first] = kv.second;

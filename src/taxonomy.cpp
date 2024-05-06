@@ -287,6 +287,7 @@ template<typename T>
 bool TaxonomyRecord<T>::saveTaxonomyRecord(const char *library_dirpath)
 {
   bool is_ok = true;
+  T num_entry = _num_nodes + 1;
   std::string save_filepath(library_dirpath);
   std::vector<std::pair<T, uint32_t>> trIDs_tiIDs(_trID_to_tiID.begin(), _trID_to_tiID.end());
   std::vector<std::pair<uint32_t, uint32_t>> tiIDs_parents(_parent_inmap.begin(), _parent_inmap.end());
@@ -295,11 +296,11 @@ bool TaxonomyRecord<T>::saveTaxonomyRecord(const char *library_dirpath)
   FILE *tax_f = IO::open_file((save_filepath + "/taxonomy").c_str(), is_ok, "wb");
   std::fwrite(&_num_nodes, sizeof(T), 1, tax_f);
   std::fwrite(&_num_input, sizeof(uint32_t), 1, tax_f);
-  std::fwrite(_parent_vec.data(), sizeof(T), _num_nodes, tax_f);
-  std::fwrite(_depth_vec.data(), sizeof(uint8_t), _num_nodes, tax_f);
-  std::fwrite(trIDs_tiIDs.data(), sizeof(std::pair<T, uint32_t>), _num_nodes, tax_f);
-  std::fwrite(tiIDs_parents.data(), sizeof(std::pair<uint32_t, uint32_t>), _num_nodes, tax_f);
-  std::fwrite(tiIDs_depths.data(), sizeof(std::pair<uint32_t, uint8_t>), _num_nodes, tax_f);
+  std::fwrite(_parent_vec.data(), sizeof(T), num_entry, tax_f);
+  std::fwrite(_depth_vec.data(), sizeof(uint8_t), num_entry, tax_f);
+  std::fwrite(trIDs_tiIDs.data(), sizeof(std::pair<T, uint32_t>), num_entry, tax_f);
+  std::fwrite(tiIDs_parents.data(), sizeof(std::pair<uint32_t, uint32_t>), num_entry, tax_f);
+  std::fwrite(tiIDs_depths.data(), sizeof(std::pair<uint32_t, uint8_t>), num_entry, tax_f);
 
   for (auto &kv : _rank_inmap) {
     size_t size_str = kv.second.size();
