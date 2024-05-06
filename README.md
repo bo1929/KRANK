@@ -80,7 +80,9 @@ If you would like to benchmark KRANK against some other tools, you can use [OPAL
 
 #### Available libraries
 More and more diverse libraries will be added soon.
-- [WoL-v1 dataset - archaeal and bacterial genomes - lightweight (6.25Gb) and w/ ranking v0.3.2](https://ter-trees.ucsd.edu/data/krank/library-WoLv1-k29w32h13b16s7-reps_adpt.tar.gz)
+- WoL-v1 dataset - archaeal and bacterial genomes:
+	* [lightweight (6.25Gb) & with ranking - selective-mode](https://ter-trees.ucsd.edu/data/krank/lib_reps_adpt-k29_w35_h13_b16_s8.tar.gz)
+	* [lightweight (6.25Gb) & with random - fast-mode](https://ter-trees.ucsd.edu/data/krank/lib_rand_free-k29_w35_h13_b16_s8.tar.gz)
 
 #### Recommendations for choosing the right set of libraries
 Soon.
