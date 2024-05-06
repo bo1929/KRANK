@@ -232,6 +232,15 @@ uint64_t inputStream<encT>::retrieveBatch(vvec<encT> &td, uint32_t tbatch_size, 
 }
 
 template<typename encT>
+void inputStream<encT>::removeBatch(unsigned int curr_batch)
+{
+  std::string batch_dirpath = dirpath;
+  batch_dirpath += +"/batch" + std::to_string(curr_batch);
+  std::string disk_path = batch_dirpath + "/lsh_enc_vec-" + std::to_string(trID_key);
+  ghc::filesystem::remove(disk_path);
+}
+
+template<typename encT>
 float inputHandler<encT>::extractInput(uint64_t rbatch_size)
 {
   uint32_t max_rix = std::numeric_limits<uint32_t>::max();
@@ -657,6 +666,10 @@ inputStream<uint32_t>::retrieveBatch(vvec<uint32_t> &td, uint32_t tbatch_size, u
 
 template uint64_t
 inputStream<uint64_t>::retrieveBatch(vvec<uint64_t> &td, uint32_t tbatch_size, unsigned int curr_batch, bool shared_table);
+
+template void inputStream<uint32_t>::removeBatch(unsigned int curr_batch);
+
+template void inputStream<uint64_t>::removeBatch(unsigned int curr_batch);
 
 template std::map<uint8_t, uint64_t> inputHandler<uint64_t>::histRowSizes();
 

@@ -18,6 +18,7 @@ Library::Library(const char *library_dirpath,
                  bool only_init,
                  bool update_annotations,
                  bool fast_mode,
+                 bool remove_intermediate,
                  bool verbose,
                  bool log)
   : _library_dirpath(library_dirpath)
@@ -40,6 +41,7 @@ Library::Library(const char *library_dirpath,
   , _only_init(only_init)
   , _update_annotations(update_annotations)
   , _fast_mode(fast_mode)
+  , _remove_intermediate(remove_intermediate)
   , _verbose(verbose)
   , _log(log)
 {
@@ -149,6 +151,29 @@ Library::Library(const char *library_dirpath,
     } else {
       Library::buildTables();
       std::cout << "Library has been built and saved" << std::endl;
+    }
+    if (_remove_intermediate) {
+      for (int i = 1; i <= _total_batches; ++i) {
+        if ((_target_batch == 0) || (i == _target_batch)) {
+          std::string batch_dirpath = _library_dirpath;
+          batch_dirpath += +"/batch" + std::to_string(i);
+          ghc::filesystem::remove_all(batch_dirpath);
+        }
+      }
+      std::string check_dirpath(_library_dirpath);
+      bool all_built = true;
+      for (int i = 1; i <= _total_batches; ++i) {
+        if (!(ghc::filesystem::exists(check_dirpath + "/enc_arr-" + std::to_string(i)) &&
+              ghc::filesystem::exists(check_dirpath + "/scount_arr-" + std::to_string(i)) &&
+              ghc::filesystem::exists(check_dirpath + "/ind_arr-" + std::to_string(i)) &&
+              ghc::filesystem::exists(check_dirpath + "/tlca_arr-" + std::to_string(i))))
+          all_built = false;
+      }
+      if (all_built) {
+        std::string rcounts_dirpath = _library_dirpath;
+        rcounts_dirpath += "/rcounts/";
+        ghc::filesystem::remove_all(rcounts_dirpath);
+      }
     }
   } else {
     std::cout << "Library has been successfully initialized" << std::endl;
@@ -373,8 +398,9 @@ void Library::getBatchHTs(HTs<encT> *ts, unsigned int curr_batch)
           tmp_trID = _tax_record.parent_vec()[tmp_trID];
         }
       }
-      if (is_below || (td.trID == _rootrID))
+      if (is_below || (td.trID == _rootrID)) {
         nkmers_batch = _inputStream_map.at(_trID_vec[i]).retrieveBatch(td.enc_vvec, _tbatch_size, curr_batch, true);
+      }
     }
     td.initBasis(td.trID);
     td.makeUnique();

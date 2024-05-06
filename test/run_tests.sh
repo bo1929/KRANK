@@ -46,7 +46,7 @@ echo "Building the library for each batch one by one..."
   -l ${LIBDIR} -t ./taxonomy/ \
   -i ./input_map.tsv  \
   -k ${MERLEN} -w ${WINSIZE} -h ${NUMPOS} -b ${NUMCOL} -s ${NBATCHB} \
-  --target-batch 0 --fast-mode --from-library --input-sequences \
+  --target-batch 0 --fast-mode --from-library --input-sequences --keep-intermediate \
   --kmer-ranking representative --adaptive-size --lca soft \
   --num-threads ${NTHREADS} \
   && echo "All batches have been constucted, the library is ready to query against."

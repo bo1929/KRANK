@@ -102,11 +102,18 @@ int main(int argc, char **argv)
     "--update-annotations,!--build-tables",
     update_annotations,
     "When --update-annotations option is given, KRANK tries to update soft LCAs of k-mers by going over reference genomes. "
+    "If the intermediate files are deleted, attempting to update annotations will result in an error. "
     /* "This will be done without rebuilding the tables, hence it will be very fast. " */
     /* "This might be particularly useful when parameters for soft LCA are changed. " */
     /* "Without a target batch given (using --target-batch), either options would be ignored. " */
     /* "KRANK would just initialize the library. " */
     "Default --build-tables selects k-mers, builds tables, and also computes soft LCAs.");
+  bool remove_intermediate = true;
+  sub_build->add_flag("--remove-intermediate,!--keep-intermediate",
+                      remove_intermediate,
+                      "When --keep-intermediate is given, KRANK will not delete batch data stored on the disk. "
+                      "You may need to manually remove many small files (potentially tens of thousands). "
+                      "This may be desired if one wants to use --update-annotations later.");
   sub_build->callback([&]() {
     if (sub_build->count("--fast-mode"))
       ranking_method = map_ranking["random_kmer"];
@@ -212,6 +219,7 @@ int main(int argc, char **argv)
               only_init,
               update_annotations,
               fast_mode,
+              remove_intermediate,
               verbose || log,
               log);
   }

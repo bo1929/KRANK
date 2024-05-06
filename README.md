@@ -272,6 +272,9 @@ Options:
   --update-annotations,--build-tables{false}
                               When --update-annotations option is given, KRANK tries to update soft LCAs of k-mers by going over reference genomes.
 							  Default --build-tables selects k-mers, builds tables, and also computes soft LCAs.
+  --remove-intermediate,--keep-intermediate{false}
+                              When --keep-intermediate is given, KRANK will not delete batch data stored on the disk.
+							  You may need to manually remove many small files (potentially tens of thousands). This may be desired if one wants to use --update-annotations later.
 ```
 
 ### `krank query`

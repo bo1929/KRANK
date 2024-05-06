@@ -35,6 +35,7 @@ public:
           bool only_init = false,
           bool update_annotations = false,
           bool fast_mode = false,
+          bool remove_intermediate = true,
           bool verbose = true,
           bool log = true);
 
@@ -74,6 +75,7 @@ private:
   bool _only_init;
   bool _update_annotations;
   bool _fast_mode;
+  bool _remove_intermediate;
   bool _log;
   bool _verbose;
   const tT _rootrID = 1;
