@@ -92,10 +92,10 @@ int main(int argc, char **argv)
   sub_build->add_flag(
     "--fast-mode,!--selection-mode",
     fast_mode,
-    "The default mode is --selection-mode which traverses the taxonomy and selects k-mers accordingly. "
-    "When --fast-mode is given, tree traversal will be skipped, and the final library will be built at the root. "
+    "The optional mode is --selection-mode which traverses the taxonomy and selects k-mers accordingly. "
+    "When --selection-mode is not given, tree traversal will be skipped, and the final library will be built at the root. "
     "With --kmer-ranking random_kmer, this is equivalent to CONSULT-II. "
-    "If --fast-mode is given, --adaptive-size will be ignored and have no effect. "
+    "If --selection-mode is not given, --adaptive-size will be ignored and have no effect. "
     "Note  --fast-mode is significantly faster.");
   bool update_annotations = false;
   sub_build->add_flag(

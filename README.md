@@ -254,8 +254,12 @@ Options:
   --target-batch UINT         The specific library batch to be built.
 							  If 0, all batches will be processed one by one.
 							  If not given, the library will only be initialized after reading the input data and encoding k-mers.
-  --kmer-ranking ENUM:value in {random_kmer->0,representative_kmer->1} OR {0,1}
+ --kmer-ranking ENUM:value in {random->0,representative->1} OR {0,1}
                               Which strategy will be used for k-mer ranking? (0: random_kmer, 1: representative_kmer)
+							  Default: representative_kmer, selected based on coverage heuristic.
+  --lca ENUM:value in {hard->0,soft->1} OR {0,1}
+                              This option determines LCA computation method for k-mer labels? (0: hard_lca, 1: soft_lca)
+							  Default: soft_lca, computed using CONSULT-II's heuristic.
   --adaptive-size,--free-size{false}
                               Use size constraint heuristic while gradually building the library.
   --num-threads UINT          Number of threads to use for OpenMP-based parallelism.
