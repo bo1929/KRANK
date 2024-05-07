@@ -70,6 +70,7 @@ Query::Query(std::vector<std::string> library_dirpaths,
 
   if (IO::checkFASTAQ(_query_filepath)) {
     ghc::filesystem::path qpath{_query_filepath};
+    qpath = qpath.stem();
     qpath.replace_extension();
     std::string fpath = _query_filepath;
     std::string queryID = qpath.generic_string();
