@@ -83,6 +83,7 @@ More and more diverse libraries will be added soon.
 - WoL-v1 dataset - archaeal and bacterial genomes:
 	* [lightweight (6.25Gb) & with ranking - selective-mode](https://ter-trees.ucsd.edu/data/krank/lib_reps_adpt-k29_w35_h13_b16_s8.tar.gz)
 	* [lightweight (6.25Gb) & with random - fast-mode](https://ter-trees.ucsd.edu/data/krank/lib_rand_free-k29_w35_h13_b16_s8.tar.gz)
+	* [high-sensitivity (25Gb) & with random - fast-mode](https://ter-trees.ucsd.edu/data/krank/lib_rand_free-k30_w35_h14_b16_s9.tar.gz)
 
 #### Recommendations for choosing the right set of libraries
 Soon.
