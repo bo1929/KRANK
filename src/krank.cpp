@@ -51,6 +51,15 @@ int main(int argc, char **argv)
   uint8_t w = k + 3;
   sub_build->add_option("-k,--kmer-length", k, "Length of k-mers. Default: 29.");
   sub_build->add_option("-w,--window-length", w, "Length of minimizer window. Default: k+3.");
+  uint64_t max_memory = 12000;
+  sub_build->add_option(
+    "-m,--max-memory",
+    max_memory,
+    "The maximum memory limit for the final library (in megabyte - MB). "
+    "This will override -h (--num-positions), -b (--num-columns) and -k (--kmer-length). "
+    "KRANK will pick a good configuration of k, h and b values for you. "
+    "Note that this is only the final library size. "
+    "Memory requirements may exceed this limit but you can always decrease needed memory per batch by increasing -s.");
   uint8_t h = 13;
   sub_build->add_option("-h,--num-positions", h, "Number of positions for the LSH. Default: 13.");
   uint8_t b = 16;
@@ -119,6 +128,14 @@ int main(int argc, char **argv)
       ranking_method = map_ranking["random_kmer"];
     if (!sub_build->count("--target-batch"))
       only_init = true;
+    if ((sub_build->count("-m") + sub_build->count("--max-memory"))) {
+      float coef_m = 17.3168587;
+      float log_mm = log2(static_cast<float>(max_memory)) + coef_m;
+      h = (log_mm - 3) / 2;
+      b = pow(2, log_mm - 2 * h);
+      k = h + 16;
+      std::cout << "Configuration for the given maximum memory: k,h,b=" << +k << "," << +h << "," << +b << std::endl;
+    }
     if (!(sub_build->count("-w") + sub_build->count("--window-length")))
       w = k + 3;
   });

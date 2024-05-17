@@ -129,15 +129,17 @@ The subprogram `krank build` can either initialize a library or construct all/so
 To initialize a library from reference sequences using default parameters (6.5Gb lightweight mode), run the below command.
 ```bash
  krank build \
-   -l $LIBRARY_DIRECTORY -t $TAXONOMY_DIRECTORY -i $MAPPING_FILE \
-   --batch-size 7 --from-scratch --num-threads $NUM_THREADS
+   -l $LIBRARY_DIRECTORY -t $TAXONOMY_DIRECTORY -i $MAPPING_FILE --max-memory 32000 \
+   --batch-size 8 --from-scratch --num-threads $NUM_THREADS
 ```
 You can benefit from parallel processing to a great extent by setting `--num-threads` to the number of available cores you have.
 Note that the overhead is very little, the speed-up will increase with the number of cores you use.
 The option `--from-scratch` specifies that this command is intended to initialize a non-existing library.
 Hence, KRANK will not be looking for an already initialized library at `$LIBRARY_DIRECTORY`.
+When `--max-memory` is given, KRANK selects a good configuration of `-k`, `-h` and `-b` to satisfy this memory constraint.
+In this example, the maximum memory is 32GB and KRANK will set `-k 30`, `-h 14` and `-b 19`.
 The option `--batch-size` sets the number of batches that the table will be split in log scale.
-For `--batch-size 7`, it is $2^7=128$.
+For `--batch-size 8`, it is $2^8=256$.
 This parameter is a bit nuanced and the optimal value will vary.
 Luckily, it does not affect the classification performance, but using a value that is too low may result in an explosion in memory usage.
 A value between 4 and 9 should work just fine.
@@ -150,7 +152,7 @@ For instance, to construct the library for the first batch out of 128, run the b
 ```bash
 krank build \
    -l $LIBRARY_DIRECTORY -t $TAXONOMY_DIRECTORY -i $MAPPING_FILE \
-   --from-library --batch-size 7 --target-batch 1 \
+   --from-library --batch-size 8 --target-batch 1 \
   --num-threads $NUM_THREADS
 ```
 Notice that, when an initialized library is targeted, the `--from-library` flag is given.
@@ -161,7 +163,7 @@ Alternatively, you can just build all batches with a single command by setting t
 ```bash
 krank build \
    -l $LIBRARY_DIRECTORY -t $TAXONOMY_DIRECTORY -i $MAPPING_FILE \
-   --from-library --batch-size 7 --target-batch 0 \
+   --from-library --batch-size 8 --target-batch 0 \
   --num-threads $NUM_THREADS
 ```
 However, the running time would be 128 times more compared to the previous command used for a single batch.
@@ -171,7 +173,7 @@ Then, we could process batches in parallel by using `xargs` as below.
 ```bash
 printf '%d\n' {1..128} | xargs -I{} -P4  krank build \
    -l $LIBRARY_DIRECTORY -t $TAXONOMY_DIRECTORY -i $MAPPING_FILE \
-   --from-library --batch-size 7 --target-batch {} \
+   --from-library --batch-size 8 --target-batch {} \
   --num-threads $NUM_THREADS
 ```
 
@@ -249,6 +251,11 @@ Options:
 							  If sequences, k-mers sets will be extracted internally.
 							  Ignored if --from-library given.
 							  Default: --input-sequences.
+  -m,--max-memory UINT        The maximum memory limit for the final library (in megabyte - MB).
+                              This will override -h (--num-positions), -b (--num-columns) and -k (--kmer-length).
+                              KRANK will pick a good configuration of k, h and b values for you.
+                              Note that this is only the final library size.
+                              Memory requirements may exceed this limit but you can always decrease needed memory per batch by increasing -s.
   -k,--kmer-length UINT       Length of k-mers. Default: 29.
   -w,--window-length UINT     Length of minimizer window. Default: k+3.
   -h,--num-positions UINT     Number of positions for the LSH. Default: 13.
