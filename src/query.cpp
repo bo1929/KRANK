@@ -598,14 +598,14 @@ bool Query::QLibrary::loadTaxonomy()
   uint32_t curr_tiID;
   size_t curr_size_str;
   std::string curr_name, curr_rank;
-  for (unsigned int i = 0; i < _tax_num_nodes; ++i) {
+  for (unsigned int i = 0; i < num_entry; ++i) {
     std::fread(&curr_tiID, sizeof(uint32_t), 1, tax_f);
     std::fread(&curr_size_str, sizeof(size_t), 1, tax_f);
     curr_rank.resize(curr_size_str);
     std::fread(&curr_rank[0], sizeof(char), curr_size_str, tax_f);
     _rank_inmap[curr_tiID] = curr_rank;
   }
-  for (unsigned int i = 0; i < _tax_num_nodes; ++i) {
+  for (unsigned int i = 0; i < num_entry; ++i) {
     std::fread(&curr_tiID, sizeof(uint32_t), 1, tax_f);
     std::fread(&curr_size_str, sizeof(size_t), 1, tax_f);
     curr_name.resize(curr_size_str);
