@@ -68,9 +68,10 @@ struct inputHandler
     , w(w)
     , ptr_lsh_vg(ptr_lsh_vg)
     , ptr_npositions(ptr_npositions)
-  {
-  }
+  {}
   float readInput(uint64_t rbatch_size);
+  void extractMers(std::vector<std::pair<uint32_t, encT>> &lsh_enc_vec_f, std::string filepath, uint64_t rbatch_size);
+  void readMers(std::vector<std::pair<uint32_t, encT>> &lsh_enc_vec_f, std::string filepath, uint64_t rbatch_size);
   float extractInput(uint64_t rbatch_size);
   bool saveInput(const char *dirpath, tT trID_key, uint16_t total_batches, uint32_t tbatch_size);
   bool loadInput(const char *dirpath, tT trID_key, uint16_t total_batches);
@@ -90,8 +91,7 @@ struct inputStream
   inputStream(std::string dirpath, tT trID_key)
     : dirpath(dirpath)
     , trID_key(trID_key)
-  {
-  }
+  {}
   void loadBatch(std::vector<std::pair<uint32_t, encT>> &lsh_enc_vec, unsigned int curr_batch);
   void loadCounts(std::unordered_map<encT, uint32_t> &rcounts);
   uint64_t retrieveBatch(vvec<encT> &td, uint32_t tbatch_size, unsigned int curr_batch, bool shared_table = false);
@@ -109,6 +109,6 @@ inline bool exists_test(const char *filepath)
 }
 
 #define DEFAULT_BATCH_SIZE 1048576
-#define GENOME_BATCH_SIZE 25
+#define GENOME_BATCH_SIZE 16
 
 #endif

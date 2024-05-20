@@ -241,7 +241,9 @@ void inputStream<encT>::removeBatch(unsigned int curr_batch)
 }
 
 template<typename encT>
-float inputHandler<encT>::extractInput(uint64_t rbatch_size)
+void inputHandler<encT>::extractMers(std::vector<std::pair<uint32_t, encT>> &lsh_enc_vec_f,
+                                     std::string filepath,
+                                     uint64_t rbatch_size)
 {
   uint32_t max_rix = std::numeric_limits<uint32_t>::max();
   max_rix = max_rix >> (32 - 2 * h);
@@ -250,133 +252,152 @@ float inputHandler<encT>::extractInput(uint64_t rbatch_size)
   uint64_t mask_lr = ((u64m >> (64 - k)) << 32) + ((u64m << 32) >> (64 - k));
   auto url_regexp = std::regex(
     R"(^(?:(?:https?|ftp)://)(?:\S+@)?(?:(?!10(?:\.\d{1,3}){3})(?!127(?:\.\d{1,3}){3})(?!169\.254(?:\.\d{1,3}){2})(?!192\.168(?:\.\d{1,3}){2})(?!172\.(?:1[6-9]|2\d|3[0-1])(?:\.\d{1,3}){2})(?:[1-9]\d?|1\d\d|2[01]\d|22[0-3])(?:\.(?:1?\d{1,2}|2[0-4]\d|25[0-5])){2}(?:\.(?:[1-9]\d?|1\d\d|2[0-4]\d|25[0-4]))|(?:[a-z\u00a1-\uffff0-9]+-)*[a-z\u00a1-\uffff0-9]+(?:\.(?:[a-z\u00a1-\uffff0-9]+-)*[a-z\u00a1-\uffff0-9]+)*(?:\.(?:[a-z\u00a1-\uffff]{2,})))(?::\d{2,5})?(?:/\S*)?$)");
+  unsigned int i, l, c;
+  bool is_url = std::regex_match(filepath, url_regexp);
+  if (is_url) {
+#pragma omp critical(pd)
+    std::cout << "Downloading: " << filepath << std::endl;
+    filepath = IO::downloadURL(filepath);
+  } else {
+#pragma omp critical(pf)
+    std::cout << "Reading: " << filepath << std::endl;
+  }
+  kseq_t *reader = IO::getReader(filepath.c_str());
+  std::vector<sseq_t> seqBatch;
+  IO::readBatch(seqBatch, reader, rbatch_size);
+  while (!(seqBatch.empty())) {
+    for (uint32_t ix = 0; ix < seqBatch.size(); ++ix) {
+      if (seqBatch[ix].len >= k) {
+        uint64_t enc64_bp, enc64_lr, cenc64_bp, cenc64_lr;
+        uint32_t cenc32_lr, cenc32_bp;
+        uint32_t rix;
+        uint8_t ldiff = w - k + 1;
+        std::string kmer_seq;
+        uint8_t kix = 0;
+        size_t wix = lsh_enc_vec_f.size();
+        std::vector<std::pair<uint32_t, encT>> lsh_enc_win(ldiff);
+        lsh_enc_vec_f.resize(wix + seqBatch[ix].len - k + 1);
+        for (i = l = 0; i < seqBatch[ix].len; ++i) {
+          c = seq_nt4_table[static_cast<uint8_t>(seqBatch[ix].nseq[i])];
+          if (c < 4) { // not an "N" base
+            l++;
+            if (l == k) { // we find a k-mer
+              kmer_seq = seqBatch[ix].nseq.substr(i - (k - 1), k);
+              kmerEncodingCompute(kmer_seq.c_str(), enc64_lr, enc64_bp);
+            } else if (l > k) // updates
+            {
+              kmer_seq = seqBatch[ix].nseq[i];
+              kmerEncodingUpdate(kmer_seq.c_str(), enc64_lr, enc64_bp);
+            }
+            if (l >= k) {
+              cenc64_bp = enc64_bp & mask_bp;
+              cenc64_lr = enc64_lr & mask_lr;
+#ifdef CANONICAL
+              if (cenc64_bp < revcomp64bp(cenc64_bp, k)) {
+                cenc64_bp = revcomp64bp(cenc64_bp, k);
+                cenc64_lr = conv64bp2lr(cenc64_bp, k);
+              }
+#endif
+              rix = computeValueLSH(cenc64_bp, *(ptr_lsh_vg));
+              assert(rix <= max_rix);
+              if (std::is_same<encT, uint64_t>::value) {
+                if (ldiff > 1) {
+                  lsh_enc_win[kix % ldiff] = std::make_pair(rix, cenc64_lr);
+                  kix++;
+                } else {
+                  lsh_enc_vec_f[wix] = std::make_pair(rix, cenc64_lr);
+                  wix++;
+                }
+              } else if (std::is_same<encT, uint32_t>::value) {
+                drop64Encoding32(*ptr_npositions, cenc64_bp, cenc64_lr, cenc32_bp, cenc32_lr);
+                if (ldiff > 1) {
+                  lsh_enc_win[kix % ldiff] = std::make_pair(rix, cenc32_lr);
+                  kix++;
+                } else {
+                  lsh_enc_vec_f[wix] = std::make_pair(rix, cenc32_lr);
+                  wix++;
+                }
+              } else {
+                std::puts("Available encoding types are 'uint64_t' and 'uint32_t'.\n");
+                exit(EXIT_FAILURE);
+              }
+            }
+            if ((l >= w || ((i == seqBatch[ix].len - 1) && l >= k)) && ldiff > 1) {
+              lsh_enc_vec_f[wix] = *std::min_element(
+                lsh_enc_win.begin(), lsh_enc_win.end(), [](std::pair<uint32_t, encT> lhs, std::pair<uint32_t, encT> rhs) {
+                  return murmur64(lhs.second) < murmur64(rhs.second);
+                  /* return lhs.second < rhs.second; */
+                });
+              wix++;
+            }
+          } else
+            l = 0;
+        }
+        lsh_enc_vec_f.resize(wix);
+      }
+    }
+    IO::readBatch(seqBatch, reader, rbatch_size);
+  }
+  kseq_destroy(reader);
+  gzclose(reader->f->f);
+  lsh_enc_vec_f.shrink_to_fit();
+  std::sort(
+    lsh_enc_vec_f.begin(), lsh_enc_vec_f.end(), [](const std::pair<uint32_t, encT> &l, const std::pair<uint32_t, encT> &r) {
+      return (l.first == r.first) ? l.second < r.second : l.first < r.first;
+    });
+  auto rone_it = std::unique(lsh_enc_vec_f.begin(), lsh_enc_vec_f.end());
+  lsh_enc_vec_f.erase(rone_it, lsh_enc_vec_f.end());
+  if (is_url)
+    std::remove(filepath.c_str());
+}
+
+template<typename encT>
+float inputHandler<encT>::extractInput(uint64_t rbatch_size)
+{
   size_t last_ix = lsh_enc_vec.size();
   float total_genome_len = 0.0;
-  for (unsigned int fix = 0; fix < filepath_v.size(); ++fix) {
-    unsigned int i, l, c;
-    std::string filepath;
-    bool is_url = std::regex_match(filepath_v[fix], url_regexp);
-    if (is_url) {
-#pragma omp critical
-      std::cout << "Downloading: " << filepath_v[fix] << std::endl;
-      filepath = IO::downloadURL(filepath_v[fix]);
-    } else {
-#pragma omp critical
-      std::cout << "Reading: " << filepath_v[fix] << std::endl;
-      filepath = filepath_v[fix];
-    }
-    kseq_t *reader = IO::getReader(filepath.c_str());
-    std::vector<sseq_t> seqBatch;
-    IO::readBatch(seqBatch, reader, rbatch_size);
-    std::vector<std::pair<uint32_t, encT>> lsh_enc_vec_f;
-    while (!(seqBatch.empty())) {
-      for (uint32_t ix = 0; ix < seqBatch.size(); ++ix) {
-        if (seqBatch[ix].len >= k) {
-          uint64_t enc64_bp, enc64_lr, cenc64_bp, cenc64_lr;
-          uint32_t cenc32_lr, cenc32_bp;
-          uint32_t rix;
-          uint8_t ldiff = w - k + 1;
-          std::string kmer_seq;
-          uint8_t kix = 0;
-          size_t wix = lsh_enc_vec_f.size();
-          std::vector<std::pair<uint32_t, encT>> lsh_enc_win(ldiff);
-          lsh_enc_vec_f.resize(wix + seqBatch[ix].len - k + 1);
-          for (i = l = 0; i < seqBatch[ix].len; ++i) {
-            c = seq_nt4_table[static_cast<uint8_t>(seqBatch[ix].nseq[i])];
-            if (c < 4) { // not an "N" base
-              l++;
-              if (l == k) { // we find a k-mer
-                kmer_seq = seqBatch[ix].nseq.substr(i - (k - 1), k);
-                kmerEncodingCompute(kmer_seq.c_str(), enc64_lr, enc64_bp);
-              } else if (l > k) // updates
-              {
-                kmer_seq = seqBatch[ix].nseq[i];
-                kmerEncodingUpdate(kmer_seq.c_str(), enc64_lr, enc64_bp);
-              }
-              if (l >= k) {
-                cenc64_bp = enc64_bp & mask_bp;
-                cenc64_lr = enc64_lr & mask_lr;
-#ifdef CANONICAL
-                if (cenc64_bp < revcomp64bp(cenc64_bp, k)) {
-                  cenc64_bp = revcomp64bp(cenc64_bp, k);
-                  cenc64_lr = conv64bp2lr(cenc64_bp, k);
-                }
-#endif
-                rix = computeValueLSH(cenc64_bp, *(ptr_lsh_vg));
-                assert(rix <= max_rix);
-                if (std::is_same<encT, uint64_t>::value) {
-                  if (ldiff > 1) {
-                    lsh_enc_win[kix % ldiff] = std::make_pair(rix, cenc64_lr);
-                    kix++;
-                  } else {
-                    lsh_enc_vec_f[wix] = std::make_pair(rix, cenc64_lr);
-                    wix++;
-                  }
-                } else if (std::is_same<encT, uint32_t>::value) {
-                  drop64Encoding32(*ptr_npositions, cenc64_bp, cenc64_lr, cenc32_bp, cenc32_lr);
-                  if (ldiff > 1) {
-                    lsh_enc_win[kix % ldiff] = std::make_pair(rix, cenc32_lr);
-                    kix++;
-                  } else {
-                    lsh_enc_vec_f[wix] = std::make_pair(rix, cenc32_lr);
-                    wix++;
-                  }
-                } else {
-                  std::puts("Available encoding types are 'uint64_t' and 'uint32_t'.\n");
-                  exit(EXIT_FAILURE);
-                }
-              }
-              if ((l >= w || ((i == seqBatch[ix].len - 1) && l >= k)) && ldiff > 1) {
-                lsh_enc_vec_f[wix] = *std::min_element(
-                  lsh_enc_win.begin(), lsh_enc_win.end(), [](std::pair<uint32_t, encT> lhs, std::pair<uint32_t, encT> rhs) {
-                    return murmur64(lhs.second) < murmur64(rhs.second);
-                    /* return lhs.second < rhs.second; */
-                  });
-                wix++;
-              }
-            } else
-              l = 0;
+  unsigned int inc = std::min(static_cast<unsigned int>(filepath_v.size()), static_cast<unsigned int>(GENOME_BATCH_SIZE));
+  for (unsigned int fix = 0; fix < filepath_v.size(); fix += inc) {
+    std::vector<std::vector<std::pair<uint32_t, encT>>> lsh_enc_vec_fv(inc);
+#pragma omp parallel
+    {
+#pragma omp single
+      {
+        for (unsigned int bix = 0; bix < inc; ++bix) {
+#pragma omp task untied
+          {
+            extractMers(lsh_enc_vec_fv[bix], filepath_v[fix + bix], rbatch_size);
           }
-          lsh_enc_vec_f.resize(wix);
+        }
+#pragma omp taskwait
+        last_ix = lsh_enc_vec_fv[0].size();
+        for (unsigned int bix = 0; bix < inc; ++bix) {
+          lsh_enc_vec.insert(lsh_enc_vec.end(), lsh_enc_vec_fv[bix].begin(), lsh_enc_vec_fv[bix].end());
+          total_genome_len += static_cast<float>(lsh_enc_vec_fv[bix].size());
         }
       }
-      IO::readBatch(seqBatch, reader, rbatch_size);
     }
-    kseq_destroy(reader);
-    gzclose(reader->f->f);
-    lsh_enc_vec_f.shrink_to_fit();
-    std::sort(lsh_enc_vec_f.begin(),
-              lsh_enc_vec_f.end(),
+    std::sort(lsh_enc_vec.begin() + last_ix,
+              lsh_enc_vec.end(),
               [](const std::pair<uint32_t, encT> &l, const std::pair<uint32_t, encT> &r) {
                 return (l.first == r.first) ? l.second < r.second : l.first < r.first;
               });
-    auto rone_it = std::unique(lsh_enc_vec_f.begin(), lsh_enc_vec_f.end());
-    lsh_enc_vec_f.erase(rone_it, lsh_enc_vec_f.end());
-    lsh_enc_vec.insert(lsh_enc_vec.end(), lsh_enc_vec_f.begin(), lsh_enc_vec_f.end());
-    total_genome_len += static_cast<float>(lsh_enc_vec_f.size());
-    if (((fix % GENOME_BATCH_SIZE) == 0) || (fix == (filepath_v.size() - 1))) {
-      std::sort(lsh_enc_vec.begin() + last_ix,
-                lsh_enc_vec.end(),
-                [](const std::pair<uint32_t, encT> &l, const std::pair<uint32_t, encT> &r) {
-                  return (l.first == r.first) ? l.second < r.second : l.first < r.first;
-                });
-      std::inplace_merge(lsh_enc_vec.begin(), lsh_enc_vec.begin() + last_ix, lsh_enc_vec.end());
-      auto nuniq_it = std::unique(lsh_enc_vec.begin(), lsh_enc_vec.end());
-      for (auto it = nuniq_it; it != lsh_enc_vec.end(); ++it) {
-        rcounts[it->second]++;
-      }
-      lsh_enc_vec.erase(nuniq_it, lsh_enc_vec.end());
-      last_ix = lsh_enc_vec.size();
+    std::inplace_merge(lsh_enc_vec.begin(), lsh_enc_vec.begin() + last_ix, lsh_enc_vec.end());
+    auto nuniq_it = std::unique(lsh_enc_vec.begin(), lsh_enc_vec.end());
+    for (auto it = nuniq_it; it != lsh_enc_vec.end(); ++it) {
+      rcounts[it->second]++;
     }
-    if (is_url)
-      std::remove(filepath.c_str());
+    lsh_enc_vec.erase(nuniq_it, lsh_enc_vec.end());
+    last_ix = lsh_enc_vec.size();
   }
   tnum_kmers = lsh_enc_vec.size();
   return total_genome_len;
 }
 
 template<typename encT>
-float inputHandler<encT>::readInput(uint64_t rbatch_size)
+void inputHandler<encT>::readMers(std::vector<std::pair<uint32_t, encT>> &lsh_enc_vec_f,
+                                  std::string filepath,
+                                  uint64_t rbatch_size)
 {
   uint64_t tnum_kmers_sum = 0;
   uint32_t max_rix = std::numeric_limits<uint32_t>::max();
@@ -385,99 +406,117 @@ float inputHandler<encT>::readInput(uint64_t rbatch_size)
   uint64_t mask_bp = u64m >> (32 - k) * 2;
   uint64_t mask_lr = ((u64m >> (64 - k)) << 32) + ((u64m << 32) >> (64 - k));
   rbatch_size = IO::adjustBatchSize(rbatch_size, num_threads);
-  size_t last_ix = lsh_enc_vec.size();
-  float total_genome_len = 0.0;
-  for (unsigned int fix = 0; fix < filepath_v.size(); ++fix) {
-    std::string &filepath = filepath_v[fix];
-    kseq_t *reader = IO::getReader(filepath.c_str());
-    std::vector<sseq_t> seqBatch;
-    IO::readBatch(seqBatch, reader, rbatch_size);
-    std::vector<std::pair<uint32_t, encT>> lsh_enc_vec_f;
-    while (!(seqBatch.empty())) {
-      uint8_t ldiff = w - k + 1;
-      uint8_t kix = 0;
-      std::vector<std::pair<uint32_t, encT>> lsh_enc_win(ldiff);
-      uint32_t wix = lsh_enc_vec_f.size();
-      lsh_enc_vec_f.resize(wix + seqBatch.size());
-      for (uint32_t ix = 0; ix < seqBatch.size(); ++ix) {
-        uint64_t enc64_bp;
-        uint64_t enc64_lr;
-        uint64_t cenc64_bp;
-        uint64_t cenc64_lr;
-        uint32_t cenc32_lr;
-        uint32_t cenc32_bp;
-        uint32_t rix;
-        if (seqBatch[ix].len != w) {
-          std::puts("An input reference k-mer length conflicts with given k& w parameters.\n");
+  kseq_t *reader = IO::getReader(filepath.c_str());
+  std::vector<sseq_t> seqBatch;
+  IO::readBatch(seqBatch, reader, rbatch_size);
+  while (!(seqBatch.empty())) {
+    uint8_t ldiff = w - k + 1;
+    uint8_t kix = 0;
+    std::vector<std::pair<uint32_t, encT>> lsh_enc_win(ldiff);
+    uint32_t wix = lsh_enc_vec_f.size();
+    lsh_enc_vec_f.resize(wix + seqBatch.size());
+    for (uint32_t ix = 0; ix < seqBatch.size(); ++ix) {
+      uint64_t enc64_bp;
+      uint64_t enc64_lr;
+      uint64_t cenc64_bp;
+      uint64_t cenc64_lr;
+      uint32_t cenc32_lr;
+      uint32_t cenc32_bp;
+      uint32_t rix;
+      if (seqBatch[ix].len != w) {
+        std::puts("An input reference k-mer length conflicts with given k& w parameters.\n");
+        exit(EXIT_FAILURE);
+      }
+      for (unsigned int kix = 0; kix < ldiff; ++kix) {
+        if (kix == 0)
+          kmerEncodingCompute(seqBatch[ix].nseq.substr(kix, k).c_str(), enc64_lr, enc64_bp);
+        else
+          kmerEncodingUpdate(seqBatch[ix].nseq.substr(kix + k - 1, 1).c_str(), enc64_lr, enc64_bp);
+        cenc64_bp = enc64_bp & mask_bp;
+        cenc64_lr = enc64_lr & mask_lr;
+#ifdef CANONICAL
+        if (cenc64_bp < revcomp64bp(cenc64_bp, k)) {
+          cenc64_bp = revcomp64bp(cenc64_bp, k);
+          cenc64_lr = conv64bp2lr(cenc64_bp, k);
+        }
+#endif
+        rix = computeValueLSH(cenc64_bp, *(ptr_lsh_vg));
+        assert(rix <= max_rix);
+        if (std::is_same<encT, uint64_t>::value) {
+          if (ldiff > 1)
+            lsh_enc_win[kix] = std::make_pair(rix, cenc64_lr);
+          else
+            lsh_enc_vec_f[wix + ix] = std::make_pair(rix, cenc64_lr);
+        } else if (std::is_same<encT, uint32_t>::value) {
+          drop64Encoding32(*ptr_npositions, cenc64_bp, cenc64_lr, cenc32_bp, cenc32_lr);
+          if (ldiff > 1)
+            lsh_enc_win[kix] = std::make_pair(rix, cenc32_lr);
+          else
+            lsh_enc_vec_f[wix + ix] = std::make_pair(rix, cenc32_lr);
+        } else {
+          std::puts("Available encoding types are 'uint64_t' and 'uint32_t'.\n");
           exit(EXIT_FAILURE);
         }
-        for (unsigned int kix = 0; kix < ldiff; ++kix) {
-          if (kix == 0)
-            kmerEncodingCompute(seqBatch[ix].nseq.substr(kix, k).c_str(), enc64_lr, enc64_bp);
-          else
-            kmerEncodingUpdate(seqBatch[ix].nseq.substr(kix + k - 1, 1).c_str(), enc64_lr, enc64_bp);
-          cenc64_bp = enc64_bp & mask_bp;
-          cenc64_lr = enc64_lr & mask_lr;
-#ifdef CANONICAL
-          if (cenc64_bp < revcomp64bp(cenc64_bp, k)) {
-            cenc64_bp = revcomp64bp(cenc64_bp, k);
-            cenc64_lr = conv64bp2lr(cenc64_bp, k);
-          }
-#endif
-          rix = computeValueLSH(cenc64_bp, *(ptr_lsh_vg));
-          assert(rix <= max_rix);
-          if (std::is_same<encT, uint64_t>::value) {
-            if (ldiff > 1)
-              lsh_enc_win[kix] = std::make_pair(rix, cenc64_lr);
-            else
-              lsh_enc_vec_f[wix + ix] = std::make_pair(rix, cenc64_lr);
-          } else if (std::is_same<encT, uint32_t>::value) {
-            drop64Encoding32(*ptr_npositions, cenc64_bp, cenc64_lr, cenc32_bp, cenc32_lr);
-            if (ldiff > 1)
-              lsh_enc_win[kix] = std::make_pair(rix, cenc32_lr);
-            else
-              lsh_enc_vec_f[wix + ix] = std::make_pair(rix, cenc32_lr);
-          } else {
-            std::puts("Available encoding types are 'uint64_t' and 'uint32_t'.\n");
-            exit(EXIT_FAILURE);
+      }
+      if (ldiff > 1)
+        lsh_enc_vec_f[wix + ix] = *std::min_element(
+          lsh_enc_win.begin(), lsh_enc_win.end(), [](std::pair<uint32_t, encT> lhs, std::pair<uint32_t, encT> rhs) {
+            return murmur64(lhs.second) < murmur64(rhs.second);
+            /* return lhs.second < rhs.second; */
+          });
+    }
+    tnum_kmers_sum += seqBatch.size();
+    IO::readBatch(seqBatch, reader, rbatch_size);
+  }
+  kseq_destroy(reader);
+  gzclose(reader->f->f);
+  lsh_enc_vec_f.shrink_to_fit();
+  std::sort(
+    lsh_enc_vec_f.begin(), lsh_enc_vec_f.end(), [](const std::pair<uint32_t, encT> &l, const std::pair<uint32_t, encT> &r) {
+      return (l.first == r.first) ? l.second < r.second : l.first < r.first;
+    });
+  auto rone_it = std::unique(lsh_enc_vec_f.begin(), lsh_enc_vec_f.end());
+  lsh_enc_vec_f.erase(rone_it, lsh_enc_vec_f.end());
+}
+
+template<typename encT>
+float inputHandler<encT>::readInput(uint64_t rbatch_size)
+{
+  size_t last_ix = lsh_enc_vec.size();
+  float total_genome_len = 0.0;
+  unsigned int inc = std::min(static_cast<unsigned int>(filepath_v.size()), static_cast<unsigned int>(GENOME_BATCH_SIZE));
+  for (unsigned int fix = 0; fix < filepath_v.size(); fix += inc) {
+    std::vector<std::vector<std::pair<uint32_t, encT>>> lsh_enc_vec_fv(inc);
+#pragma omp parallel
+    {
+#pragma omp single
+      {
+        for (unsigned int bix = 0; bix < inc; ++bix) {
+#pragma omp task untied
+          {
+            readMers(lsh_enc_vec_fv[bix], filepath_v[fix + bix], rbatch_size);
           }
         }
-        if (ldiff > 1)
-          lsh_enc_vec_f[wix + ix] = *std::min_element(
-            lsh_enc_win.begin(), lsh_enc_win.end(), [](std::pair<uint32_t, encT> lhs, std::pair<uint32_t, encT> rhs) {
-              return murmur64(lhs.second) < murmur64(rhs.second);
-              /* return lhs.second < rhs.second; */
-            });
+#pragma omp taskwait
+        last_ix = lsh_enc_vec_fv[0].size();
+        for (unsigned int bix = 0; bix < inc; ++bix) {
+          lsh_enc_vec.insert(lsh_enc_vec.end(), lsh_enc_vec_fv[bix].begin(), lsh_enc_vec_fv[bix].end());
+          total_genome_len += static_cast<float>(lsh_enc_vec_fv[bix].size());
+        }
       }
-      tnum_kmers_sum += seqBatch.size();
-      IO::readBatch(seqBatch, reader, rbatch_size);
     }
-    kseq_destroy(reader);
-    gzclose(reader->f->f);
-    lsh_enc_vec_f.shrink_to_fit();
-    std::sort(lsh_enc_vec_f.begin(),
-              lsh_enc_vec_f.end(),
+    std::sort(lsh_enc_vec.begin() + last_ix,
+              lsh_enc_vec.end(),
               [](const std::pair<uint32_t, encT> &l, const std::pair<uint32_t, encT> &r) {
                 return (l.first == r.first) ? l.second < r.second : l.first < r.first;
               });
-    auto rone_it = std::unique(lsh_enc_vec_f.begin(), lsh_enc_vec_f.end());
-    lsh_enc_vec_f.erase(rone_it, lsh_enc_vec_f.end());
-    lsh_enc_vec.insert(lsh_enc_vec.end(), lsh_enc_vec_f.begin(), lsh_enc_vec_f.end());
-    total_genome_len += static_cast<float>(lsh_enc_vec_f.size());
-    if (((fix % GENOME_BATCH_SIZE) == 0) || (fix == (filepath_v.size() - 1))) {
-      std::sort(lsh_enc_vec.begin() + last_ix,
-                lsh_enc_vec.end(),
-                [](const std::pair<uint32_t, encT> &l, const std::pair<uint32_t, encT> &r) {
-                  return (l.first == r.first) ? l.second < r.second : l.first < r.first;
-                });
-      std::inplace_merge(lsh_enc_vec.begin(), lsh_enc_vec.begin() + last_ix, lsh_enc_vec.end());
-      auto nuniq_it = std::unique(lsh_enc_vec.begin(), lsh_enc_vec.end());
-      for (auto it = nuniq_it; it != lsh_enc_vec.end(); ++it) {
-        rcounts[it->second]++;
-      }
-      lsh_enc_vec.erase(nuniq_it, lsh_enc_vec.end());
-      last_ix = lsh_enc_vec.size();
+    std::inplace_merge(lsh_enc_vec.begin(), lsh_enc_vec.begin() + last_ix, lsh_enc_vec.end());
+    auto nuniq_it = std::unique(lsh_enc_vec.begin(), lsh_enc_vec.end());
+    for (auto it = nuniq_it; it != lsh_enc_vec.end(); ++it) {
+      rcounts[it->second]++;
     }
+    lsh_enc_vec.erase(nuniq_it, lsh_enc_vec.end());
+    last_ix = lsh_enc_vec.size();
   }
   tnum_kmers = lsh_enc_vec.size();
   return total_genome_len;
@@ -628,6 +667,22 @@ template float inputHandler<uint64_t>::readInput(uint64_t rbatch_size);
 template float inputHandler<uint32_t>::extractInput(uint64_t rbatch_size);
 
 template float inputHandler<uint64_t>::extractInput(uint64_t rbatch_size);
+
+template void inputHandler<uint32_t>::extractMers(std::vector<std::pair<uint32_t, uint32_t>> &lsh_enc_vec_f,
+                                                  std::string filepath,
+                                                  uint64_t rbatch_size);
+
+template void inputHandler<uint64_t>::extractMers(std::vector<std::pair<uint32_t, uint64_t>> &lsh_enc_vec_f,
+                                                  std::string filepath,
+                                                  uint64_t rbatch_size);
+
+template void inputHandler<uint32_t>::readMers(std::vector<std::pair<uint32_t, uint32_t>> &lsh_enc_vec_f,
+                                               std::string filepath,
+                                               uint64_t rbatch_size);
+
+template void inputHandler<uint64_t>::readMers(std::vector<std::pair<uint32_t, uint64_t>> &lsh_enc_vec_f,
+                                               std::string filepath,
+                                               uint64_t rbatch_size);
 
 template bool
 inputHandler<uint64_t>::saveInput(const char *dirpath, tT trID_key, uint16_t total_batches, uint32_t tbatch_size);
