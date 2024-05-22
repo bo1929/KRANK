@@ -40,7 +40,7 @@ echo "Initialzing the library..."
   --from-scratch --input-sequences \
   --kmer-ranking representative --adaptive-size --lca soft \
   --num-threads ${NTHREADS} \
-  && echo "The library has been successfully initialized and k-mers havebeen extracted."
+  && echo "The library has been successfully initialized and k-mers have been extracted."
 
 echo "Building the library for each batch one by one..."
 /usr/bin/time -v ../krank --seed ${RANDOM_SEED} build \
