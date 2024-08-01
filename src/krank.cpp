@@ -159,10 +159,10 @@ int main(int argc, char **argv)
       "-q,--query-file", query_file, "Path to the tab-separated file containing paths and IDs of query FASTA/FASTQ files.")
     ->required()
     ->check(CLI::ExistingFile);
-  float tvote_threshold = 0.03;
+  float tvote_threshold = 0.3;
   sub_query->add_option("--total-vote-threshold,--tvote-threshold",
                         tvote_threshold,
-                        "The minimum total vote to classify, can be considered as a confidence threshold. Default: 0.03.");
+                        "The minimum total vote to classify, can be considered as a confidence threshold. Default: 0.3.");
   uint8_t max_match_hdist = 5;
   sub_query->add_option("--max-match-distance,--max-match-hdist",
                         max_match_hdist,
