@@ -57,7 +57,7 @@ If `PREDICTION_SCORE` is not close to 1, it means that KRANK also found some *k*
 If it is close to 1, the prediction is not ambiguous, i.e., there is no other potential assignment.
 However, this does not necessarily imply that the assignment is *confident*.
 `MATCH_SCORE` quantifies the confidence, and the highest possible value is the number of *k*-mers in the sequence (e.g., 122 for short reads in the default parameter configuration).
-KRANK internally filters assignments with `MATCH_SCORE` smaller than 0.03.
+KRANK internally filters assignments with `MATCH_SCORE` smaller than 0.3.
 You can disable this by setting `--tvote-threshold 0`.
 All values greater than 1 could be considered sufficiently high.
 Below 1 is still worth considering especially for novel/distant queries that are of interest.
@@ -304,7 +304,7 @@ Options:
   -q,--query-file TEXT:FILE REQUIRED
                               Path to the tab-separated file containing paths and IDs of query FASTA/FASTQ files.
   --total-vote-threshold,--tvote-threshold FLOAT
-                              The minimum total vote to classify, can be considered as a confidence threshold. Default: 0.03.
+                              The minimum total vote to classify, can be considered as a confidence threshold. Default: 0.3.
   --max-match-distance,--max-match-hdist UINT
                               The maximum Hamming distance for a k-mer to be considered as a match. Default: 5.
   --save-match-info,--no-match-info{false}
