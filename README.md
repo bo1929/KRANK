@@ -60,10 +60,10 @@ However, this does not necessarily imply that the assignment is *confident*.
 KRANK internally filters assignments with `MATCH_SCORE` smaller than 0.05.
 You can disable this by setting `--tvote-threshold 0`.
 Note that, if specified, a total vote threshold should be given for each library.
-For instance, if you had `--library-dir $LIBRARY_DIRECTORY1 $LIBRARY_DIRECTORY2`, there needs to be two thresholds: `--tvote-threshold $TVOTE_THRESHOLD1 $TVOTE_THRESHOLD2`.
+For instance, if you had `--library-dir $LIBRARY_DIRECTORY1 $LIBRARY_DIRECTORY2`, there need to be two thresholds: `--tvote-threshold $TVOTE_THRESHOLD1 $TVOTE_THRESHOLD2`.
 For taxa appearing only in `$LIBRARY_DIRECTORY1` or `$LIBRARY_DIRECTORY2`, the corresponding total vote threshold will be used.
-All values greater than 1 could be considered sufficiently high.
-Below 1 is still worth considering especially for novel/distant queries that are of interest.
+All values greater than 0.05 should be considered sufficiently high.
+Below 0.05 is still worth considering especially for novel/distant queries that are of interest, or for working with vertebrates.
 
 For relative abundances, an example for the output report would look as below.
 ```
