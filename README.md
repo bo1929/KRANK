@@ -89,7 +89,7 @@ More and more diverse libraries will be added soon.
 	* [high-sensitivity (25Gb) & with random - selective-mode](https://ter-trees.ucsd.edu/data/krank/wol_v1-lib_reps_adpt-k30_w35_h14_b16_s9.tar.gz)
 	* [high-sensitivity (25Gb) & with random - fast-mode](https://ter-trees.ucsd.edu/data/krank/wol_v1-lib_rand_free-k30_w35_h14_b16_s9.tar.gz)
 - Human reference libraries:
-	* [human T2T pangeome (6.25Gb)](https://ter-trees.ucsd.edu/data/krank/human_t2t_pangenome-lib_rand_free-k29_w35_h13_b16_s8.tar.gz)
+	* [human T2T pangeome (6.25Gb)](https://ter-trees.ucsd.edu/data/krank/human_pangenome-lib_rand_free-k29_w34_h13_b16_s8.tar.gz)
 
 #### Recommendations for choosing the right set of libraries
 Soon.
