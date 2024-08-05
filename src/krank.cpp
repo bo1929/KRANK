@@ -159,10 +159,19 @@ int main(int argc, char **argv)
       "-q,--query-file", query_file, "Path to the tab-separated file containing paths and IDs of query FASTA/FASTQ files.")
     ->required()
     ->check(CLI::ExistingFile);
-  float tvote_threshold = 0.3;
-  sub_query->add_option("--total-vote-threshold,--tvote-threshold",
-                        tvote_threshold,
-                        "The minimum total vote to classify, can be considered as a confidence threshold. Default: 0.3.");
+  std::vector<float> tvote_threshold_v;
+  sub_query->add_option(
+    "--total-vote-threshold,--tvote-threshold",
+    tvote_threshold_v,
+    "The minimum total vote threshold(s) to classify, the order should match the order of the given libraries. Default: 0.05.");
+  sub_query->callback([&]() {
+    if (app.count("--tvote-threshold") + app.count("--total-vote-threshold")) {
+      tvote_threshold_v.resize(library_dir_v.size());
+      for (unsigned int i = 0; i < tvote_threshold_v.size(); ++i) {
+        tvote_threshold_v[i] = 0.05;
+      }
+    }
+  });
   uint8_t max_match_hdist = 5;
   sub_query->add_option("--max-match-distance,--max-match-hdist",
                         max_match_hdist,
@@ -197,6 +206,10 @@ int main(int argc, char **argv)
     std::cerr << "Maximum Hamming distance for a match cannot be greater than k-mer length." << std::endl;
   if ((w < k) || (b < 2) || (h < 2) || (h > 16) || (k > 32) || (h >= k) || (batch_bsize > (2 * h - 1)) ||
       (target_batch > pow(2, batch_bsize)) || (max_match_hdist > k)) {
+    exit(EXIT_FAILURE);
+  }
+  if (tvote_threshold_v.size() == library_dir_v.size()) {
+    std::cerr << "The number of total threshold values must be equal to the number of KRANK libraries." << std::endl;
     exit(EXIT_FAILURE);
   }
 #ifndef SHORT_TABLE
@@ -244,7 +257,7 @@ int main(int argc, char **argv)
     Query q(library_dir_v,
             output_dir.c_str(),
             query_file.c_str(),
-            tvote_threshold,
+            tvote_threshold_v,
             max_match_hdist,
             save_match_info,
             verbose || log,

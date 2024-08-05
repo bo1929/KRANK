@@ -6,7 +6,7 @@
 Query::Query(std::vector<std::string> library_dirpaths,
              const char *output_dirpath,
              const char *query_filepath,
-             float tvote_threshold,
+             std::vector<float> tvote_threshold_v,
              uint8_t max_match_hdist,
              bool save_match_info,
              bool verbose,
@@ -14,7 +14,7 @@ Query::Query(std::vector<std::string> library_dirpaths,
   : _library_dirpaths(library_dirpaths)
   , _output_dirpath(output_dirpath)
   , _query_filepath(query_filepath)
-  , _tvote_threshold(tvote_threshold)
+  , _tvote_threshold_v(tvote_threshold_v)
   , _max_match_hdist(max_match_hdist)
   , _save_match_info(save_match_info)
   , _log(log)
@@ -118,7 +118,13 @@ void Query::profileBatch(std::unordered_map<uint32_t, float> &profile_accumulate
   std::string curr_rank, curr_name;
   for (auto &vi : total_vinfo_v) {
     curr_tiID = vi.pred_tiID;
-    if ((curr_tiID != 0) && (vi.tvote_n > _tvote_threshold)) {
+    float tvote_threshold = 0;
+    for (unsigned int lix = 0; lix < _num_libraries; ++lix) {
+      if (_slib_ptr_v[lix]->_tiID_to_trID.find(curr_tiID) != _slib_ptr_v[lix]->_tiID_to_trID.end()) {
+        std::max(tvote_threshold, _tvote_threshold_v[lix]);
+      }
+    }
+    if ((curr_tiID != 0) && (vi.tvote_n > tvote_threshold)) {
       while (curr_tiID != 0) {
         profile_accumulated[curr_tiID] += 1.0;
         curr_tiID = _parent_inmap[curr_tiID];
@@ -352,9 +358,16 @@ void Query::perform(uint64_t rbatch_size)
       std::string curr_rank, curr_name;
       ofs_clsinfo << "SEQ_ID\tRANK\tTAXON_ID\tTAXON_NAME\tPREDICTION_SCORE\tMATCH_SCORE" << std::endl;
       for (uint32_t ix = 0; ix < seqBatch.size(); ++ix) {
-        if ((total_vinfo_v[ix].pred_tiID != 0) && (total_vinfo_v[ix].tvote_n > _tvote_threshold)) {
-          curr_rank = _rank_inmap[total_vinfo_v[ix].pred_tiID];
-          curr_name = _name_inmap[total_vinfo_v[ix].pred_tiID];
+        auto curr_tiID = total_vinfo_v[ix].pred_tiID;
+        float tvote_threshold = 0;
+        for (unsigned int lix = 0; lix < _num_libraries; ++lix) {
+          if (_slib_ptr_v[lix]->_tiID_to_trID.find(curr_tiID) != _slib_ptr_v[lix]->_tiID_to_trID.end()) {
+            std::max(tvote_threshold, _tvote_threshold_v[lix]);
+          }
+        }
+        if ((total_vinfo_v[ix].pred_tiID != 0) && (total_vinfo_v[ix].tvote_n > tvote_threshold)) {
+          curr_rank = _rank_inmap[curr_tiID];
+          curr_name = _name_inmap[curr_tiID];
           th_ratio = total_vinfo_v[ix].tvote_n / total_vinfo_v[ix].tvote_r;
           ofs_clsinfo << names_vec[ix];
           ofs_clsinfo << "\t" << curr_rank << "\t" << total_vinfo_v[ix].pred_tiID << "\t" << curr_name;
@@ -588,12 +601,16 @@ bool Query::QLibrary::loadTaxonomy()
   std::fread(tiIDs_parents.data(), sizeof(std::pair<uint32_t, uint32_t>), num_entry, tax_f);
   std::fread(tiIDs_depths.data(), sizeof(std::pair<uint32_t, uint8_t>), num_entry, tax_f);
 
-  for (auto kv : trIDs_tiIDs)
+  for (auto kv : trIDs_tiIDs) {
     _trID_to_tiID[kv.first] = kv.second;
-  for (auto kv : tiIDs_parents)
+    _tiID_to_trID[kv.second] = kv.first;
+  }
+  for (auto kv : tiIDs_parents) {
     _parent_inmap[kv.first] = kv.second;
-  for (auto kv : tiIDs_depths)
+  }
+  for (auto kv : tiIDs_depths) {
     _depth_inmap[kv.first] = kv.second;
+  }
 
   uint32_t curr_tiID;
   size_t curr_size_str;
