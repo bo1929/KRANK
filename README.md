@@ -57,10 +57,13 @@ If `PREDICTION_SCORE` is not close to 1, it means that KRANK also found some *k*
 If it is close to 1, the prediction is not ambiguous, i.e., there is no other potential assignment.
 However, this does not necessarily imply that the assignment is *confident*.
 `MATCH_SCORE` quantifies the confidence, and the highest possible value is the number of *k*-mers in the sequence (e.g., 122 for short reads in the default parameter configuration).
-KRANK internally filters assignments with `MATCH_SCORE` smaller than 0.03.
+KRANK internally filters assignments with `MATCH_SCORE` smaller than 0.05.
 You can disable this by setting `--tvote-threshold 0`.
-All values greater than 1 could be considered sufficiently high.
-Below 1 is still worth considering especially for novel/distant queries that are of interest.
+Note that, if specified, a total vote threshold should be given for each library.
+For instance, if you had `--library-dir $LIBRARY_DIRECTORY1 $LIBRARY_DIRECTORY2`, there need to be two thresholds: `--tvote-threshold $TVOTE_THRESHOLD1 $TVOTE_THRESHOLD2`.
+For taxa appearing only in `$LIBRARY_DIRECTORY1` or `$LIBRARY_DIRECTORY2`, the corresponding total vote threshold will be used.
+All values greater than 0.05 should be considered sufficiently high.
+Below 0.05 is still worth considering especially for novel/distant queries that are of interest, or for working with vertebrates.
 
 For relative abundances, an example for the output report would look as below.
 ```
@@ -81,9 +84,12 @@ If you would like to benchmark KRANK against some other tools, you can use [OPAL
 #### Available libraries
 More and more diverse libraries will be added soon.
 - WoL-v1 dataset - archaeal and bacterial genomes:
-	* [lightweight (6.25Gb) & with ranking - selective-mode](https://ter-trees.ucsd.edu/data/krank/lib_reps_adpt-k29_w35_h13_b16_s8.tar.gz)
-	* [lightweight (6.25Gb) & with random - fast-mode](https://ter-trees.ucsd.edu/data/krank/lib_rand_free-k29_w35_h13_b16_s8.tar.gz)
-	* [high-sensitivity (25Gb) & with random - fast-mode](https://ter-trees.ucsd.edu/data/krank/lib_rand_free-k30_w35_h14_b16_s9.tar.gz)
+	* [lightweight (6.25Gb) & with ranking - selective-mode](https://ter-trees.ucsd.edu/data/krank/wol_v1-lib_reps_adpt-k29_w35_h13_b16_s8.tar.gz)
+	* [lightweight (6.25Gb) & with random - fast-mode](https://ter-trees.ucsd.edu/data/krank/wol_v1-lib_rand_free-k29_w35_h13_b16_s8.tar.gz)
+	* [high-sensitivity (25Gb) & with random - selective-mode](https://ter-trees.ucsd.edu/data/krank/wol_v1-lib_reps_adpt-k30_w35_h14_b16_s9.tar.gz)
+	* [high-sensitivity (25Gb) & with random - fast-mode](https://ter-trees.ucsd.edu/data/krank/wol_v1-lib_rand_free-k30_w35_h14_b16_s9.tar.gz)
+- Human reference libraries:
+	* [human T2T pangeome (6.25Gb)](https://ter-trees.ucsd.edu/data/krank/human_pangenome-lib_rand_free-k29_w34_h13_b16_s8.tar.gz)
 
 #### Recommendations for choosing the right set of libraries
 Soon.
@@ -126,7 +132,7 @@ The keys (the first column) in the `--input-file` must appear in the taxonomy, i
 Building a library is a relatively expensive but one-time operation.
 It consists of two steps: library initialization and batch building.
 The subprogram `krank build` can either initialize a library or construct all/some batches of the library.
-To initialize a library from reference sequences using default parameters (6.5Gb lightweight mode), run the below command.
+To initialize a library from reference sequences using default parameters for a library of size 32Gb, run the below command.
 ```bash
  krank build \
    -l $LIBRARY_DIRECTORY -t $TAXONOMY_DIRECTORY -i $MAPPING_FILE --max-memory 32000 \
@@ -137,7 +143,7 @@ Note that the overhead is very little, the speed-up will increase with the numbe
 The option `--from-scratch` specifies that this command is intended to initialize a non-existing library.
 Hence, KRANK will not be looking for an already initialized library at `$LIBRARY_DIRECTORY`.
 When `--max-memory` is given, KRANK selects a good configuration of `-k`, `-h` and `-b` to satisfy this memory constraint.
-In this example, the maximum memory is 32GB and KRANK will set `-k 30`, `-h 14` and `-b 19`.
+In this example, the maximum memory is 32Gb and KRANK will set `-k 30`, `-h 14` and `-b 19`.
 The option `--batch-size` sets the number of batches that the table will be split in log scale.
 For `--batch-size 8`, it is $2^8=256$.
 This parameter is a bit nuanced and the optimal value will vary.
@@ -300,8 +306,8 @@ Options:
   -o,--output-dir TEXT:DIR    Path to the directory to output result files. Default: the current working directory.
   -q,--query-file TEXT:FILE REQUIRED
                               Path to the tab-separated file containing paths and IDs of query FASTA/FASTQ files.
-  --total-vote-threshold,--tvote-threshold FLOAT
-                              The minimum total vote to classify, can be considered as a confidence threshold. Default: 0.03.
+  --total-vote-threshold,--tvote-threshold FLOAT ...
+                              The minimum total vote threshold(s) to classify, the order should match the order of the given libraries. Default: 0.05.
   --max-match-distance,--max-match-hdist UINT
                               The maximum Hamming distance for a k-mer to be considered as a match. Default: 5.
   --save-match-info,--no-match-info{false}

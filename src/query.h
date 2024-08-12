@@ -22,7 +22,7 @@ public:
   Query(std::vector<std::string> library_dirpaths,
         const char *output_dirpath,
         const char *query_filepath,
-        float tvote_threshold = 0.03,
+        std::vector<float> tvote_threshold_v,
         uint8_t max_match_hdist = 5,
         bool save_match_info = true,
         bool verbose = false,
@@ -85,6 +85,7 @@ private:
     std::vector<uint8_t> _positions;
     std::vector<uint8_t> _npositions;
     std::unordered_map<tT, uint32_t> _trID_to_tiID;
+    std::unordered_map<uint32_t, tT> _tiID_to_trID;
     std::unordered_map<uint32_t, uint32_t> _parent_inmap;
     std::unordered_map<uint32_t, uint8_t> _depth_inmap;
     std::unordered_map<uint32_t, std::string> _rank_inmap;
@@ -113,7 +114,7 @@ private:
   uint8_t _k;
   uint8_t _num_libraries;
   uint8_t _max_match_hdist;
-  float _tvote_threshold;
+  std::vector<float> _tvote_threshold_v;
   uint8_t _save_match_info;
   uint64_t _mask_bp;
   uint64_t _mask_lr;
