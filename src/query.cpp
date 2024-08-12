@@ -121,7 +121,7 @@ void Query::profileBatch(std::unordered_map<uint32_t, float> &profile_accumulate
     float tvote_threshold = 0;
     for (unsigned int lix = 0; lix < _num_libraries; ++lix) {
       if (_slib_ptr_v[lix]->_tiID_to_trID.find(curr_tiID) != _slib_ptr_v[lix]->_tiID_to_trID.end()) {
-        std::max(tvote_threshold, _tvote_threshold_v[lix]);
+        tvote_threshold = std::max(tvote_threshold, _tvote_threshold_v[lix]);
       }
     }
     if ((curr_tiID != 0) && (vi.tvote_n > tvote_threshold)) {
@@ -362,7 +362,7 @@ void Query::perform(uint64_t rbatch_size)
         float tvote_threshold = 0;
         for (unsigned int lix = 0; lix < _num_libraries; ++lix) {
           if (_slib_ptr_v[lix]->_tiID_to_trID.find(curr_tiID) != _slib_ptr_v[lix]->_tiID_to_trID.end()) {
-            std::max(tvote_threshold, _tvote_threshold_v[lix]);
+            tvote_threshold = std::max(tvote_threshold, _tvote_threshold_v[lix]);
           }
         }
         if ((total_vinfo_v[ix].pred_tiID != 0) && (total_vinfo_v[ix].tvote_n > tvote_threshold)) {
