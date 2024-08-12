@@ -165,7 +165,7 @@ int main(int argc, char **argv)
     tvote_threshold_v,
     "The minimum total vote threshold(s) to classify, the order should match the order of the given libraries. Default: 0.05.");
   sub_query->callback([&]() {
-    if (sub_query->count("--tvote-threshold") + sub_query->count("--total-vote-threshold")) {
+    if (!(sub_query->count("--tvote-threshold") + sub_query->count("--total-vote-threshold"))) {
       tvote_threshold_v.resize(library_dir_v.size());
       for (unsigned int i = 0; i < tvote_threshold_v.size(); ++i) {
         tvote_threshold_v[i] = 0.05;
