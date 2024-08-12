@@ -84,12 +84,12 @@ If you would like to benchmark KRANK against some other tools, you can use [OPAL
 #### Available libraries
 More and more diverse libraries will be added soon.
 - WoL-v1 dataset - archaeal and bacterial genomes:
-	* [lightweight (6.25Gb) & with ranking - selective-mode](https://ter-trees.ucsd.edu/data/krank/wol_v1-lib_reps_adpt-k29_w35_h13_b16_s8.tar.gz)
-	* [lightweight (6.25Gb) & with random - fast-mode](https://ter-trees.ucsd.edu/data/krank/wol_v1-lib_rand_free-k29_w35_h13_b16_s8.tar.gz)
-	* [high-sensitivity (25Gb) & with random - selective-mode](https://ter-trees.ucsd.edu/data/krank/wol_v1-lib_reps_adpt-k30_w35_h14_b16_s9.tar.gz)
-	* [high-sensitivity (25Gb) & with random - fast-mode](https://ter-trees.ucsd.edu/data/krank/wol_v1-lib_rand_free-k30_w35_h14_b16_s9.tar.gz)
+	* [lightweight (6.25GB) & with ranking - selective-mode](https://ter-trees.ucsd.edu/data/krank/wol_v1-lib_reps_adpt-k29_w35_h13_b16_s8.tar.gz)
+	* [lightweight (6.25GB) & with random - fast-mode](https://ter-trees.ucsd.edu/data/krank/wol_v1-lib_rand_free-k29_w35_h13_b16_s8.tar.gz)
+	* [high-sensitivity (25GB) & with random - selective-mode](https://ter-trees.ucsd.edu/data/krank/wol_v1-lib_reps_adpt-k30_w35_h14_b16_s9.tar.gz)
+	* [high-sensitivity (25GB) & with random - fast-mode](https://ter-trees.ucsd.edu/data/krank/wol_v1-lib_rand_free-k30_w35_h14_b16_s9.tar.gz)
 - Human reference libraries:
-	* [human T2T pangeome (6.25Gb)](https://ter-trees.ucsd.edu/data/krank/human_pangenome-lib_rand_free-k29_w34_h13_b16_s8.tar.gz)
+	* [human T2T pangeome (6.25GB)](https://ter-trees.ucsd.edu/data/krank/human_pangenome-lib_rand_free-k29_w34_h13_b16_s8.tar.gz)
 
 #### Recommendations for choosing the right set of libraries
 Soon.
@@ -132,7 +132,7 @@ The keys (the first column) in the `--input-file` must appear in the taxonomy, i
 Building a library is a relatively expensive but one-time operation.
 It consists of two steps: library initialization and batch building.
 The subprogram `krank build` can either initialize a library or construct all/some batches of the library.
-To initialize a library from reference sequences using default parameters for a library of size 32Gb, run the below command.
+To initialize a library from reference sequences using default parameters for a library of size 32GB, run the below command.
 ```bash
  krank build \
    -l $LIBRARY_DIRECTORY -t $TAXONOMY_DIRECTORY -i $MAPPING_FILE --max-memory 32000 \
@@ -143,7 +143,7 @@ Note that the overhead is very little, the speed-up will increase with the numbe
 The option `--from-scratch` specifies that this command is intended to initialize a non-existing library.
 Hence, KRANK will not be looking for an already initialized library at `$LIBRARY_DIRECTORY`.
 When `--max-memory` is given, KRANK selects a good configuration of `-k`, `-h` and `-b` to satisfy this memory constraint.
-In this example, the maximum memory is 32Gb and KRANK will set `-k 30`, `-h 14` and `-b 19`.
+In this example, the maximum memory is 32GB and KRANK will set `-k 30`, `-h 14` and `-b 19`.
 The option `--batch-size` sets the number of batches that the table will be split in log scale.
 For `--batch-size 8`, it is $2^8=256$.
 This parameter is a bit nuanced and the optimal value will vary.
@@ -198,8 +198,8 @@ Since $b$ is the number of columns, the total number of *k*-mers stored in a tab
 So increasing $h$ and $b$ will directly translate into more memory use.
 If you are not sure about these values, just use `-b 16` and set `-h` to $k-16$.
 The resulting reference library will use $2^{2h}16(4+2)+2^{2h}$ bytes.
-For $h=14$, $k=30$, and $b=16$, KRANK will construct a 26Gb library with high sensitivity.
-Alternatively, a lighter-weight 6.5Gb version could be built by setting $h=13$ and $k=29$.
+For $h=14$, $k=30$, and $b=16$, KRANK will construct a 26GB library with high sensitivity.
+Alternatively, a lighter-weight 6.5GB version could be built by setting $h=13$ and $k=29$.
 
 The other two flags are related to *k*-mer selection and gradual *k*-mer filtering.
 Setting `--kmer-ranking 0` (default is 1) changes *k*-mer selection to random; and KRANK does not use its heuristic to filter *k*-mers.
