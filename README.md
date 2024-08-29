@@ -83,6 +83,9 @@ If you would like to benchmark KRANK against some other tools, you can use [OPAL
 
 #### Available libraries
 More and more diverse libraries will be added soon.
+- RefSeq bacterial and archael genomes:
+	* [high-sensitivity (25GB) & with random - fast-mode](https://ter-trees.ucsd.edu/data/krank/refseq_cami2-lib_rand_free-k30_w33_h14_b16_s9.tar.gz)
+ 	* [high-sensitivity (25GB) & with random - selective-mode](https://ter-trees.ucsd.edu/data/krank/refseq_cami2-lib_reps_adpt-k30_w33_h14_b16_s9.tar.gz)	 
 - WoL-v1 dataset - archaeal and bacterial genomes:
 	* [lightweight (6.25GB) & with ranking - selective-mode](https://ter-trees.ucsd.edu/data/krank/wol_v1-lib_reps_adpt-k29_w35_h13_b16_s8.tar.gz)
 	* [lightweight (6.25GB) & with random - fast-mode](https://ter-trees.ucsd.edu/data/krank/wol_v1-lib_rand_free-k29_w35_h13_b16_s8.tar.gz)
@@ -92,7 +95,7 @@ More and more diverse libraries will be added soon.
 	* [human T2T pangeome (6.25GB)](https://ter-trees.ucsd.edu/data/krank/human_pangenome-lib_rand_free-k29_w34_h13_b16_s8.tar.gz)
 
 #### Recommendations for choosing the right set of libraries
-Soon.
+For the time being only libraries for archael genomes and bacterial genomes are avaible (and one human pangenome -- potentially for contamination removal). We recommend using them after contination removal for the best performance. If you have less than 8GB, just use [WoL-v1 lightweight](https://ter-trees.ucsd.edu/data/krank/wol_v1-lib_rand_free-k29_w35_h13_b16_s8.tar.gz), if you have up to 16GB you add [this library](https://ter-trees.ucsd.edu/data/krank/wol_v1-lib_reps_adpt-k29_w35_h13_b16_s8.tar.gz) (query against these two simultanously `--library-dir $LIBRARY_DIRECTORY1 $LIBRARY_DIRECTORY2`). If you have up to 32GB, just use [RefSeq high-sensitivity](https://ter-trees.ucsd.edu/data/krank/refseq_cami2-lib_rand_free-k30_w33_h14_b16_s9.tar.gz), if you have up to 64GB memory add [this library](https://ter-trees.ucsd.edu/data/krank/refseq_cami2-lib_reps_adpt-k30_w33_h14_b16_s9.tar.gz).
 
 ### Building a KRANK library
 To build a reference library, KRANK requires two input files: a taxonomy and a mapping from taxon IDs to filepaths (or URLs for FTP) of input reference sequences.
