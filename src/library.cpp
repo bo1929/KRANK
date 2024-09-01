@@ -102,21 +102,10 @@ Library::Library(const char *library_dirpath,
 
   if (_verbose)
     std::cout << "Reading and processing the input sequences..." << std::endl;
-  omp_set_nested(1);
-  omp_set_num_threads(num_threads);
-#pragma omp parallel
-  {
-#pragma omp single
-    {
-      for (unsigned int i = 0; i < _trID_vec.size(); ++i) {
-        tT trID_key = _trID_vec[i];
-#pragma omp task untied
-        {
-          processLeaf(trID_key);
-        }
-      }
-    }
-#pragma omp taskwait
+#pragma omp parallel for schedule(dynamic), num_threads(num_threads)
+  for (unsigned int i = 0; i < _trID_vec.size(); ++i) {
+    tT trID_key = _trID_vec[i];
+    processLeaf(trID_key);
   }
 
   if (_verbose) {
@@ -194,7 +183,7 @@ Library::Library(const char *library_dirpath,
 void Library::processLeaf(tT trID_key)
 {
   std::vector<std::string> &filepath_v = _tax_record.trID_to_input()[trID_key];
-#pragma omp critical(log_processing)
+#pragma omp critical
   LOG(INFO) << COND(_log) << "Processing k-mer set for taxon " << _tax_record.tiID_from_trID(trID_key) << std::endl;
   inputHandler<encT> pI(filepath_v, _k, _w, _h, &_lsh_vg, &_npositions);
   if (!_from_library) {
@@ -204,7 +193,7 @@ void Library::processLeaf(tT trID_key)
     else
       total_genome_len = pI.extractInput(1);
     uint64_t size_basis = pI.lsh_enc_vec.size();
-#pragma omp critical(update_metadata)
+#pragma omp critical
     {
       _basis_to_size[trID_key] = size_basis;
       tT tmp_trID = trID_key;
@@ -220,10 +209,10 @@ void Library::processLeaf(tT trID_key)
       std::cerr << "Error saving LSH-value and encoding pairs for " << _tax_record.tiID_from_trID(trID_key) << std::endl;
       exit(EXIT_FAILURE);
     }
-#pragma omp critical(print_asave)
+#pragma omp critical
     LOG(INFO) << COND(_log) << "LSH & encodings are saved for " << _tax_record.tiID_from_trID(trID_key) << std::endl;
   }
-#pragma omp critical(emplace_iS)
+#pragma omp critical
   _inputStream_map.emplace(std::make_pair(trID_key, inputStream<encT>(_library_dirpath, trID_key)));
   pI.clearInput();
 }
