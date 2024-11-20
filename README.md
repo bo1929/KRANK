@@ -317,3 +317,21 @@ Options:
                               Save matching information to --output-dir for each query, this flag is not given by default. There is no practical need to give this flag. This is for debugging purposes and maybe for alternative down-stream analyses.
   --num-threads UINT          Number of threads to use for OpenMP-based parallelism.
 ```
+
+## Citation
+Şapcı, A. O. B., & Mirarab, S. (2024). Memory-bound *k*-mer selection for large and evolutionary diverse reference libraries. Genome Research, gr.279339.124. https://doi.org/10.1101/gr.279339.124
+```bibtex
+@article{sapci_krank_2024,
+	title = {Memory-bound k-mer selection for large and evolutionary diverse reference libraries},
+	issn = {1088-9051, 1549-5469},
+	url = {https://genome.cshlp.org/content/early/2024/08/29/gr.279339.124},
+	doi = {10.1101/gr.279339.124},
+	language = {en},
+	urldate = {2024-08-29},
+	journal = {Genome Research},
+	author = {Şapcı, Ali Osman Berk and Mirarab, Siavash},
+	month = aug,
+	year = {2024},
+	pages = {gr.279339.124},
+}
+```
